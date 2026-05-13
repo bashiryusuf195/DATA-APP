@@ -1,0 +1,79 @@
+// src/config/index.ts
+//
+// Single source of truth for all environment variables.
+// Every other file imports from here — never from process.env directly.
+// If a required variable is missing, the server crashes immediately with a
+// clear message rather than failing silently later.
+
+import dotenv from 'dotenv';
+dotenv.config();
+
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `\n[CONFIG ERROR] Missing required environment variable: "${name}"\n` +
+      `→ Copy .env.example to .env and fill in the value.\n`
+    );
+  }
+  return value;
+}
+
+function optional(name: string, fallback: string): string {
+  return process.env[name] ?? fallback;
+}
+
+export const config = {
+  // ── App ────────────────────────────────────────────────────────────────────
+  env:        optional('NODE_ENV',     'development'),
+  port:       parseInt(optional('PORT', '3000'), 10),
+  appName:    optional('APP_NAME',     'vtu-api'),
+  appVersion: optional('APP_VERSION',  '1.0.0'),
+
+  // Convenience booleans — used throughout the codebase
+  isDev:  optional('NODE_ENV', 'development') === 'development',
+  isProd: optional('NODE_ENV', 'development') === 'production',
+
+  // ── Supabase ───────────────────────────────────────────────────────────────
+  supabase: {
+    url:            required('SUPABASE_URL'),
+    anonKey:        required('SUPABASE_ANON_KEY'),
+    serviceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
+  },
+
+  // ── Database (Knex / raw SQL) ──────────────────────────────────────────────
+  database: {
+    writeUrl: required('DATABASE_URL'),
+    // Falls back to the write URL in development (same DB)
+    readUrl:  optional('DATABASE_READ_URL', process.env['DATABASE_URL'] ?? ''),
+  },
+
+  // ── Redis ──────────────────────────────────────────────────────────────────
+  redis: {
+    url: required('REDIS_URL'),
+  },
+
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  jwt: {
+    secret: required('JWT_SECRET'),
+  },
+
+  // ── Encryption ─────────────────────────────────────────────────────────────
+  encryption: {
+    key: required('ENCRYPTION_KEY'),
+  },
+
+  // ── Rate Limiting ──────────────────────────────────────────────────────────
+  rateLimit: {
+    windowMs: parseInt(optional('RATE_LIMIT_WINDOW_MS', '60000'), 10),
+    max:      parseInt(optional('RATE_LIMIT_MAX',       '60'),    10),
+  },
+
+  // ── CORS ───────────────────────────────────────────────────────────────────
+  corsOrigins: optional('CORS_ORIGINS', 'http://localhost:3001')
+    .split(',')
+    .map(o => o.trim()),
+
+  // ── Logging ────────────────────────────────────────────────────────────────
+  logLevel: optional('LOG_LEVEL', 'info'),
+} as const;

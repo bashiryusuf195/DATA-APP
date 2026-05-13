@@ -1,0 +1,61 @@
+// src/app.ts
+//
+// Configures and exports the Express application.
+// Kept separate from server.ts so tests can import the app
+// without binding to a port.
+//
+// Middleware order matters — each layer runs in the order it is registered:
+//   1. Security headers  (helmet)
+//   2. CORS
+//   3. Body parsing
+//   4. Request logger    (assigns traceId)
+//   5. Rate limiter
+//   6. Routes
+//   7. 404 handler       (after all routes)
+//   8. Error handler     (must be very last)
+
+import express                             from 'express';
+import helmet                              from 'helmet';
+import cors                                from 'cors';
+import { config }                          from './config';
+import { rootRouter }                      from './routes';
+import { requestLogger }                   from './middleware/requestLogger';
+import { standardLimiter }                 from './middleware/rateLimiter';
+import { errorHandler, notFoundHandler }   from './middleware/errorHandler';
+
+export const app = express();
+
+// ── 1. Security headers ───────────────────────────────────────────────────────
+// Sets X-Frame-Options, X-XSS-Protection, Strict-Transport-Security, etc.
+app.use(helmet());
+
+// ── 2. CORS ───────────────────────────────────────────────────────────────────
+// Only allows requests from the origins listed in CORS_ORIGINS.
+app.use(cors({
+  origin:         config.corsOrigins,
+  credentials:    true,
+  methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+}));
+
+// ── 3. Body parsing ───────────────────────────────────────────────────────────
+// Parse JSON request bodies. Limit to 1 MB to block oversized payloads.
+app.use(express.json({ limit: '1mb' }));
+
+// ── 4. Request logger ─────────────────────────────────────────────────────────
+app.use(requestLogger);
+
+// ── 5. Rate limiter ───────────────────────────────────────────────────────────
+app.use(standardLimiter);
+
+// ── 6. Routes ─────────────────────────────────────────────────────────────────
+app.use('/api/v1', rootRouter);
+
+// ── 7. 404 handler ───────────────────────────────────────────────────────────
+// Must come AFTER all routes so it only fires if nothing else matched.
+app.use(notFoundHandler);
+
+// ── 8. Error handler ──────────────────────────────────────────────────────────
+// Must be the LAST middleware registered.
+// Express identifies error handlers by their 4-parameter signature.
+app.use(errorHandler);
