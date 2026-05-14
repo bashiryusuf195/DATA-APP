@@ -25,6 +25,7 @@ import { errorHandler, notFoundHandler }   from './middleware/errorHandler';
 import { authRouter }                      from "./modules/auth/routes/auth.routes";
 import { walletRouter } from "./modules/wallet/routes/wallet.routes";
 import { transactionRouter } from "./modules/transactions/routes/transaction.routes";
+import "./modules/queue";
 export const app = express();
 
 // ── 1. Security headers ───────────────────────────────────────────────────────
