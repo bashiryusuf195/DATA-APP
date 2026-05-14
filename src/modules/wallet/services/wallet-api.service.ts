@@ -102,4 +102,58 @@ export async function fundUserWallet(
     transfer: result,
     balance,
   };
+}/**
+ * User wallet transfer.
+ */
+export async function transferBetweenWallets(
+  userId: string,
+  input: {
+    to_wallet_id: string;
+    amount: number;
+    description?: string;
+  }
+) {
+  const senderWallet = await db("wallets")
+    .where({
+      user_id: userId,
+      wallet_type: "user",
+    })
+    .first();
+
+  if (!senderWallet) {
+    throw new Error("Sender wallet not found");
+  }
+
+  const receiverWallet = await db("wallets")
+    .where({
+      id: input.to_wallet_id,
+    })
+    .first();
+
+  if (!receiverWallet) {
+    throw new Error("Receiver wallet not found");
+  }
+
+  if (senderWallet.id === receiverWallet.id) {
+    throw new Error("Cannot transfer to same wallet");
+  }
+
+  const result = await walletService.transfer({
+    from_wallet_id: senderWallet.id,
+    to_wallet_id: receiverWallet.id,
+    amount: input.amount,
+    currency: "NGN",
+    description:
+      input.description ?? "Wallet transfer",
+    idempotency_key: `transfer_${Date.now()}`,
+  });
+
+  const balance = await walletService.getWalletBalance(
+    senderWallet.id
+  );
+
+  return {
+    transfer: result,
+    balance,
+  };
 }

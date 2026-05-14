@@ -6,6 +6,7 @@ import {
   getBalanceController,
   getLedgerController,
   fundTestController,
+  transferController,
 } from "../controllers/wallet.controller";
 const router = Router();
 
@@ -27,5 +28,10 @@ router.post(
   "/fund-test",
   authenticate,
   fundTestController
+);
+router.post(
+  "/transfer",
+  authenticate,
+  transferController
 );
 export { router as walletRouter };
