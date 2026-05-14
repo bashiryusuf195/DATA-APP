@@ -9,6 +9,7 @@ export const TransferSchema = z.object({
   to_wallet_id: z.string().uuid(),
   amount: z.number().positive().max(1000000),
   description: z.string().min(3).max(255).optional(),
+  idempotency_key: z.string().min(8).max(128).optional(),
 });
 
 export type TransferInput = z.infer<typeof TransferSchema>;

@@ -108,10 +108,11 @@ export async function fundUserWallet(
 export async function transferBetweenWallets(
   userId: string,
   input: {
-    to_wallet_id: string;
-    amount: number;
-    description?: string;
-  }
+  to_wallet_id: string;
+  amount: number;
+  description?: string;
+  idempotency_key?: string;
+}
 ) {
   const senderWallet = await db("wallets")
     .where({
@@ -138,6 +139,7 @@ export async function transferBetweenWallets(
     throw new Error("Cannot transfer to same wallet");
   }
 
+  
   const result = await walletService.transfer({
     from_wallet_id: senderWallet.id,
     to_wallet_id: receiverWallet.id,
@@ -145,7 +147,9 @@ export async function transferBetweenWallets(
     currency: "NGN",
     description:
       input.description ?? "Wallet transfer",
-    idempotency_key: `transfer_${Date.now()}`,
+    idempotency_key:
+  input.idempotency_key ??
+  `transfer_${userId}_${input.to_wallet_id}_${input.amount}_${Date.now()}`,
   });
 
   const balance = await walletService.getWalletBalance(
