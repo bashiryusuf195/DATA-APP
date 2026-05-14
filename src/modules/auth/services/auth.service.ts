@@ -442,7 +442,7 @@ export async function verifyAccessToken(
   rawToken: string
 ): Promise<AccessTokenPayload> {
   const { verifySupabaseJwt } = await import("./supabase.service");
-  const jwtPayload = verifySupabaseJwt(rawToken);
+  const jwtPayload = await verifySupabaseJwt(rawToken);
 
   const user = await db("users")
     .where({ auth_id: jwtPayload.sub })

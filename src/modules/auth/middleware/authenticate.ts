@@ -40,7 +40,7 @@ export async function authenticate(
     const db = getDbInstance();
 
     // 1. Local JWT verification — fast, no network
-    const jwtPayload = verifySupabaseJwt(rawToken);
+    const jwtPayload = await verifySupabaseJwt(rawToken);
 
     // 2. Load our user record by Supabase auth_id
     const user = await db("users")

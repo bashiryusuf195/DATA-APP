@@ -9,9 +9,12 @@
 // avoid a network round-trip on every authenticated request.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import jwt                                    from "jsonwebtoken";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 import { env }                                from "../../../shared/config/env";
 import { AppError }                           from "../../../shared/errors/AppError";
+const JWKS = createRemoteJWKSet(
+  new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+);
 
 // ── Singleton clients ──────────────────────────────────────────
 
@@ -53,25 +56,27 @@ export interface SupabaseJwtPayload {
  * Verify a Supabase JWT locally.
  * Avoids a network round-trip on every request.
  */
-export function verifySupabaseJwt(token: string): SupabaseJwtPayload {
+export async function verifySupabaseJwt(
+  token: string
+): Promise<SupabaseJwtPayload> {
   try {
-    const payload = jwt.decode(token) as SupabaseJwtPayload;
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: `${env.SUPABASE_URL}/auth/v1`,
+      audience: "authenticated",
+    });
 
-if (!payload) {
-  throw new AppError(401, "TOKEN_INVALID", "Invalid access token");
-}
-
-return payload;
+    return payload as unknown as SupabaseJwtPayload;
   } catch (err) {
-    if (err instanceof jwt.TokenExpiredError) {
-      throw new AppError(401, "TOKEN_EXPIRED",  "Access token has expired");
-    }
-    if (err instanceof jwt.JsonWebTokenError) {
-      throw new AppError(401, "TOKEN_INVALID",  "Invalid access token");
-    }
-    throw new AppError(401, "TOKEN_ERROR", "Token verification failed");
+    console.error("JWT verify failed:", err);
+
+    throw new AppError(
+      401,
+      "TOKEN_INVALID",
+      "Invalid or expired access token"
+    );
   }
 }
+
 
 /**
  * Sign in a user via Supabase email/password.
