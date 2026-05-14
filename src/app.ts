@@ -59,3 +59,6 @@ app.use(notFoundHandler);
 // Must be the LAST middleware registered.
 // Express identifies error handlers by their 4-parameter signature.
 app.use(errorHandler);
+import { authRouter } from "./modules/auth/routes/auth.routes";
+app.use("/auth", authRouter);
+
