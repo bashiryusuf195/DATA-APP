@@ -22,6 +22,7 @@ import { rootRouter }                      from './routes';
 import { requestLogger }                   from './middleware/requestLogger';
 import { standardLimiter }                 from './middleware/rateLimiter';
 import { errorHandler, notFoundHandler }   from './middleware/errorHandler';
+import { authRouter }                      from "./modules/auth/routes/auth.routes";
 
 export const app = express();
 
@@ -50,6 +51,7 @@ app.use(standardLimiter);
 
 // ── 6. Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/v1', rootRouter);
+app.use("/auth", authRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.
@@ -59,6 +61,5 @@ app.use(notFoundHandler);
 // Must be the LAST middleware registered.
 // Express identifies error handlers by their 4-parameter signature.
 app.use(errorHandler);
-import { authRouter } from "./modules/auth/routes/auth.routes";
-app.use("/auth", authRouter);
+// ── 6. Routes ─────────────────────────────────────────────────────────────────
 

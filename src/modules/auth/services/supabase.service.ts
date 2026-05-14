@@ -10,8 +10,8 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import jwt                                    from "jsonwebtoken";
-import { env }                                from "../../../shared/config/env.js";
-import { AppError }                           from "../../../shared/errors/AppError.js";
+import { env }                                from "../../../shared/config/env";
+import { AppError }                           from "../../../shared/errors/AppError";
 
 // ── Singleton clients ──────────────────────────────────────────
 
@@ -92,7 +92,7 @@ export async function supabaseSignUp(email: string, password: string, phone?: st
     email,
     password,
     phone:         phone ?? undefined,
-    email_confirm: false,  // auto-confirm; set false to require email verification
+    email_confirm: true,  // auto-confirm; set false to require email verification
   });
   if (error || !data.user) {
     if (error?.message?.includes("already registered")) {
