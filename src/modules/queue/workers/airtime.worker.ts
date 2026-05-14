@@ -1,25 +1,38 @@
-import { queueService } from "../services/queue.service";
+import { Job } from "bullmq";
+
+import { createWorker } from "../config/queue.config";
 
 import type { AirtimeJobPayload } from "../jobs/airtime.job";
 
-queueService.register(
-  "airtime_purchase",
-  async (payload: unknown) => {
-    const job =
-      payload as AirtimeJobPayload;
+export const airtimeWorker =
+  createWorker(
+    "airtime-purchases",
 
-    console.log(
-      "[AIRTIME WORKER] Processing:",
-      job
-    );
+    async (job) => {
+  const data = job.data as AirtimeJobPayload;
+      console.log(
+        "[AIRTIME WORKER] Processing:",
+        data
+      );
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, 2000)
-    );
+      await new Promise((resolve) =>
+        setTimeout(resolve, 2000)
+      );
 
-    console.log(
-      "[AIRTIME WORKER] Completed:",
-      job.reference
+      console.log(
+        "[AIRTIME WORKER] Completed:",
+        data.reference
+      );
+    }
+  );
+
+airtimeWorker.on(
+  "failed",
+  (job, err) => {
+    console.error(
+      "[AIRTIME WORKER FAILED]",
+      job?.id,
+      err
     );
   }
 );
