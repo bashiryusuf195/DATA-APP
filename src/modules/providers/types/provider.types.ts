@@ -1,0 +1,40 @@
+export type ProviderServiceType =
+  | "airtime"
+  | "data"
+  | "electricity"
+  | "cable_tv"
+  | "exam_pin";
+
+export interface ProviderPurchaseInput {
+  service_type: ProviderServiceType;
+
+  amount: number;
+
+  phone?: string;
+
+  smartcard_number?: string;
+
+  meter_number?: string;
+
+  variation_code?: string;
+
+  customer_name?: string;
+
+  reference: string;
+
+  metadata?: Record<string, unknown>;
+}
+
+export interface ProviderPurchaseResult {
+  success: boolean;
+
+  provider_reference: string;
+
+  provider: string;
+
+  message: string;
+
+  status: "successful" | "pending" | "failed";
+
+  raw_response?: unknown;
+}
