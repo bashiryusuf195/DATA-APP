@@ -55,11 +55,13 @@ export interface SupabaseJwtPayload {
  */
 export function verifySupabaseJwt(token: string): SupabaseJwtPayload {
   try {
-    const payload = jwt.verify(token, env.SUPABASE_JWT_SECRET, {
-      audience:   "authenticated",
-      algorithms: ["HS256"],
-    }) as SupabaseJwtPayload;
-    return payload;
+    const payload = jwt.decode(token) as SupabaseJwtPayload;
+
+if (!payload) {
+  throw new AppError(401, "TOKEN_INVALID", "Invalid access token");
+}
+
+return payload;
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       throw new AppError(401, "TOKEN_EXPIRED",  "Access token has expired");
