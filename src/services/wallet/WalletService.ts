@@ -26,6 +26,8 @@ import type {
   TransferWalletInput,
   GetLedgerPageInput,
   JournalResult,
+  BootstrapTreasuryInput,
+  BootstrapTreasuryResult,
 } from "./types.js";
 
 export class WalletService {
@@ -232,6 +234,66 @@ export class WalletService {
     );
   }
 
+  // ── Treasury bootstrap ────────────────────────────────────────
+
+  /**
+   * One-time initialisation for a treasury wallet.
+   * Calls the PostgreSQL bootstrap_treasury_wallet() function which:
+   *   - Guards against re-bootstrapping (wallet must have zero ledger history)
+   *   - Posts a GENESIS journal batch bypassing balance checks
+   *   - Inserts two balanced ledger entries:
+   *       CREDIT treasury_wallet  +amount
+   *       DEBIT  equity_wallet    -amount
+   *   - Records metadata.bootstrap = true on the batch
+   * Idempotent: re-calling returns the existing batch_id with idempotent=true.
+   */
+  async bootstrapTreasury(
+    input: BootstrapTreasuryInput
+  ): Promise<BootstrapTreasuryResult> {
+    // Check whether genesis batch already exists BEFORE calling the function
+    const existing = await this.db("wallet_journal_batches")
+      .where({
+        reference_type: "genesis",
+        reference_id:   input.treasury_wallet_id,
+      })
+      .first("id");
+
+    const alreadyExisted = Boolean(existing);
+
+    let journal_batch_id: string;
+
+    try {
+      await this.db.transaction(async (trx) => {
+        const result = await trx.raw<{
+          rows: Array<{ bootstrap_treasury_wallet: string }>;
+        }>(
+          `SELECT bootstrap_treasury_wallet(
+            ?::UUID,
+            ?::UUID,
+            ?::NUMERIC,
+            ?::CHAR(3),
+            ?::TEXT
+          ) AS bootstrap_treasury_wallet`,
+          [
+            input.treasury_wallet_id,
+            input.equity_wallet_id,
+            input.amount,
+            (input.currency ?? "NGN").toUpperCase(),
+            input.description ?? "GENESIS — Treasury opening balance",
+          ]
+        );
+        journal_batch_id = result.rows[0].bootstrap_treasury_wallet;
+      });
+    } catch (err) {
+      throw fromPostgresError(err);
+    }
+
+    return {
+      journal_batch_id: journal_batch_id!,
+      idempotent: alreadyExisted,
+    };
+  }
+
   // ── Ledger history ────────────────────────────────────────────
 
   /**
@@ -303,13 +365,12 @@ export class WalletService {
     try {
       // Wrap in a transaction so advisory lock is scoped correctly
       await this.db.transaction(async (trx) => {
-  const result = await trx.raw<{ rows: Array<{ journal_batch_id: string }> }>(
-    sql,
-    bindings as any[]
-  );
-
-  journal_batch_id = result.rows[0].journal_batch_id;
-});
+        const result = await trx.raw<{ rows: Array<{ journal_batch_id: string }> }>(
+          sql,
+          bindings as any[]
+        );
+        journal_batch_id = result.rows[0].journal_batch_id;
+      });
     } catch (err) {
       throw fromPostgresError(err);
     }

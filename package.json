@@ -8,7 +8,9 @@
     "build": "tsc --project tsconfig.json",
     "start": "node dist/server.js",
     "worker": "tsx watch src/workers/index.ts",
-    "type-check": "tsc --noEmit"
+   "type-check": "tsc --noEmit",
+"seed:wallets": "npx tsx scripts/seed-wallets.ts",
+"test:wallet": "npx tsx tests/manual-wallet-test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

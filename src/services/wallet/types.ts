@@ -9,7 +9,8 @@ export type WalletType =
   | "commission"
   | "escrow"
   | "fee"
-  | "settlement";
+  | "settlement"
+  | "treasury";           // added: money-creation origin wallet
 
 export type WalletStatus = "active" | "suspended" | "frozen" | "closed";
 
@@ -17,7 +18,7 @@ export type LedgerEntryType = "debit" | "credit";
 
 export type JournalStatus = "pending" | "posted" | "reversed" | "failed";
 
-// ── Domain objects ────────────────────────────────────────────
+// Domain objects
 
 export interface Wallet {
   id: string;
@@ -79,7 +80,7 @@ export interface LedgerEntry {
   created_at: Date;
 }
 
-// ── Input types ───────────────────────────────────────────────
+// Input types
 
 export interface CreateWalletInput {
   user_id?: string | null;
@@ -136,7 +137,30 @@ export interface GetLedgerPageInput {
   offset?: number;
 }
 
-// ── Results ───────────────────────────────────────────────────
+// Treasury bootstrap
+
+export interface BootstrapTreasuryInput {
+  /** The treasury wallet to fund. Must have wallet_type = 'treasury'. */
+  treasury_wallet_id: string;
+  /**
+   * Equity contra wallet that absorbs the matching debit.
+   * Keeps the ledger globally balanced (SUM signed_amount = 0).
+   * Must also be wallet_type = 'treasury', label = 'GENESIS_EQUITY'.
+   */
+  equity_wallet_id: string;
+  /** Opening balance to inject. Must be > 0. */
+  amount: number;
+  currency?: string;
+  description?: string;
+}
+
+export interface BootstrapTreasuryResult {
+  journal_batch_id: string;
+  /** true when wallet was already bootstrapped — no new write performed */
+  idempotent: boolean;
+}
+
+// Results
 
 export interface JournalResult {
   journal_batch_id: string;
