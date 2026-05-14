@@ -15,7 +15,20 @@ export class MockVTUProvider implements VTUProvider {
   ): Promise<ProviderPurchaseResult> {
     await new Promise((resolve) =>
       setTimeout(resolve, 1000)
-    );
+    );if (input.phone === "08000000000") {
+  return {
+    success: false,
+    provider_reference: randomUUID(),
+    provider: this.name,
+    message: "Mock provider failure",
+    status: "failed",
+    raw_response: {
+      mock: true,
+      forced_failure: true,
+      input,
+    },
+  };
+}
 
     return {
       success: true,
