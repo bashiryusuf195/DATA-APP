@@ -1,3 +1,4 @@
+import "dotenv/config";
 import type { Knex } from "knex";
 
 // ============================================================
@@ -38,7 +39,7 @@ const sharedConfig: Knex.Config = {
     idleTimeoutMillis: 600_000,
   },
   migrations: {
-    directory: "./migrations",
+    directory: "./src/database/migrations",
     extension: "ts",
     tableName: "knex_migrations",
     // Disable transaction wrapping so partition DDL works correctly.

@@ -1,508 +1,265 @@
 import type { Knex } from "knex";
 
 // ============================================================
-// Migration 4 — Transactions
+// Migration 3 — Wallets / Ledger
 // Tables:
-//   transactions, payments, refunds, reversals,
-//   commissions, settlements, disputes
+//   wallets, wallet_journal_batches, wallet_ledger
+//
+// Design principles:
+//   1. NO stored balance on wallets — balance is always derived
+//      from wallet_ledger via:
+//      SUM(amount) WHERE entry_type = 'credit'
+//      - SUM(amount) WHERE entry_type = 'debit'
+//      Use the view v_wallet_balances (created below) for reads.
+//
+//   2. Proper double-entry accounting:
+//      Every economic event produces a journal_batch with >= 2
+//      ledger entries where SUM of signed_amount = 0.
+//      (credits are positive, debits are negative)
+//
+//   3. wallet_ledger does NOT reference transactions table
+//      (transactions table does not exist yet). The reference
+//      is captured via reference_type / reference_id (polymorphic)
+//      and backfilled once Migration 4 runs.
 //
 // Partitioning:
-//   transactions → RANGE by created_at (monthly) — highest volume
-//   payments     → RANGE by created_at (monthly)
-//   All others   → non-partitioned (manageable volume)
-//
-// Migration order note:
-//   wallet_ledger.reference_id can now be resolved to transactions.id
-//   at app layer (no FK constraint from ledger → transactions — by design).
+//   wallet_ledger → RANGE by created_at (monthly)
+//   PK is (id, created_at) to satisfy PostgreSQL partition rules.
 // ============================================================
 
 export async function up(knex: Knex): Promise<void> {
   // ── 1. Enums ───────────────────────────────────────────────
   await knex.raw(`
     DO $$ BEGIN
-      CREATE TYPE transaction_type AS ENUM (
-        'airtime_purchase',
-        'data_purchase',
-        'electricity_payment',
-        'cable_tv_payment',
-        'water_payment',
-        'internet_payment',
-        'education_payment',
-        'insurance_payment',
-        'betting_payment',
-        'government_payment',
-        'wallet_topup',
-        'wallet_withdrawal',
-        'wallet_transfer',
-        'commission_payout',
-        'refund',
-        'reversal',
-        'fee_charge',
-        'settlement'
+      CREATE TYPE wallet_type AS ENUM (
+        'user',        -- end-user consumer wallet
+        'merchant',    -- business / merchant wallet
+        'agent',       -- agent wallet
+        'commission',  -- commission pool
+        'escrow',      -- escrow holding wallet
+        'fee',         -- platform fee collection
+        'settlement'   -- settlement wallet
       );
     EXCEPTION WHEN duplicate_object THEN NULL; END $$
   `);
 
   await knex.raw(`
     DO $$ BEGIN
-      CREATE TYPE transaction_status AS ENUM (
-        'initiated',
-        'pending',
-        'processing',
-        'successful',
-        'failed',
-        'reversed',
-        'refunded',
-        'disputed',
-        'expired'
-      );
+      CREATE TYPE wallet_status AS ENUM ('active', 'suspended', 'frozen', 'closed');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$
   `);
 
   await knex.raw(`
     DO $$ BEGIN
-      CREATE TYPE payment_method AS ENUM (
-        'wallet',
-        'card',
-        'bank_transfer',
-        'ussd',
-        'qr_code',
-        'nfc',
-        'bank_debit'
-      );
+      CREATE TYPE ledger_entry_type AS ENUM ('debit', 'credit');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$
   `);
 
   await knex.raw(`
     DO $$ BEGIN
-      CREATE TYPE payment_status AS ENUM (
-        'pending', 'processing', 'successful', 'failed', 'cancelled', 'refunded'
-      );
+      CREATE TYPE journal_status AS ENUM ('pending', 'posted', 'reversed', 'failed');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$
   `);
 
+  // ── 2. wallets ─────────────────────────────────────────────
+  // NOTE: No balance columns. Balance = SUM from wallet_ledger.
   await knex.raw(`
-    DO $$ BEGIN
-      CREATE TYPE refund_status AS ENUM ('pending', 'approved', 'rejected', 'processed', 'failed');
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$
-  `);
+    CREATE TABLE IF NOT EXISTS wallets (
+      id                UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id           UUID          REFERENCES users(id) ON DELETE RESTRICT,
+      wallet_type       wallet_type   NOT NULL DEFAULT 'user',
+      currency          CHAR(3)       NOT NULL DEFAULT 'NGN',
+      status            wallet_status NOT NULL DEFAULT 'active',
 
-  await knex.raw(`
-    DO $$ BEGIN
-      CREATE TYPE reversal_status AS ENUM ('pending', 'processing', 'completed', 'failed');
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$
-  `);
+      -- Limits (policy-level, not enforced by DB — enforced at application layer)
+      daily_debit_limit   NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (daily_debit_limit >= 0),
+      monthly_debit_limit NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (monthly_debit_limit >= 0),
+      single_txn_limit    NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (single_txn_limit >= 0),
 
-  await knex.raw(`
-    DO $$ BEGIN
-      CREATE TYPE dispute_status AS ENUM (
-        'open', 'under_review', 'resolved_customer',
-        'resolved_merchant', 'closed', 'escalated'
-      );
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$
-  `);
+      -- Overdraft (0 = no overdraft allowed)
+      overdraft_limit   NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (overdraft_limit >= 0),
 
-  await knex.raw(`
-    DO $$ BEGIN
-      CREATE TYPE commission_status AS ENUM ('pending', 'approved', 'paid', 'cancelled');
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$
-  `);
+      is_default        BOOLEAN       NOT NULL DEFAULT FALSE,
+      label             TEXT,
+      metadata          JSONB         NOT NULL DEFAULT '{}',
+      created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
-  await knex.raw(`
-    DO $$ BEGIN
-      CREATE TYPE settlement_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$
-  `);
-
-  // ── 2. transactions (RANGE-partitioned by created_at) ─────
-  // PK is (id, created_at) — required for PostgreSQL partitioned UNIQUE.
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS transactions (
-      id                UUID               NOT NULL DEFAULT uuid_generate_v4(),
-      user_id           UUID               NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      wallet_id         UUID               REFERENCES wallets(id) ON DELETE RESTRICT,
-      service_id        UUID               REFERENCES services(id) ON DELETE RESTRICT,
-      provider_id       UUID               REFERENCES providers(id) ON DELETE RESTRICT,
-      provider_service_id UUID             REFERENCES provider_services(id) ON DELETE SET NULL,
-
-      transaction_type  transaction_type   NOT NULL,
-      status            transaction_status NOT NULL DEFAULT 'initiated',
-
-      amount            NUMERIC(18,2)      NOT NULL CHECK (amount > 0),
-      fee               NUMERIC(18,2)      NOT NULL DEFAULT 0 CHECK (fee >= 0),
-      net_amount        NUMERIC(18,2)      NOT NULL CHECK (net_amount > 0),  -- amount - fee
-      currency          CHAR(3)            NOT NULL DEFAULT 'NGN',
-
-      -- Beneficiary / recipient details
-      beneficiary_phone TEXT,
-      beneficiary_email TEXT,
-      beneficiary_name  TEXT,
-      beneficiary_account TEXT,            -- meter no, smart card no, account no, etc.
-      beneficiary_meta  JSONB              NOT NULL DEFAULT '{}',
-
-      -- Provider response
-      provider_ref      TEXT,              -- provider's transaction reference
-      provider_status   TEXT,
-      provider_response JSONB              NOT NULL DEFAULT '{}',
-      provider_token    TEXT,              -- token / PIN delivered to customer
-
-      -- Idempotency
-      idempotency_key   TEXT,
-
-      -- Retry tracking
-      retry_count       INTEGER            NOT NULL DEFAULT 0 CHECK (retry_count >= 0),
-      max_retries       INTEGER            NOT NULL DEFAULT 3,
-      next_retry_at     TIMESTAMPTZ,
-
-      -- Timing
-      initiated_at      TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
-      processed_at      TIMESTAMPTZ,
-      completed_at      TIMESTAMPTZ,
-      expires_at        TIMESTAMPTZ,
-      created_at        TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
-
-      metadata          JSONB              NOT NULL DEFAULT '{}',
-      ip_address        INET,
-      device_id         UUID               REFERENCES device_registry(id) ON DELETE SET NULL,
-      channel           TEXT,              -- 'web' | 'mobile' | 'ussd' | 'api'
-
-      -- Partition key must be part of PK
-      PRIMARY KEY (id, created_at),
-
-      CONSTRAINT txn_currency_fmt       CHECK (currency ~ '^[A-Z]{3}$'),
-      CONSTRAINT txn_net_amount_check   CHECK (net_amount = amount - fee),
-      CONSTRAINT txn_retry_valid        CHECK (retry_count <= max_retries)
-    ) PARTITION BY RANGE (created_at)
-  `);
-
-  await knex.raw(`COMMENT ON TABLE transactions IS
-    'RANGE partitioned by created_at (monthly).
-     High-volume table — use pg_partman for automated partition management.
-     Retention: hot partition = 6 months, cold = archive after 2 years.'
-  `);
-
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS transactions_default PARTITION OF transactions DEFAULT
-  `);
-
-  // Idempotency unique index — must include partition key per PostgreSQL rules
-  await knex.raw(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_idempotency
-    ON transactions (idempotency_key, created_at)
-    WHERE idempotency_key IS NOT NULL
-  `);
-
-  // Provider ref unique per provider — include created_at for partition validity
-  await knex.raw(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_provider_ref
-    ON transactions (provider_id, provider_ref, created_at)
-    WHERE provider_ref IS NOT NULL
-  `);
-
-  // ── 3. payments (RANGE-partitioned by created_at) ─────────
-  // Captures the payment event that funds a transaction.
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS payments (
-      id              UUID           NOT NULL DEFAULT uuid_generate_v4(),
-      transaction_id  UUID           NOT NULL,   -- refs transactions(id) at app layer; no FK across partitioned tables without including partition key
-      user_id         UUID           NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      wallet_id       UUID           REFERENCES wallets(id) ON DELETE RESTRICT,
-
-      payment_method  payment_method NOT NULL,
-      status          payment_status NOT NULL DEFAULT 'pending',
-
-      amount          NUMERIC(18,2)  NOT NULL CHECK (amount > 0),
-      currency        CHAR(3)        NOT NULL DEFAULT 'NGN',
-      fee             NUMERIC(18,2)  NOT NULL DEFAULT 0 CHECK (fee >= 0),
-
-      -- Card / bank details (tokenized — never store raw PAN)
-      payment_ref     TEXT,                      -- internal payment reference
-      gateway_ref     TEXT,                      -- payment gateway reference
-      gateway         TEXT,                      -- 'paystack' | 'flutterwave' | 'monnify'
-      gateway_response JSONB         NOT NULL DEFAULT '{}',
-      card_last4      CHAR(4),
-      card_brand      TEXT,
-      card_exp_month  SMALLINT,
-      card_exp_year   SMALLINT,
-      bank_code       TEXT,
-      account_number  TEXT,                      -- masked
-
-      authorization_code TEXT,
-      channel         TEXT,
-
-      initiated_at    TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-      confirmed_at    TIMESTAMPTZ,
-      failed_at       TIMESTAMPTZ,
-      failure_reason  TEXT,
-      created_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-      metadata        JSONB          NOT NULL DEFAULT '{}',
-
-      -- Partition key must be part of PK
-      PRIMARY KEY (id, created_at),
-
-      CONSTRAINT payments_currency_fmt CHECK (currency ~ '^[A-Z]{3}$')
-    ) PARTITION BY RANGE (created_at)
-  `);
-
-  await knex.raw(`COMMENT ON TABLE payments IS
-    'RANGE partitioned by created_at.
-     transaction_id references transactions table but FK is not enforced
-     at DB level across two independently-partitioned tables (PostgreSQL limitation).
-     Enforce via application layer and periodic reconciliation jobs.'
-  `);
-
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS payments_default PARTITION OF payments DEFAULT
-  `);
-
-  await knex.raw(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_gateway_ref
-    ON payments (gateway, gateway_ref, created_at)
-    WHERE gateway_ref IS NOT NULL
-  `);
-
-  // ── 4. refunds ─────────────────────────────────────────────
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS refunds (
-      id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
-      transaction_id  UUID          NOT NULL,   -- polymorphic — resolved at app layer
-      user_id         UUID          NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      wallet_id       UUID          REFERENCES wallets(id) ON DELETE RESTRICT,
-      journal_batch_id UUID         REFERENCES wallet_journal_batches(id) ON DELETE SET NULL,
-
-      status          refund_status NOT NULL DEFAULT 'pending',
-      amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
-      currency        CHAR(3)       NOT NULL DEFAULT 'NGN',
-      reason          TEXT          NOT NULL,
-      notes           TEXT,
-
-      requested_by    UUID          REFERENCES users(id) ON DELETE SET NULL,
-      reviewed_by     UUID          REFERENCES users(id) ON DELETE SET NULL,
-      reviewed_at     TIMESTAMPTZ,
-      processed_at    TIMESTAMPTZ,
-      failure_reason  TEXT,
-
-      metadata        JSONB         NOT NULL DEFAULT '{}',
-      created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-
-      CONSTRAINT refunds_currency_fmt CHECK (currency ~ '^[A-Z]{3}$')
+      CONSTRAINT wallets_currency_fmt   CHECK (currency ~ '^[A-Z]{3}$'),
+      CONSTRAINT wallets_user_required  CHECK (
+        -- system wallets (commission, fee, settlement) may have null user_id
+        user_id IS NOT NULL OR wallet_type IN ('commission', 'fee', 'settlement', 'escrow')
+      )
     )
   `);
 
+  await knex.raw(`COMMENT ON TABLE wallets IS
+    'No balance columns. Account balance is always computed from wallet_ledger.
+     Use view v_wallet_balances for current balance reads.'
+  `);
+
   await knex.raw(`
-    CREATE TRIGGER trg_refunds_updated_at
-    BEFORE UPDATE ON refunds
+    CREATE TRIGGER trg_wallets_updated_at
+    BEFORE UPDATE ON wallets
     FOR EACH ROW EXECUTE FUNCTION set_updated_at()
   `);
 
-  // ── 5. reversals ───────────────────────────────────────────
+  // Ensure each user has at most one default wallet per currency
   await knex.raw(`
-    CREATE TABLE IF NOT EXISTS reversals (
-      id              UUID            PRIMARY KEY DEFAULT uuid_generate_v4(),
-      transaction_id  UUID            NOT NULL,  -- resolved at app layer
-      user_id         UUID            NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      journal_batch_id UUID           REFERENCES wallet_journal_batches(id) ON DELETE SET NULL,
-
-      status          reversal_status NOT NULL DEFAULT 'pending',
-      amount          NUMERIC(18,2)   NOT NULL CHECK (amount > 0),
-      currency        CHAR(3)         NOT NULL DEFAULT 'NGN',
-      reason          TEXT            NOT NULL,
-      initiated_by    UUID            REFERENCES users(id) ON DELETE SET NULL,
-      processed_at    TIMESTAMPTZ,
-      failure_reason  TEXT,
-
-      provider_reversal_ref TEXT,
-      provider_response     JSONB    NOT NULL DEFAULT '{}',
-
-      metadata        JSONB           NOT NULL DEFAULT '{}',
-      created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-
-      CONSTRAINT reversals_currency_fmt CHECK (currency ~ '^[A-Z]{3}$')
-    )
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_wallets_default_per_user
+    ON wallets (user_id, currency)
+    WHERE is_default = TRUE AND user_id IS NOT NULL
   `);
 
+  // ── 3. wallet_journal_batches ──────────────────────────────
+  // Groups the >= 2 ledger lines of a single economic event.
+  // Enforces: SUM(signed_amount) = 0 across all entries via
+  //           application-layer validation + DB check trigger.
   await knex.raw(`
-    CREATE TRIGGER trg_reversals_updated_at
-    BEFORE UPDATE ON reversals
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at()
-  `);
-
-  // ── 6. commissions ─────────────────────────────────────────
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS commissions (
-      id                UUID              PRIMARY KEY DEFAULT uuid_generate_v4(),
-      transaction_id    UUID              NOT NULL,   -- resolved at app layer
-      beneficiary_id    UUID              NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      beneficiary_wallet_id UUID          REFERENCES wallets(id) ON DELETE SET NULL,
-      journal_batch_id  UUID              REFERENCES wallet_journal_batches(id) ON DELETE SET NULL,
-
-      status            commission_status NOT NULL DEFAULT 'pending',
-      amount            NUMERIC(18,2)     NOT NULL CHECK (amount > 0),
-      currency          CHAR(3)           NOT NULL DEFAULT 'NGN',
-      rate              NUMERIC(7,4),                -- commission rate used
-      commission_type   TEXT              NOT NULL DEFAULT 'agent',  -- 'agent' | 'referral' | 'platform'
-
-      approved_by       UUID              REFERENCES users(id) ON DELETE SET NULL,
-      approved_at       TIMESTAMPTZ,
-      paid_at           TIMESTAMPTZ,
-      cancelled_reason  TEXT,
-
-      metadata          JSONB             NOT NULL DEFAULT '{}',
-      created_at        TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
-      updated_at        TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
-
-      CONSTRAINT commissions_currency_fmt CHECK (currency ~ '^[A-Z]{3}$')
-    )
-  `);
-
-  await knex.raw(`
-    CREATE TRIGGER trg_commissions_updated_at
-    BEFORE UPDATE ON commissions
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at()
-  `);
-
-  // ── 7. settlements ─────────────────────────────────────────
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS settlements (
-      id                UUID              PRIMARY KEY DEFAULT uuid_generate_v4(),
-      provider_id       UUID              REFERENCES providers(id) ON DELETE RESTRICT,
-      wallet_id         UUID              REFERENCES wallets(id) ON DELETE RESTRICT,
-      journal_batch_id  UUID              REFERENCES wallet_journal_batches(id) ON DELETE SET NULL,
-
-      status            settlement_status NOT NULL DEFAULT 'pending',
-      amount            NUMERIC(18,2)     NOT NULL CHECK (amount > 0),
-      currency          CHAR(3)           NOT NULL DEFAULT 'NGN',
-      settlement_date   DATE              NOT NULL,
-      period_start      TIMESTAMPTZ       NOT NULL,
-      period_end        TIMESTAMPTZ       NOT NULL,
-      transaction_count INTEGER           NOT NULL DEFAULT 0 CHECK (transaction_count >= 0),
-      bank_code         TEXT,
-      account_number    TEXT,
-      account_name      TEXT,
-      bank_reference    TEXT,
-      notes             TEXT,
-      processed_at      TIMESTAMPTZ,
-      failure_reason    TEXT,
-
-      metadata          JSONB             NOT NULL DEFAULT '{}',
-      created_at        TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
-      updated_at        TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
-
-      CONSTRAINT settlements_currency_fmt      CHECK (currency ~ '^[A-Z]{3}$'),
-      CONSTRAINT settlements_period_valid      CHECK (period_end > period_start)
-    )
-  `);
-
-  await knex.raw(`
-    CREATE TRIGGER trg_settlements_updated_at
-    BEFORE UPDATE ON settlements
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at()
-  `);
-
-  // ── 8. disputes ────────────────────────────────────────────
-  await knex.raw(`
-    CREATE TABLE IF NOT EXISTS disputes (
+    CREATE TABLE IF NOT EXISTS wallet_journal_batches (
       id              UUID           PRIMARY KEY DEFAULT uuid_generate_v4(),
-      transaction_id  UUID           NOT NULL,  -- resolved at app layer
-      user_id         UUID           NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-      assigned_to     UUID           REFERENCES users(id) ON DELETE SET NULL,
-      refund_id       UUID           REFERENCES refunds(id) ON DELETE SET NULL,
-
-      status          dispute_status NOT NULL DEFAULT 'open',
-      subject         TEXT           NOT NULL,
+      status          journal_status NOT NULL DEFAULT 'pending',
       description     TEXT           NOT NULL,
-      evidence_urls   TEXT[]         NOT NULL DEFAULT '{}',
-      amount_disputed NUMERIC(18,2)  NOT NULL CHECK (amount_disputed > 0),
-      currency        CHAR(3)        NOT NULL DEFAULT 'NGN',
-      resolution_note TEXT,
-      resolved_at     TIMESTAMPTZ,
-      escalated_at    TIMESTAMPTZ,
-
+      reference_type  TEXT,          -- 'transaction' | 'topup' | 'withdrawal' | 'reversal' | 'fee'
+      reference_id    UUID,          -- polymorphic FK; resolved at application layer
+      idempotency_key TEXT           UNIQUE,   -- prevent duplicate journal posting
+      posted_at       TIMESTAMPTZ,
+      reversed_at     TIMESTAMPTZ,
+      reversed_by     UUID           REFERENCES users(id) ON DELETE SET NULL,
+      reversal_batch_id UUID         REFERENCES wallet_journal_batches(id) ON DELETE RESTRICT,
       metadata        JSONB          NOT NULL DEFAULT '{}',
       created_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-
-      CONSTRAINT disputes_currency_fmt CHECK (currency ~ '^[A-Z]{3}$')
+      updated_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW()
     )
   `);
 
+  await knex.raw(`COMMENT ON TABLE wallet_journal_batches IS
+    'Each batch represents one balanced economic event.
+     All linked wallet_ledger entries must sum to zero (debits = credits).
+     Enforced at application layer via service-level transaction.'
+  `);
+
   await knex.raw(`
-    CREATE TRIGGER trg_disputes_updated_at
-    BEFORE UPDATE ON disputes
+    CREATE TRIGGER trg_journal_batches_updated_at
+    BEFORE UPDATE ON wallet_journal_batches
     FOR EACH ROW EXECUTE FUNCTION set_updated_at()
   `);
 
-  // ── 9. Indexes ─────────────────────────────────────────────
-  // transactions (hot paths — indexes on parent propagate to partitions)
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_user_created    ON transactions (user_id, created_at DESC)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_wallet          ON transactions (wallet_id, created_at DESC) WHERE wallet_id IS NOT NULL`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_status          ON transactions (status, created_at DESC)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_type            ON transactions (transaction_type, created_at DESC)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_service         ON transactions (service_id) WHERE service_id IS NOT NULL`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_provider        ON transactions (provider_id) WHERE provider_id IS NOT NULL`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_txn_beneficiary     ON transactions (beneficiary_phone) WHERE beneficiary_phone IS NOT NULL`);
+  // ── 4. wallet_ledger (RANGE-partitioned by created_at) ────
+  // Double-entry: every row is either a debit or credit line.
+  // signed_amount: credits > 0, debits < 0.
+  // For each journal_batch: SUM(signed_amount) MUST = 0.
+  //
+  // PostgreSQL partition rules:
+  //   - UNIQUE/PK must include the partition key (created_at).
+  //   - FK from wallet_ledger to wallet_journal_batches is fine
+  //     because wallet_journal_batches is NOT partitioned.
+  //   - No FK to transactions table (not created yet).
+  await knex.raw(`
+    CREATE TABLE IF NOT EXISTS wallet_ledger (
+      id              UUID              NOT NULL DEFAULT uuid_generate_v4(),
+      journal_batch_id UUID             NOT NULL REFERENCES wallet_journal_batches(id) ON DELETE RESTRICT,
+      wallet_id       UUID              NOT NULL REFERENCES wallets(id) ON DELETE RESTRICT,
+      entry_type      ledger_entry_type NOT NULL,
+      amount          NUMERIC(18,2)     NOT NULL CHECK (amount > 0),    -- always positive
+      signed_amount   NUMERIC(18,2)     NOT NULL,                       -- negative=debit, positive=credit
+      currency        CHAR(3)           NOT NULL DEFAULT 'NGN',
+      running_balance NUMERIC(18,2),     -- optional snapshot; authoritative value = SUM query
+      description     TEXT              NOT NULL,
 
-  // payments
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_pay_user_created    ON payments (user_id, created_at DESC)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_pay_status          ON payments (status, created_at DESC)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_pay_method         ON payments (payment_method)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_pay_wallet          ON payments (wallet_id) WHERE wallet_id IS NOT NULL`);
+      -- Polymorphic reference (resolved at app layer, no FK constraint)
+      reference_type  TEXT,              -- 'transaction' | 'topup' | 'fee' | 'reversal' | ...
+      reference_id    UUID,              -- ID in the referenced table
 
-  // refunds
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_refund_user         ON refunds (user_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_refund_txn          ON refunds (transaction_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_refund_status       ON refunds (status)`);
+      metadata        JSONB             NOT NULL DEFAULT '{}',
+      created_at      TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
 
-  // reversals
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_reversal_user       ON reversals (user_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_reversal_txn        ON reversals (transaction_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_reversal_status     ON reversals (status)`);
+      -- Partition key (created_at) must be part of PK
+      PRIMARY KEY (id, created_at),
 
-  // commissions
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_commission_user     ON commissions (beneficiary_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_commission_status   ON commissions (status)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_commission_txn      ON commissions (transaction_id)`);
+      CONSTRAINT ledger_currency_fmt        CHECK (currency ~ '^[A-Z]{3}$'),
+      CONSTRAINT ledger_signed_amount_valid CHECK (
+        (entry_type = 'credit' AND signed_amount > 0) OR
+        (entry_type = 'debit'  AND signed_amount < 0)
+      ),
+      CONSTRAINT ledger_amount_matches_signed CHECK (
+        amount = ABS(signed_amount)
+      )
+    ) PARTITION BY RANGE (created_at)
+  `);
 
-  // settlements
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_settlement_provider ON settlements (provider_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_settlement_status   ON settlements (status, settlement_date DESC)`);
+  await knex.raw(`COMMENT ON TABLE wallet_ledger IS
+    'Double-entry ledger. Each economic event produces >= 2 rows via wallet_journal_batches.
+     Balance = SUM(signed_amount) grouped by wallet_id.
+     Partitioned monthly by created_at. Use pg_partman for automated partition management.'
+  `);
 
-  // disputes
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_dispute_user        ON disputes (user_id)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_dispute_status      ON disputes (status)`);
-  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_dispute_assigned    ON disputes (assigned_to) WHERE assigned_to IS NOT NULL`);
+  await knex.raw(`
+    CREATE TABLE IF NOT EXISTS wallet_ledger_default PARTITION OF wallet_ledger DEFAULT
+  `);
+
+  // ── 5. Balance view ────────────────────────────────────────
+  await knex.raw(`
+    CREATE OR REPLACE VIEW v_wallet_balances AS
+    SELECT
+      w.id                               AS wallet_id,
+      w.user_id,
+      w.wallet_type,
+      w.currency,
+      w.status,
+      COALESCE(SUM(l.signed_amount), 0)  AS balance,
+      COUNT(l.id)                        AS ledger_entry_count,
+      MAX(l.created_at)                  AS last_activity_at
+    FROM wallets w
+    LEFT JOIN wallet_ledger l ON l.wallet_id = w.id
+    GROUP BY w.id, w.user_id, w.wallet_type, w.currency, w.status
+  `);
+
+  await knex.raw(`COMMENT ON VIEW v_wallet_balances IS
+    'Computes current wallet balance from wallet_ledger.
+     For high-frequency reads, materialize this or maintain a cached balance
+     in application layer (Redis), invalidated on every ledger insert.'
+  `);
+
+  // ── 6. Indexes ─────────────────────────────────────────────
+  // wallets
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_wallets_user_id     ON wallets (user_id) WHERE user_id IS NOT NULL`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_wallets_type        ON wallets (wallet_type)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_wallets_status      ON wallets (status)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_wallets_currency    ON wallets (currency)`);
+
+  // wallet_journal_batches
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_journal_ref         ON wallet_journal_batches (reference_type, reference_id) WHERE reference_id IS NOT NULL`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_journal_status      ON wallet_journal_batches (status)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_journal_created_at  ON wallet_journal_batches (created_at DESC)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_journal_idempotency ON wallet_journal_batches (idempotency_key) WHERE idempotency_key IS NOT NULL`);
+
+  // wallet_ledger (indexes on parent propagate to all partitions)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_ledger_wallet_id    ON wallet_ledger (wallet_id, created_at DESC)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_ledger_batch_id     ON wallet_ledger (journal_batch_id)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_ledger_entry_type   ON wallet_ledger (entry_type, wallet_id)`);
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_ledger_ref          ON wallet_ledger (reference_type, reference_id) WHERE reference_id IS NOT NULL`);
 }
 
 // ============================================================
 // DOWN
 // ============================================================
 export async function down(knex: Knex): Promise<void> {
+  await knex.raw(`DROP VIEW  IF EXISTS v_wallet_balances              CASCADE`);
+
   const triggers: Array<[string, string]> = [
-    ["trg_disputes_updated_at",    "disputes"],
-    ["trg_settlements_updated_at", "settlements"],
-    ["trg_commissions_updated_at", "commissions"],
-    ["trg_reversals_updated_at",   "reversals"],
-    ["trg_refunds_updated_at",     "refunds"],
+    ["trg_wallets_updated_at",        "wallets"],
+    ["trg_journal_batches_updated_at","wallet_journal_batches"],
   ];
   for (const [trg, tbl] of triggers) {
     await knex.raw(`DROP TRIGGER IF EXISTS ${trg} ON ${tbl}`);
   }
 
-  await knex.raw(`DROP TABLE IF EXISTS disputes      CASCADE`);
-  await knex.raw(`DROP TABLE IF EXISTS settlements   CASCADE`);
-  await knex.raw(`DROP TABLE IF EXISTS commissions   CASCADE`);
-  await knex.raw(`DROP TABLE IF EXISTS reversals     CASCADE`);
-  await knex.raw(`DROP TABLE IF EXISTS refunds       CASCADE`);
-  await knex.raw(`DROP TABLE IF EXISTS payments      CASCADE`);
-  await knex.raw(`DROP TABLE IF EXISTS transactions  CASCADE`);
+  await knex.raw(`DROP TABLE IF EXISTS wallet_ledger           CASCADE`);
+  await knex.raw(`DROP TABLE IF EXISTS wallet_journal_batches  CASCADE`);
+  await knex.raw(`DROP TABLE IF EXISTS wallets                 CASCADE`);
 
-  const enums = [
-    "settlement_status", "commission_status", "dispute_status",
-    "reversal_status", "refund_status", "payment_status",
-    "payment_method", "transaction_status", "transaction_type",
-  ];
+  const enums = ["journal_status", "ledger_entry_type", "wallet_status", "wallet_type"];
   for (const e of enums) {
     await knex.raw(`DROP TYPE IF EXISTS ${e} CASCADE`);
   }
