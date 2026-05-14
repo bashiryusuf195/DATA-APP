@@ -5,8 +5,8 @@ import { authenticate } from "../../auth/middleware/authenticate";
 import {
   getBalanceController,
   getLedgerController,
+  fundTestController,
 } from "../controllers/wallet.controller";
-
 const router = Router();
 
 /**
@@ -23,5 +23,9 @@ router.get(
   authenticate,
   getLedgerController
 );
-
+router.post(
+  "/fund-test",
+  authenticate,
+  fundTestController
+);
 export { router as walletRouter };

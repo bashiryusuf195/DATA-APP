@@ -57,3 +57,49 @@ export async function getUserWalletLedger(
     entries: ledger,
   };
 }
+/**
+ * Development-only funding helper.
+ * Transfers money from settlement wallet → user wallet.
+ */
+export async function fundUserWallet(
+  userId: string,
+  amount: number
+) {
+  const userWallet = await db("wallets")
+    .where({
+      user_id: userId,
+      wallet_type: "user",
+    })
+    .first();
+
+  if (!userWallet) {
+    throw new Error("Wallet not found");
+  }
+
+  const settlementWalletId =
+    process.env.SYSTEM_SETTLEMENT_WALLET_ID;
+
+  if (!settlementWalletId) {
+    throw new Error(
+      "SYSTEM_SETTLEMENT_WALLET_ID missing from environment"
+    );
+  }
+
+  const result = await walletService.transfer({
+  from_wallet_id: settlementWalletId,
+  to_wallet_id: userWallet.id,
+  amount,
+  currency: "NGN",
+  description: "Development wallet funding",
+  idempotency_key: `fund_test_${Date.now()}`,
+});
+
+  const balance = await walletService.getWalletBalance(
+    userWallet.id
+  );
+
+  return {
+    transfer: result,
+    balance,
+  };
+}
