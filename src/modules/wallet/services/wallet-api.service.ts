@@ -4,6 +4,7 @@ import {
   generateFundingReference,
   generateTransferReference,
 } from "../../../lib/reference";
+import { createTransaction } from "../../transactions/services/transaction.service";
 
 const db = getDbInstance();
 
@@ -84,22 +85,40 @@ export async function fundUserWallet(userId: string, amount: number) {
   const reference = generateFundingReference();
 
   const result = await walletService.transfer({
-  from_wallet_id: settlementWalletId,
-  to_wallet_id: userWallet.id,
-  amount,
-  currency: "NGN",
-  description: "Development wallet funding",
-  idempotency_key: reference,
-  reference_type: "wallet_funding",
-  metadata: {
+    from_wallet_id: settlementWalletId,
+    to_wallet_id: userWallet.id,
+    amount,
+    currency: "NGN",
+    description: "Development wallet funding",
+    idempotency_key: reference,
+    reference_type: "wallet_funding",
+    metadata: {
+      reference,
+    },
+  });
+
+  const transaction = await createTransaction({
+    user_id: userId,
     reference,
-  },
-});
+    type: "wallet_funding",
+    status: "successful",
+    amount,
+    currency: "NGN",
+    source_wallet_id: settlementWalletId,
+    destination_wallet_id: userWallet.id,
+    journal_batch_id: result.journal_batch_id,
+    description: "Development wallet funding",
+    metadata: {
+      wallet_reference: reference,
+    },
+    processed_at: new Date(),
+  });
 
   const balance = await walletService.getWalletBalance(userWallet.id);
 
   return {
     reference,
+    transaction,
     transfer: result,
     balance,
   };
@@ -145,24 +164,42 @@ export async function transferBetweenWallets(
   const reference = generateTransferReference();
 
   const result = await walletService.transfer({
-  from_wallet_id: senderWallet.id,
-  to_wallet_id: receiverWallet.id,
-  amount: input.amount,
-  currency: "NGN",
-  description: input.description ?? "Wallet transfer",
-  idempotency_key:
-    input.idempotency_key ??
-    `transfer_${userId}_${input.to_wallet_id}_${input.amount}_${Date.now()}`,
-  reference_type: "wallet_transfer",
-  metadata: {
+    from_wallet_id: senderWallet.id,
+    to_wallet_id: receiverWallet.id,
+    amount: input.amount,
+    currency: "NGN",
+    description: input.description ?? "Wallet transfer",
+    idempotency_key:
+      input.idempotency_key ??
+      `transfer_${userId}_${input.to_wallet_id}_${input.amount}_${Date.now()}`,
+    reference_type: "wallet_transfer",
+    metadata: {
+      reference,
+    },
+  });
+
+  const transaction = await createTransaction({
+    user_id: userId,
     reference,
-  },
-});
+    type: "wallet_transfer",
+    status: "successful",
+    amount: input.amount,
+    currency: "NGN",
+    source_wallet_id: senderWallet.id,
+    destination_wallet_id: receiverWallet.id,
+    journal_batch_id: result.journal_batch_id,
+    description: input.description ?? "Wallet transfer",
+    metadata: {
+      wallet_reference: reference,
+    },
+    processed_at: new Date(),
+  });
 
   const balance = await walletService.getWalletBalance(senderWallet.id);
 
   return {
     reference,
+    transaction,
     transfer: result,
     balance,
   };
