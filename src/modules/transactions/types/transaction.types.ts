@@ -3,7 +3,8 @@ export type TransactionStatus =
   | "processing"
   | "successful"
   | "failed"
-  | "reversed";
+  | "reversed"
+  | "cancelled";
 
 export type TransactionType =
   | "wallet_funding"

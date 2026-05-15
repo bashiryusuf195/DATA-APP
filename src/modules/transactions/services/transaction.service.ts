@@ -28,4 +28,35 @@ export async function createTransaction(input: CreateTransactionInput) {
     .returning("*");
 
   return transaction;
+}export async function updateTransactionStatus(
+  reference: string,
+  data: {
+    status: "pending" | "processing" | "successful" | "failed" | "reversed" | "cancelled";
+    provider_reference?: string | null;
+    journal_batch_id?: string | null;
+    failure_reason?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  const [transaction] = await db("transactions")
+    .where({ reference })
+    .update({
+      status: data.status,
+      provider_reference: data.provider_reference ?? undefined,
+      journal_batch_id: data.journal_batch_id ?? undefined,
+      failure_reason: data.failure_reason ?? undefined,
+      metadata: data.metadata ?? undefined,
+      processed_at: data.status === "successful" ? new Date() : undefined,
+      failed_at: data.status === "failed" ? new Date() : undefined,
+      updated_at: new Date(),
+    })
+    .returning("*");
+
+  return transaction;
+}
+
+export async function getTransactionByReference(reference: string) {
+  return db("transactions")
+    .where({ reference })
+    .first();
 }
