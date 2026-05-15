@@ -36,6 +36,7 @@ export async function createTransaction(input: CreateTransactionInput) {
     journal_batch_id?: string | null;
     failure_reason?: string | null;
     metadata?: Record<string, unknown>;
+    provider?: string | null;
   }
 ) {
   const [transaction] = await db("transactions")
@@ -48,7 +49,7 @@ export async function createTransaction(input: CreateTransactionInput) {
       metadata: data.metadata ?? undefined,
       processed_at: data.status === "successful" ? new Date() : undefined,
       failed_at: data.status === "failed" ? new Date() : undefined,
-      updated_at: new Date(),
+      updated_at: new Date(),provider: data.provider ?? undefined,
     })
     .returning("*");
 

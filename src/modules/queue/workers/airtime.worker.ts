@@ -97,6 +97,9 @@ export const airtimeWorker =
               ? "successful"
               : "failed",
 
+          provider:
+            providerResult.provider,
+
           provider_reference:
             providerResult.provider_reference,
 

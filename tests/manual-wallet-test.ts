@@ -370,6 +370,7 @@ async function main(): Promise<void> {
       });
     } catch (err) {
       if (err instanceof WalletError && err.message.includes("INSUFFICIENT_BALANCE")) {
+        
         caught = true;
         fmt.caught("Debit correctly rejected", err.code, err.message);
       } else {
