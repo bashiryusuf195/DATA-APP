@@ -13,7 +13,8 @@ export type TransactionType =
   | "data"
   | "electricity"
   | "cable_tv"
-  | "exam_pin";
+  | "exam_pin"
+  | "identity_verification";
 
 export interface CreateTransactionInput {
   user_id: string;
