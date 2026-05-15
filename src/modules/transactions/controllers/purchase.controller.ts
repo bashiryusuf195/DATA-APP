@@ -6,7 +6,7 @@ import type {
 
 import { AirtimePurchaseSchema } from "../validators/purchase.validators";
 
-import { purchaseAirtime } from "../services/purchase.service";
+import { initializeAirtimePurchase } from "../services/purchase.service";
 
 import { airtimeQueue } from "../../queue/queues/airtime.queue";
 
@@ -20,7 +20,7 @@ export async function purchaseAirtimeController(
       AirtimePurchaseSchema.parse(req.body);
 
     const result =
-      await purchaseAirtime(
+      await initializeAirtimePurchase(
         req.user!.id,
         input
       );
