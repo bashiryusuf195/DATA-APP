@@ -46,6 +46,10 @@ const sharedConfig: Knex.Config = {
     // Each migration is responsible for its own atomicity.
     disableTransactions: true,
   },
+  seeds: {
+    directory: "./src/database/seeds",
+    extension: "ts",
+  },
 };
 
 const config: { [env: string]: Knex.Config } = {

@@ -25,6 +25,7 @@ import { errorHandler, notFoundHandler }   from './middleware/errorHandler';
 import { authRouter }                      from "./modules/auth/routes/auth.routes";
 import { walletRouter } from "./modules/wallet/routes/wallet.routes";
 import { transactionRouter } from "./modules/transactions/routes/transaction.routes";
+import { catalogRouter } from "./modules/catalog/routes/catalog.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/v1', rootRouter);
 app.use("/auth", authRouter);
 app.use("/wallet", walletRouter);
 app.use("/transactions", transactionRouter);
+app.use("/services", catalogRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.
