@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { getDbInstance } from "../../../db/knex";
 
 const db = getDbInstance();
@@ -43,6 +44,76 @@ export async function getActivePlansForType(
       "catalog_services.slug as service_slug",
       "catalog_services.name as service_name"
     );
+}
+
+// ── Admin write operations ────────────────────────────────────────────────────
+
+export async function createCatalogService(data: {
+  slug: string;
+  name: string;
+  service_type: string;
+  is_active: boolean;
+}) {
+  const [row] = await db("catalog_services")
+    .insert({ id: randomUUID(), ...data })
+    .returning("*");
+  return row;
+}
+
+export async function updateCatalogService(
+  id: string,
+  data: Partial<{
+    slug: string;
+    name: string;
+    service_type: string;
+    is_active: boolean;
+  }>
+) {
+  const rows = await db("catalog_services")
+    .where({ id })
+    .update({ ...data, updated_at: new Date() })
+    .returning("*");
+  return rows[0] ?? null;
+}
+
+export async function createServicePlan(data: {
+  service_id: string;
+  provider_code: string;
+  name: string;
+  variation_code: string;
+  amount: number;
+  cost_price?: number | null;
+  selling_price?: number | null;
+  is_variable_amount: boolean;
+  metadata: Record<string, unknown>;
+  is_active: boolean;
+}) {
+  const [row] = await db("service_plans")
+    .insert({ id: randomUUID(), ...data })
+    .returning("*");
+  return row;
+}
+
+export async function updateServicePlan(
+  id: string,
+  data: Partial<{
+    service_id: string;
+    provider_code: string;
+    name: string;
+    variation_code: string;
+    amount: number;
+    cost_price: number | null;
+    selling_price: number | null;
+    is_variable_amount: boolean;
+    metadata: Record<string, unknown>;
+    is_active: boolean;
+  }>
+) {
+  const rows = await db("service_plans")
+    .where({ id })
+    .update({ ...data, updated_at: new Date() })
+    .returning("*");
+  return rows[0] ?? null;
 }
 
 export async function getPlanByVariationCode(
