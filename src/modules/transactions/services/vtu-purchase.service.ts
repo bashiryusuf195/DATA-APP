@@ -29,6 +29,14 @@ const SERVICE_TRANSACTION_TYPE: Record<ProviderServiceType, TransactionType> = {
   identity_verification: "identity_verification",
 };
 
+export interface VtuPlanMeta {
+  plan_id: string;
+  variation_code: string;
+  plan_name: string;
+  service_slug: string;
+  service_name: string;
+}
+
 export interface VtuPurchaseInput {
   service_type: ProviderServiceType;
   amount: number;
@@ -38,6 +46,7 @@ export interface VtuPurchaseInput {
   meter_number?: string;
   variation_code?: string;
   customer_name?: string;
+  plan?: VtuPlanMeta;
 }
 
 export async function initializeVtuPurchase(
@@ -84,6 +93,12 @@ export async function initializeVtuPurchase(
       meter_number: input.meter_number,
       variation_code: input.variation_code,
       customer_name: input.customer_name,
+      ...(input.plan && {
+        plan_id: input.plan.plan_id,
+        plan_name: input.plan.plan_name,
+        service_slug: input.plan.service_slug,
+        service_name: input.plan.service_name,
+      }),
     },
   });
 

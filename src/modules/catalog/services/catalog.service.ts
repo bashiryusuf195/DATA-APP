@@ -62,7 +62,9 @@ export async function getPlanByVariationCode(
       "service_plans.amount",
       "service_plans.selling_price",
       "service_plans.is_variable_amount",
-      "service_plans.provider_code"
+      "service_plans.provider_code",
+      "catalog_services.slug as service_slug",
+      "catalog_services.name as service_name"
     )
     .first();
 }

@@ -44,6 +44,23 @@ async function requirePlan(serviceType: string, variationCode: string) {
   return plan;
 }
 
+// Extracts the fields required by VtuPlanMeta from a plan row.
+function buildPlanMeta(plan: {
+  id: string;
+  variation_code: string;
+  name: string;
+  service_slug: string;
+  service_name: string;
+}) {
+  return {
+    plan_id: plan.id,
+    variation_code: plan.variation_code,
+    plan_name: plan.name,
+    service_slug: plan.service_slug,
+    service_name: plan.service_name,
+  };
+}
+
 export async function purchaseAirtimeController(
   req: Request,
   res: Response,
@@ -87,6 +104,7 @@ export async function purchaseDataController(
       phone: input.phone,
       variation_code: input.variation_code,
       description: `Data purchase for ${input.phone} — ${plan.name}`,
+      plan: buildPlanMeta(plan),
     });
 
     await vtuPurchaseQueue.add(
@@ -116,8 +134,7 @@ export async function purchaseElectricityController(
   try {
     const input = ElectricityPurchaseSchema.parse(req.body);
 
-    // Validates that the variation_code (prepaid/postpaid) exists in the catalog.
-    await requirePlan("electricity", input.variation_code);
+    const plan = await requirePlan("electricity", input.variation_code);
 
     const result = await initializeVtuPurchase(req.user!.id, {
       service_type: "electricity",
@@ -126,6 +143,7 @@ export async function purchaseElectricityController(
       variation_code: input.variation_code,
       phone: input.phone,
       description: `Electricity ${input.variation_code} top-up for meter ${input.meter_number}`,
+      plan: buildPlanMeta(plan),
     });
 
     await vtuPurchaseQueue.add(
@@ -164,6 +182,7 @@ export async function purchaseCableTvController(
       smartcard_number: input.smartcard_number,
       variation_code: input.variation_code,
       description: `Cable TV purchase for ${input.smartcard_number} — ${plan.name}`,
+      plan: buildPlanMeta(plan),
     });
 
     await vtuPurchaseQueue.add(
@@ -201,6 +220,7 @@ export async function purchaseExamPinController(
       phone: input.phone,
       variation_code: input.variation_code,
       description: `Exam PIN purchase for ${input.phone} — ${plan.name}`,
+      plan: buildPlanMeta(plan),
     });
 
     await vtuPurchaseQueue.add(
@@ -239,6 +259,7 @@ export async function identityVerificationController(
       customer_name: input.customer_name,
       variation_code: input.variation_code,
       description: `Identity verification (${input.variation_code.toUpperCase()}) for ${input.phone ?? input.customer_name}`,
+      plan: buildPlanMeta(plan),
     });
 
     await vtuPurchaseQueue.add(
