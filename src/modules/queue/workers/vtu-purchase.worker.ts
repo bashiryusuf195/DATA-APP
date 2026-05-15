@@ -2,7 +2,7 @@ import { createWorker } from "../config/queue.config";
 
 import type { VtuPurchaseJobPayload } from "../jobs/vtu-purchase.job";
 
-import { providerRegistry } from "../../providers/services/provider-registry.service";
+import { getBestProvider } from "../../providers/services/provider-routing.service";
 
 import {
   getTransactionByReference,
@@ -27,7 +27,7 @@ export const vtuPurchaseWorker = createWorker(
 
     await updateTransactionStatus(data.reference, { status: "processing" });
 
-    const provider = providerRegistry.getDefaultProvider();
+    const provider = await getBestProvider(data.service_type);
 
     const providerResult = await provider.purchase({
       service_type: data.service_type,

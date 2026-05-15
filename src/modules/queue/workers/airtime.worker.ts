@@ -4,7 +4,7 @@ import { createWorker } from "../config/queue.config";
 
 import type { AirtimeJobPayload } from "../jobs/airtime.job";
 
-import { providerRegistry } from "../../providers/services/provider-registry.service";
+import { getBestProvider } from "../../providers/services/provider-routing.service";
 
 import {
   getTransactionByReference,
@@ -45,7 +45,7 @@ export const airtimeWorker =
       );
 
       const provider =
-        providerRegistry.getDefaultProvider();
+        await getBestProvider("airtime");
 
       const providerResult =
         await provider.purchase({
