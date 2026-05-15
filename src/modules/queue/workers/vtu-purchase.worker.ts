@@ -3,6 +3,7 @@ import { createWorker } from "../config/queue.config";
 import type { VtuPurchaseJobPayload } from "../jobs/vtu-purchase.job";
 
 import { getBestProvider } from "../../providers/services/provider-routing.service";
+import { recordFailedJob } from "../services/failed-job.service";
 
 import {
   getTransactionByReference,
@@ -17,7 +18,13 @@ export const vtuPurchaseWorker = createWorker(
   async (job) => {
     const data = job.data as VtuPurchaseJobPayload;
 
-    console.log("[VTU WORKER] Processing:", data.reference, data.service_type);
+    console.log(
+      "[VTU WORKER] Processing:",
+      data.reference,
+      data.service_type,
+      `| attemptsMade=${job.attemptsMade}`,
+      `| opts.attempts=${job.opts?.attempts ?? "unset"}`
+    );
 
     const transaction = await getTransactionByReference(data.reference);
 
@@ -26,6 +33,12 @@ export const vtuPurchaseWorker = createWorker(
     }
 
     await updateTransactionStatus(data.reference, { status: "processing" });
+
+    // TEST-ONLY: simulate an unrecoverable infrastructure crash to verify
+    // BullMQ retry exhaustion and dead-letter persistence.
+    if (data.phone === "09999999999") {
+      throw new Error("Forced worker crash");
+    }
 
     const provider = await getBestProvider(data.service_type);
 
@@ -72,6 +85,68 @@ export const vtuPurchaseWorker = createWorker(
   }
 );
 
-vtuPurchaseWorker.on("failed", (job, err) => {
-  console.error("[VTU WORKER FAILED]", job?.id, err);
+vtuPurchaseWorker.on("active", (job) => {
+  console.log(
+    "[VTU WORKER ACTIVE]",
+    job.id,
+    `| name=${job.name}`,
+    `| attemptsMade=${job.attemptsMade}`,
+    `| opts.attempts=${job.opts?.attempts ?? "unset"}`
+  );
+});
+
+vtuPurchaseWorker.on("completed", (job) => {
+  console.log(
+    "[VTU WORKER COMPLETED]",
+    job.id,
+    `| name=${job.name}`,
+    `| ref=${(job.data as VtuPurchaseJobPayload)?.reference ?? "unknown"}`
+  );
+});
+
+// Fires after every failed attempt (attemptsMade is already post-increment here).
+// Record to dead-letter table only when all retries are exhausted.
+vtuPurchaseWorker.on("failed", async (job, err) => {
+  if (!job) return;
+
+  const data = job.data as VtuPurchaseJobPayload;
+  const maxAttempts = job.opts?.attempts ?? 3;
+  const isFinalFailure = job.attemptsMade >= maxAttempts;
+
+  console.error(
+    "[VTU WORKER FAILED]",
+    job.id,
+    `| attempt ${job.attemptsMade} of ${maxAttempts}`,
+    `| isFinal=${isFinalFailure}`,
+    `| ref=${data?.reference ?? "unknown"}`,
+    `| err=${err.message}`
+  );
+
+  if (!isFinalFailure) return;
+
+  try {
+    await recordFailedJob({
+      queue_name: "vtu-purchases",
+      job_name: job.name,
+      reference: data?.reference ?? null,
+      payload: job.data as Record<string, unknown>,
+      error_message: err.message,
+      stack_trace: err.stack ?? null,
+      retry_count: job.attemptsMade,
+    });
+
+    if (data?.reference) {
+      await updateTransactionStatus(data.reference, {
+        status: "failed",
+        failure_reason: err.message,
+      });
+    }
+
+    console.log(
+      "[VTU WORKER] Dead-letter recorded for ref:",
+      data?.reference ?? "unknown"
+    );
+  } catch (recordErr) {
+    console.error("[VTU WORKER] Failed to record dead-letter:", recordErr);
+  }
 });

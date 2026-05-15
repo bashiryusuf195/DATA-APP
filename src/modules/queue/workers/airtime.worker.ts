@@ -1,10 +1,9 @@
-import { Job } from "bullmq";
-
 import { createWorker } from "../config/queue.config";
 
 import type { AirtimeJobPayload } from "../jobs/airtime.job";
 
 import { getBestProvider } from "../../providers/services/provider-routing.service";
+import { recordFailedJob } from "../services/failed-job.service";
 
 import {
   getTransactionByReference,
@@ -13,130 +12,136 @@ import {
 
 import { walletService } from "../../wallet/services/wallet-api.service";
 
-export const airtimeWorker =
-  createWorker(
-    "airtime-purchases",
+export const airtimeWorker = createWorker(
+  "airtime-purchases",
 
-    async (job) => {
-      const data =
-        job.data as AirtimeJobPayload;
+  async (job) => {
+    const data = job.data as AirtimeJobPayload;
 
-      console.log(
-        "[AIRTIME WORKER] Processing:",
-        data.reference
-      );
-
-      const transaction =
-        await getTransactionByReference(
-          data.reference
-        );
-
-      if (!transaction) {
-        throw new Error(
-          "Transaction not found"
-        );
-      }
-
-      await updateTransactionStatus(
-        data.reference,
-        {
-          status: "processing",
-        }
-      );
-
-      const provider =
-        await getBestProvider("airtime");
-
-      const providerResult =
-        await provider.purchase({
-          service_type: "airtime",
-          amount: data.amount,
-          phone: data.phone,
-          reference: data.reference,
-        });
-
-      let refundResult = null;
-
-      if (!providerResult.success) {
-        refundResult =
-          await walletService.transfer({
-            from_wallet_id:
-              transaction.destination_wallet_id,
-
-            to_wallet_id:
-              transaction.source_wallet_id,
-
-            amount: Number(
-              transaction.amount
-            ),
-
-            currency:
-              transaction.currency,
-
-            description:
-              `Refund for failed airtime purchase ${data.reference}`,
-
-            idempotency_key:
-              `${data.reference}_refund`,
-
-            reference_type:
-              "airtime_refund",
-
-            metadata: {
-              reference:
-                data.reference,
-            },
-          });
-      }
-
-      await updateTransactionStatus(
-        data.reference,
-        {
-          status:
-            providerResult.success
-              ? "successful"
-              : "failed",
-
-          provider:
-            providerResult.provider,
-
-          provider_reference:
-            providerResult.provider_reference,
-
-          failure_reason:
-            providerResult.success
-              ? null
-              : providerResult.message,
-
-          metadata: {
-            provider_response:
-              providerResult.raw_response,
-
-            refund:
-              refundResult
-                ? {
-                    journal_batch_id:
-                      refundResult.journal_batch_id,
-                  }
-                : null,
-          },
-        }
-      );
-
-      console.log(
-        "[AIRTIME WORKER] Completed:",
-        data.reference
-      );
-    }
-  );
-
-airtimeWorker.on(
-  "failed",
-  (job, err) => {
-    console.error(
-      "[AIRTIME WORKER FAILED]",
-      job?.id,
-      err
+    console.log(
+      "[AIRTIME WORKER] Processing:",
+      data.reference,
+      `| attemptsMade=${job.attemptsMade}`,
+      `| opts.attempts=${job.opts?.attempts ?? "unset"}`
     );
+
+    const transaction = await getTransactionByReference(data.reference);
+
+    if (!transaction) {
+      throw new Error("Transaction not found");
+    }
+
+    await updateTransactionStatus(data.reference, { status: "processing" });
+
+    // TEST-ONLY: simulate an unrecoverable infrastructure crash to verify
+    // BullMQ retry exhaustion and dead-letter persistence.
+    if (data.phone === "09999999999") {
+      throw new Error("Forced worker crash");
+    }
+
+    const provider = await getBestProvider("airtime");
+
+    const providerResult = await provider.purchase({
+      service_type: "airtime",
+      amount: data.amount,
+      phone: data.phone,
+      reference: data.reference,
+    });
+
+    let refundResult = null;
+
+    if (!providerResult.success) {
+      refundResult = await walletService.transfer({
+        from_wallet_id: transaction.destination_wallet_id,
+        to_wallet_id: transaction.source_wallet_id,
+        amount: Number(transaction.amount),
+        currency: transaction.currency,
+        description: `Refund for failed airtime purchase ${data.reference}`,
+        idempotency_key: `${data.reference}_refund`,
+        reference_type: "airtime_refund",
+        metadata: { reference: data.reference },
+      });
+    }
+
+    await updateTransactionStatus(data.reference, {
+      status: providerResult.success ? "successful" : "failed",
+      provider: providerResult.provider,
+      provider_reference: providerResult.provider_reference,
+      failure_reason: providerResult.success ? null : providerResult.message,
+      metadata: {
+        provider_response: providerResult.raw_response,
+        refund: refundResult
+          ? { journal_batch_id: refundResult.journal_batch_id }
+          : null,
+      },
+    });
+
+    console.log("[AIRTIME WORKER] Completed:", data.reference);
   }
 );
+
+airtimeWorker.on("active", (job) => {
+  console.log(
+    "[AIRTIME WORKER ACTIVE]",
+    job.id,
+    `| name=${job.name}`,
+    `| attemptsMade=${job.attemptsMade}`,
+    `| opts.attempts=${job.opts?.attempts ?? "unset"}`
+  );
+});
+
+airtimeWorker.on("completed", (job) => {
+  console.log(
+    "[AIRTIME WORKER COMPLETED]",
+    job.id,
+    `| name=${job.name}`,
+    `| ref=${(job.data as AirtimeJobPayload)?.reference ?? "unknown"}`
+  );
+});
+
+// Fires after every failed attempt (attemptsMade is already post-increment here).
+// Record to dead-letter table only when all retries are exhausted.
+airtimeWorker.on("failed", async (job, err) => {
+  if (!job) return;
+
+  const data = job.data as AirtimeJobPayload;
+  const maxAttempts = job.opts?.attempts ?? 3;
+  const isFinalFailure = job.attemptsMade >= maxAttempts;
+
+  console.error(
+    "[AIRTIME WORKER FAILED]",
+    job.id,
+    `| attempt ${job.attemptsMade} of ${maxAttempts}`,
+    `| isFinal=${isFinalFailure}`,
+    `| ref=${data?.reference ?? "unknown"}`,
+    `| err=${err.message}`
+  );
+
+  if (!isFinalFailure) return;
+
+  try {
+    await recordFailedJob({
+      queue_name: "airtime-purchases",
+      job_name: job.name,
+      reference: data?.reference ?? null,
+      payload: job.data as Record<string, unknown>,
+      error_message: err.message,
+      stack_trace: err.stack ?? null,
+      retry_count: job.attemptsMade,
+    });
+
+    if (data?.reference) {
+      await updateTransactionStatus(data.reference, {
+        status: "failed",
+        failure_reason: err.message,
+      });
+    }
+
+    console.log(
+      "[AIRTIME WORKER] Dead-letter recorded for ref:",
+      data?.reference ?? "unknown"
+    );
+  } catch (recordErr) {
+    console.error("[AIRTIME WORKER] Failed to record dead-letter:", recordErr);
+  }
+});

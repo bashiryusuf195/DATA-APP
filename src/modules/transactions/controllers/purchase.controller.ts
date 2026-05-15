@@ -17,6 +17,7 @@ import { getPlanByVariationCode } from "../../catalog/services/catalog.service";
 
 import { airtimeQueue } from "../../queue/queues/airtime.queue";
 import { vtuPurchaseQueue } from "../../queue/queues/vtu-purchase.queue";
+import { defaultJobOptions } from "../../queue/config/queue.config";
 
 // Resolves the effective charge amount from a plan.
 // Fixed-price plans use selling_price (if set) or amount.
@@ -79,7 +80,7 @@ export async function purchaseAirtimeController(
         amount: input.amount,
         reference: result.reference,
       },
-      { jobId: result.reference }
+      { ...defaultJobOptions, jobId: result.reference }
     );
 
     res.status(200).json({ success: true, data: result });
@@ -117,7 +118,7 @@ export async function purchaseDataController(
         phone: input.phone,
         variation_code: input.variation_code,
       },
-      { jobId: result.reference }
+      { ...defaultJobOptions, jobId: result.reference }
     );
 
     res.status(200).json({ success: true, data: result });
@@ -157,7 +158,7 @@ export async function purchaseElectricityController(
         variation_code: input.variation_code,
         phone: input.phone,
       },
-      { jobId: result.reference }
+      { ...defaultJobOptions, jobId: result.reference }
     );
 
     res.status(200).json({ success: true, data: result });
@@ -195,7 +196,7 @@ export async function purchaseCableTvController(
         smartcard_number: input.smartcard_number,
         variation_code: input.variation_code,
       },
-      { jobId: result.reference }
+      { ...defaultJobOptions, jobId: result.reference }
     );
 
     res.status(200).json({ success: true, data: result });
@@ -233,7 +234,7 @@ export async function purchaseExamPinController(
         phone: input.phone,
         variation_code: input.variation_code,
       },
-      { jobId: result.reference }
+      { ...defaultJobOptions, jobId: result.reference }
     );
 
     res.status(200).json({ success: true, data: result });
@@ -273,7 +274,7 @@ export async function identityVerificationController(
         customer_name: input.customer_name,
         variation_code: input.variation_code,
       },
-      { jobId: result.reference }
+      { ...defaultJobOptions, jobId: result.reference }
     );
 
     res.status(200).json({ success: true, data: result });

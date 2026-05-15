@@ -27,6 +27,7 @@ import { walletRouter } from "./modules/wallet/routes/wallet.routes";
 import { transactionRouter } from "./modules/transactions/routes/transaction.routes";
 import { catalogRouter } from "./modules/catalog/routes/catalog.routes";
 import { adminCatalogRouter } from "./modules/catalog/routes/admin-catalog.routes";
+import { adminQueueRouter } from "./modules/queue/routes/admin-queue.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -60,6 +61,7 @@ app.use("/wallet", walletRouter);
 app.use("/transactions", transactionRouter);
 app.use("/services", catalogRouter);
 app.use("/admin", adminCatalogRouter);
+app.use("/admin", adminQueueRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.

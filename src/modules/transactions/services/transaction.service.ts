@@ -28,7 +28,9 @@ export async function createTransaction(input: CreateTransactionInput) {
     .returning("*");
 
   return transaction;
-}export async function updateTransactionStatus(
+}
+
+export async function updateTransactionStatus(
   reference: string,
   data: {
     status: "pending" | "processing" | "successful" | "failed" | "reversed" | "cancelled";
@@ -49,7 +51,8 @@ export async function createTransaction(input: CreateTransactionInput) {
       metadata: data.metadata ?? undefined,
       processed_at: data.status === "successful" ? new Date() : undefined,
       failed_at: data.status === "failed" ? new Date() : undefined,
-      updated_at: new Date(),provider: data.provider ?? undefined,
+      updated_at: new Date(),
+      provider: data.provider ?? undefined,
     })
     .returning("*");
 
