@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { authenticate } from "../../auth/middleware/authenticate";
+import { idempotency } from "../../idempotency/middleware/idempotency.middleware";
 
 import {
   purchaseAirtimeController,
@@ -21,11 +22,11 @@ const router = Router();
 router.get("/", authenticate, listTransactionsController);
 router.get("/:reference", authenticate, getTransactionController);
 
-router.post("/airtime", authenticate, purchaseAirtimeController);
-router.post("/data", authenticate, purchaseDataController);
-router.post("/electricity", authenticate, purchaseElectricityController);
-router.post("/cable-tv", authenticate, purchaseCableTvController);
-router.post("/exam-pin", authenticate, purchaseExamPinController);
-router.post("/identity-verification", authenticate, identityVerificationController);
+router.post("/airtime", authenticate, idempotency, purchaseAirtimeController);
+router.post("/data", authenticate, idempotency, purchaseDataController);
+router.post("/electricity", authenticate, idempotency, purchaseElectricityController);
+router.post("/cable-tv", authenticate, idempotency, purchaseCableTvController);
+router.post("/exam-pin", authenticate, idempotency, purchaseExamPinController);
+router.post("/identity-verification", authenticate, idempotency, identityVerificationController);
 
 export { router as transactionRouter };
