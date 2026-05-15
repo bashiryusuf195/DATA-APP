@@ -61,3 +61,32 @@ export async function getTransactionByReference(reference: string) {
     .where({ reference })
     .first();
 }
+
+export async function getTransactionByReferenceForUser(
+  reference: string,
+  userId: string
+) {
+  return db("transactions")
+    .where({ reference, user_id: userId })
+    .first();
+}
+
+export async function getUserTransactions(
+  userId: string,
+  options: {
+    limit: number;
+    offset: number;
+    status?: string;
+    type?: string;
+  }
+) {
+  return db("transactions")
+    .where({ user_id: userId })
+    .modify((q) => {
+      if (options.status) q.where({ status: options.status });
+      if (options.type) q.where({ type: options.type });
+    })
+    .orderBy("created_at", "desc")
+    .limit(options.limit)
+    .offset(options.offset);
+}

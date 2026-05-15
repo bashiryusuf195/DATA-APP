@@ -11,7 +11,15 @@ import {
   identityVerificationController,
 } from "../controllers/purchase.controller";
 
+import {
+  listTransactionsController,
+  getTransactionController,
+} from "../controllers/transaction-history.controller";
+
 const router = Router();
+
+router.get("/", authenticate, listTransactionsController);
+router.get("/:reference", authenticate, getTransactionController);
 
 router.post("/airtime", authenticate, purchaseAirtimeController);
 router.post("/data", authenticate, purchaseDataController);
