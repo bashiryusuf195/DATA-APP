@@ -8,6 +8,7 @@ declare global {
       sessionId?: string;
       deviceFingerprint?: string;
 
+      rawBody?: Buffer;
       user?: {
   sub?: string;
   id: string;

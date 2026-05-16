@@ -88,4 +88,15 @@ export const config = {
     publicKey: optional('VTPASS_PUBLIC_KEY', ''),
     secretKey: optional('VTPASS_SECRET_KEY', ''),
   },
+
+  // ── Paystack ───────────────────────────────────────────────────────────────
+  // All optional — wallet funding endpoint will return 503 if absent.
+  // Populate PAYSTACK_* env vars to enable live funding.
+  paystack: {
+    secretKey:   optional('PAYSTACK_SECRET_KEY',   ''),
+    publicKey:   optional('PAYSTACK_PUBLIC_KEY',   ''),
+    baseUrl:     optional('PAYSTACK_BASE_URL',      'https://api.paystack.co'),
+    callbackUrl: optional('PAYSTACK_CALLBACK_URL', ''),
+    webhookSecret: optional('PAYSTACK_WEBHOOK_SECRET', ''),
+  },
 } as const;

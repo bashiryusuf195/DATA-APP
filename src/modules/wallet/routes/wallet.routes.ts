@@ -9,6 +9,11 @@ import {
   fundTestController,
   transferController,
 } from "../controllers/wallet.controller";
+import {
+  initializeFundingController,
+  verifyFundingController,
+} from "../controllers/wallet-funding.controller";
+
 const router = Router();
 
 /**
@@ -25,6 +30,16 @@ router.get(
   "/ledger",
   authenticate,
   getLedgerController
+);
+router.post(
+  "/fund/initialize",
+  authenticate,
+  initializeFundingController
+);
+router.post(
+  "/fund/verify/:reference",
+  authenticate,
+  verifyFundingController
 );
 router.post(
   "/fund-test",

@@ -35,6 +35,7 @@ import { notificationsRouter }       from "./modules/notifications/routes/notifi
 import { adminNotificationsRouter }  from "./modules/notifications/routes/admin-notifications.routes";
 import { adminProvidersRouter }      from "./modules/providers/routes/admin-providers.routes";
 import { adminRoutingRulesRouter }   from "./modules/providers/routes/admin-routing-rules.routes";
+import { adminWalletRouter }         from "./modules/wallet/routes/admin-wallet.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -52,8 +53,14 @@ app.use(cors({
 }));
 
 // ── 3. Body parsing ───────────────────────────────────────────────────────────
-// Parse JSON request bodies. Limit to 1 MB to block oversized payloads.
-app.use(express.json({ limit: '1mb' }));
+// Parse JSON request bodies. The verify callback saves the raw Buffer so
+// webhook controllers can validate HMAC signatures (e.g. Paystack x-paystack-signature).
+app.use(express.json({
+  limit: '1mb',
+  verify: (req: express.Request, _res: express.Response, buf: Buffer) => {
+    req.rawBody = buf;
+  },
+}));
 
 // ── 4. Request logger ─────────────────────────────────────────────────────────
 app.use(requestLogger);
@@ -74,6 +81,7 @@ app.use("/admin", adminReconciliationRouter);
 app.use("/admin", adminNotificationsRouter);
 app.use("/admin", adminProvidersRouter);
 app.use("/admin", adminRoutingRulesRouter);
+app.use("/admin", adminWalletRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);
 
