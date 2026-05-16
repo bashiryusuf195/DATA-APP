@@ -33,9 +33,10 @@ import { adminWebhookRouter } from "./modules/webhooks/routes/admin-webhook.rout
 import { adminReconciliationRouter } from "./modules/reconciliation/routes/admin-reconciliation.routes";
 import { notificationsRouter }       from "./modules/notifications/routes/notifications.routes";
 import { adminNotificationsRouter }  from "./modules/notifications/routes/admin-notifications.routes";
-import { adminProvidersRouter }      from "./modules/providers/routes/admin-providers.routes";
-import { adminRoutingRulesRouter }   from "./modules/providers/routes/admin-routing-rules.routes";
-import { adminWalletRouter }         from "./modules/wallet/routes/admin-wallet.routes";
+import { adminProvidersRouter }        from "./modules/providers/routes/admin-providers.routes";
+import { adminRoutingRulesRouter }     from "./modules/providers/routes/admin-routing-rules.routes";
+import { adminProviderAttemptsRouter } from "./modules/providers/routes/admin-provider-attempts.routes";
+import { adminWalletRouter }           from "./modules/wallet/routes/admin-wallet.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -81,6 +82,7 @@ app.use("/admin", adminReconciliationRouter);
 app.use("/admin", adminNotificationsRouter);
 app.use("/admin", adminProvidersRouter);
 app.use("/admin", adminRoutingRulesRouter);
+app.use("/admin", adminProviderAttemptsRouter);
 app.use("/admin", adminWalletRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);

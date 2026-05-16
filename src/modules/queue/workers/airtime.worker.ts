@@ -1,19 +1,14 @@
 import { createWorker } from "../config/queue.config";
-
 import type { AirtimeJobPayload } from "../jobs/airtime.job";
-
-import { getBestProvider } from "../../providers/services/provider-routing.service";
+import { providerExecutionEngine } from "../../providers/services/provider-execution-engine.service";
 import { recordFailedJob } from "../services/failed-job.service";
-
 import {
   getTransactionByReference,
   updateTransactionStatus,
 } from "../../transactions/services/transaction.service";
-
-import { walletService } from "../../wallet/services/wallet-api.service";
 import { createNotification } from "../../notifications/services/notification.service";
 
-console.log("[AIRTIME WORKER MODULE LOADED v3]");
+console.log("[AIRTIME WORKER MODULE LOADED v4]");
 
 export const airtimeWorker = createWorker(
   "airtime-purchases",
@@ -36,85 +31,47 @@ export const airtimeWorker = createWorker(
 
     await updateTransactionStatus(data.reference, { status: "processing" });
 
-    // TEST-ONLY: simulate an unrecoverable infrastructure crash to verify
-    // BullMQ retry exhaustion and dead-letter persistence.
+    // TEST-ONLY: simulate an unrecoverable infrastructure crash
     if (data.phone === "09999999999") {
       throw new Error("Forced worker crash");
     }
 
-    const provider = await getBestProvider("airtime");
-
-    const providerResult = await provider.purchase({
+    // Execution engine handles: provider selection, failover, refund on failure,
+    // transaction status update, and user notification.
+    const result = await providerExecutionEngine.executeWithFailover({
       service_type: "airtime",
-      amount: data.amount,
-      phone: data.phone,
-      reference: data.reference,
-    });
-
-    let refundResult = null;
-
-    if (!providerResult.success) {
-      refundResult = await walletService.transfer({
-        from_wallet_id: transaction.destination_wallet_id,
-        to_wallet_id: transaction.source_wallet_id,
-        amount: Number(transaction.amount),
-        currency: transaction.currency,
-        description: `Refund for failed airtime purchase ${data.reference}`,
-        idempotency_key: `${data.reference}_refund`,
-        reference_type: "airtime_refund",
-        metadata: { reference: data.reference },
-      });
-    }
-
-    await updateTransactionStatus(data.reference, {
-      status: providerResult.success ? "successful" : "failed",
-      provider: providerResult.provider,
-      provider_reference: providerResult.provider_reference,
-      failure_reason: providerResult.success ? null : providerResult.message,
-      metadata: {
-        provider_response: providerResult.raw_response,
-        refund: refundResult
-          ? { journal_batch_id: refundResult.journal_batch_id }
-          : null,
+      purchase_input: {
+        service_type:   "airtime",
+        amount:         data.amount,
+        phone:          data.phone,
+        reference:      data.reference,
+        variation_code: (data as unknown as { variation_code?: string }).variation_code,
+      },
+      transaction_reference: data.reference,
+      transaction: {
+        user_id:               transaction.user_id,
+        status:                transaction.status,
+        source_wallet_id:      transaction.source_wallet_id ?? null,
+        destination_wallet_id: transaction.destination_wallet_id ?? null,
+        amount:                transaction.amount,
+        currency:              transaction.currency ?? "NGN",
       },
     });
 
-    const notifType = providerResult.success ? "purchase_successful" : "purchase_failed";
     console.log(
-      "[AIRTIME WORKER] [NOTIFICATION CREATE START]",
-      `| user_id=${transaction.user_id}`,
-      `| reference=${data.reference}`,
-      `| notifType=${notifType}`
+      "[AIRTIME WORKER] Completed:", data.reference,
+      `| success=${result.success}`,
+      `| final_provider=${result.final_provider ?? "none"}`,
+      `| attempts=${result.total_attempts}`,
+      `| failover=${result.failover_triggered}`,
+      `| idempotent=${result.idempotent_replay}`
     );
-    try {
-      const notifId = await createNotification({
-        user_id: transaction.user_id,
-        channel: "in_app",
-        type:    notifType,
-        title:   providerResult.success ? "Transaction Successful" : "Transaction Failed",
-        message: providerResult.success
-          ? "Your airtime purchase was successful."
-          : "Your airtime purchase failed and has been refunded.",
-        metadata: {
-          reference: data.reference,
-          type:      "airtime",
-          amount:    data.amount,
-          ...(providerResult.success ? {} : { failure_reason: providerResult.message }),
-        },
-      });
-      console.log("[AIRTIME WORKER] [NOTIFICATION CREATE SUCCESS] id:", notifId);
-    } catch (notifErr) {
-      console.error("[AIRTIME WORKER] [NOTIFICATION CREATE FAILED]", notifErr);
-    }
-
-    console.log("[AIRTIME WORKER] Completed:", data.reference);
   }
 );
 
 airtimeWorker.on("active", (job) => {
   console.log(
-    "[AIRTIME WORKER ACTIVE]",
-    job.id,
+    "[AIRTIME WORKER ACTIVE]", job.id,
     `| name=${job.name}`,
     `| attemptsMade=${job.attemptsMade}`,
     `| opts.attempts=${job.opts?.attempts ?? "unset"}`
@@ -123,75 +80,69 @@ airtimeWorker.on("active", (job) => {
 
 airtimeWorker.on("completed", (job) => {
   console.log(
-    "[AIRTIME WORKER COMPLETED]",
-    job.id,
+    "[AIRTIME WORKER COMPLETED]", job.id,
     `| name=${job.name}`,
     `| ref=${(job.data as AirtimeJobPayload)?.reference ?? "unknown"}`
   );
 });
 
-// Fires after every failed attempt (attemptsMade is already post-increment here).
-// Record to dead-letter table only when all retries are exhausted.
+// Fires after every failed attempt — record to dead-letter only when retries exhausted.
+// Note: engine handles provider-level failures gracefully (no throw). This handler
+// fires only for infrastructure failures (DB down, network, OOM).
 airtimeWorker.on("failed", async (job, err) => {
   if (!job) return;
 
-  const data = job.data as AirtimeJobPayload;
+  const data        = job.data as AirtimeJobPayload;
   const maxAttempts = job.opts?.attempts ?? 3;
-  const isFinalFailure = job.attemptsMade >= maxAttempts;
+  const isFinal     = job.attemptsMade >= maxAttempts;
 
   console.error(
-    "[AIRTIME WORKER FAILED]",
-    job.id,
+    "[AIRTIME WORKER FAILED]", job.id,
     `| attempt ${job.attemptsMade} of ${maxAttempts}`,
-    `| isFinal=${isFinalFailure}`,
+    `| isFinal=${isFinal}`,
     `| ref=${data?.reference ?? "unknown"}`,
     `| err=${err.message}`
   );
 
-  if (!isFinalFailure) return;
+  if (!isFinal) return;
 
   try {
     await recordFailedJob({
-      queue_name: "airtime-purchases",
-      job_name: job.name,
-      reference: data?.reference ?? null,
-      payload: job.data as Record<string, unknown>,
+      queue_name:    "airtime-purchases",
+      job_name:      job.name,
+      reference:     data?.reference ?? null,
+      payload:       job.data as Record<string, unknown>,
       error_message: err.message,
-      stack_trace: err.stack ?? null,
-      retry_count: job.attemptsMade,
+      stack_trace:   err.stack ?? null,
+      retry_count:   job.attemptsMade,
     });
 
     if (data?.reference) {
       await updateTransactionStatus(data.reference, {
-        status: "failed",
+        status:         "failed",
         failure_reason: err.message,
       });
     }
 
-    try {
-      await createNotification({
-        user_id:  null,
-        channel:  "in_app",
-        type:     "admin_alert",
-        title:    "Worker Job Permanently Failed",
-        message:  `Airtime job "${job.name}" for reference ${data?.reference ?? "unknown"} permanently failed after ${job.attemptsMade} attempts: ${err.message}`,
-        metadata: {
-          queue_name:    "airtime-purchases",
-          job_id:        job.id,
-          reference:     data?.reference ?? null,
-          user_id:       data?.user_id   ?? null,
-          error_message: err.message,
-          retry_count:   job.attemptsMade,
-        },
-      });
-    } catch (notifErr) {
-      console.error("[AIRTIME WORKER] Failed to create admin notification:", (notifErr as Error).message);
-    }
+    await createNotification({
+      user_id:  null,
+      channel:  "in_app",
+      type:     "admin_alert",
+      title:    "Worker Job Permanently Failed",
+      message:  `Airtime job "${job.name}" for reference ${data?.reference ?? "unknown"} permanently failed after ${job.attemptsMade} attempts: ${err.message}`,
+      metadata: {
+        queue_name:    "airtime-purchases",
+        job_id:        job.id,
+        reference:     data?.reference ?? null,
+        user_id:       data?.user_id   ?? null,
+        error_message: err.message,
+        retry_count:   job.attemptsMade,
+      },
+    }).catch((notifErr: unknown) => {
+      console.error("[AIRTIME WORKER] Admin notification failed:", (notifErr as Error).message);
+    });
 
-    console.log(
-      "[AIRTIME WORKER] Dead-letter recorded for ref:",
-      data?.reference ?? "unknown"
-    );
+    console.log("[AIRTIME WORKER] Dead-letter recorded for ref:", data?.reference ?? "unknown");
   } catch (recordErr) {
     console.error("[AIRTIME WORKER] Failed to record dead-letter:", recordErr);
   }
