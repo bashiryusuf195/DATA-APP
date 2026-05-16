@@ -4,10 +4,18 @@ import {
   listNotificationsController,
   markNotificationReadController,
 } from "../controllers/notifications.controller";
+import {
+  getPreferencesController,
+  updatePreferencesController,
+} from "../controllers/notification-preferences.controller";
 
 const router = Router();
 
-router.get(  "/",        authenticate, listNotificationsController);
-router.patch("/:id/read", authenticate, markNotificationReadController);
+// Specific paths must come before parameterised /:id routes.
+router.get(   "/preferences", authenticate, getPreferencesController);
+router.patch( "/preferences", authenticate, updatePreferencesController);
+
+router.get(   "/",        authenticate, listNotificationsController);
+router.patch( "/:id/read", authenticate, markNotificationReadController);
 
 export { router as notificationsRouter };

@@ -1,9 +1,10 @@
 import { randomUUID } from "crypto";
 import { getDbInstance } from "../../../db/knex";
+import { shouldNotify } from "./notification-preferences.service";
 
 const db = getDbInstance();
 
-export type NotificationChannel = "email" | "sms" | "in_app" | "admin";
+export type NotificationChannel = "email" | "sms" | "in_app" | "push" | "admin";
 export type NotificationStatus  = "pending" | "sent" | "failed" | "read";
 
 export interface CreateNotificationInput {
@@ -16,10 +17,25 @@ export interface CreateNotificationInput {
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────
+// Returns the new notification id, or null when suppressed by user preferences.
+// Preference lookup failures are logged and treated as "allow" so they never
+// block transaction processing.
 
 export async function createNotification(
   input: CreateNotificationInput
-): Promise<string> {
+): Promise<string | null> {
+  // admin channel and null user_id bypass preferences entirely.
+  if (input.user_id && input.channel !== "admin") {
+    try {
+      const allowed = await shouldNotify(input.user_id, input.type, input.channel);
+      if (!allowed) return null;
+    } catch (err) {
+      console.error(
+        "[NOTIFICATION] Preference check failed — proceeding with notification:",
+        (err as Error).message
+      );
+    }
+  }
   return createNotificationIdempotent({ ...input, notification_key: null });
 }
 
