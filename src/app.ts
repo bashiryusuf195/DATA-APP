@@ -34,6 +34,7 @@ import { adminReconciliationRouter } from "./modules/reconciliation/routes/admin
 import { notificationsRouter }       from "./modules/notifications/routes/notifications.routes";
 import { adminNotificationsRouter }  from "./modules/notifications/routes/admin-notifications.routes";
 import { adminProvidersRouter }      from "./modules/providers/routes/admin-providers.routes";
+import { adminRoutingRulesRouter }   from "./modules/providers/routes/admin-routing-rules.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -72,6 +73,7 @@ app.use("/admin", adminWebhookRouter);
 app.use("/admin", adminReconciliationRouter);
 app.use("/admin", adminNotificationsRouter);
 app.use("/admin", adminProvidersRouter);
+app.use("/admin", adminRoutingRulesRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);
 

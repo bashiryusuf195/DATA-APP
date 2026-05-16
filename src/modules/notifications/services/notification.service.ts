@@ -4,7 +4,7 @@ import { shouldNotify } from "./notification-preferences.service";
 
 const db = getDbInstance();
 
-export type NotificationChannel = "email" | "sms" | "in_app" | "push" | "admin";
+export type NotificationChannel = "email" | "sms" | "in_app" | "push" | "webhook";
 export type NotificationStatus  = "pending" | "sent" | "failed" | "read";
 
 export interface CreateNotificationInput {
@@ -24,8 +24,8 @@ export interface CreateNotificationInput {
 export async function createNotification(
   input: CreateNotificationInput
 ): Promise<string | null> {
-  // admin channel and null user_id bypass preferences entirely.
-  if (input.user_id && input.channel !== "admin") {
+  // null user_id means system/admin notification — bypass user preferences.
+  if (input.user_id) {
     try {
       const allowed = await shouldNotify(input.user_id, input.type, input.channel);
       if (!allowed) return null;
@@ -67,9 +67,9 @@ async function _insertNotification(
 ): Promise<string> {
   const now = new Date();
 
-  // in_app and admin notifications are readable directly from the DB —
-  // they are immediately "sent". email/sms would need a delivery queue.
-  const isImmediate = input.channel === "in_app" || input.channel === "admin";
+  // in_app notifications are readable directly from the DB — immediately "sent".
+  // email/sms/webhook would need a delivery queue.
+  const isImmediate = input.channel === "in_app";
   const status: NotificationStatus = isImmediate ? "sent" : "pending";
 
   const id = randomUUID();

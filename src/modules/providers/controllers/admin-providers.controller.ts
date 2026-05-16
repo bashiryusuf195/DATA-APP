@@ -5,8 +5,102 @@ import {
   getProviderConfigWithCredentials,
   upsertProviderCredentials,
 } from "../services/provider-credentials.service";
+import {
+  createProviderConfig,
+  updateProviderConfig,
+  disableProviderConfig,
+} from "../services/provider-config.service";
 import { providerRegistry } from "../services/provider-registry.service";
 import { HttpVTUProvider } from "../services/http-vtu.provider";
+import type { ProviderServiceType } from "../types/provider.types";
+
+// ── POST /admin/providers ─────────────────────────────────────────────────────
+
+const CreateProviderSchema = z.object({
+  provider_code:      z.string().min(1),
+  name:               z.string().min(1),
+  is_active:          z.boolean().optional(),
+  priority:           z.number().int().min(1).optional(),
+  supported_services: z.array(z.string()).optional(),
+  health_status:      z.string().optional(),
+  metadata:           z.record(z.unknown()).optional(),
+});
+
+export async function createProviderController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const input = CreateProviderSchema.parse(req.body);
+    const row = await createProviderConfig({
+      ...input,
+      supported_services: input.supported_services as ProviderServiceType[] | undefined,
+    });
+    res.status(201).json({ success: true, data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── PATCH /admin/providers/:providerCode ──────────────────────────────────────
+
+const UpdateProviderSchema = z.object({
+  name:               z.string().min(1).optional(),
+  is_active:          z.boolean().optional(),
+  priority:           z.number().int().min(1).optional(),
+  supported_services: z.array(z.string()).optional(),
+  health_status:      z.string().optional(),
+  metadata:           z.record(z.unknown()).optional(),
+}).refine((d) => Object.keys(d).length > 0, {
+  message: "At least one field must be provided",
+});
+
+export async function updateProviderController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { providerCode } = req.params;
+    const input = UpdateProviderSchema.parse(req.body);
+    const row = await updateProviderConfig(providerCode, {
+      ...input,
+      supported_services: input.supported_services as ProviderServiceType[] | undefined,
+    });
+
+    if (!row) {
+      res.status(404).json({ success: false, error: "Provider not found" });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── DELETE /admin/providers/:providerCode ─────────────────────────────────────
+
+export async function disableProviderController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { providerCode } = req.params;
+    const row = await disableProviderConfig(providerCode);
+
+    if (!row) {
+      res.status(404).json({ success: false, error: "Provider not found" });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: row });
+  } catch (err) {
+    next(err);
+  }
+}
 
 // ── GET /admin/providers ──────────────────────────────────────────────────────
 

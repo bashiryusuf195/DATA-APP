@@ -176,8 +176,8 @@ vtuPurchaseWorker.on("failed", async (job, err) => {
     try {
       await createNotification({
         user_id:  null,
-        channel:  "admin",
-        type:     "worker_job_permanently_failed",
+        channel:  "in_app",
+        type:     "admin_alert",
         title:    "Worker Job Permanently Failed",
         message:  `VTU job "${job.name}" (${data?.service_type ?? "unknown"}) for reference ${data?.reference ?? "unknown"} permanently failed after ${job.attemptsMade} attempts: ${err.message}`,
         metadata: {

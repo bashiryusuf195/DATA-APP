@@ -5,7 +5,7 @@ import { listAdminNotifications } from "../services/notification.service";
 const AdminQuerySchema = z.object({
   limit:   z.coerce.number().int().min(1).max(100).default(20),
   offset:  z.coerce.number().int().min(0).default(0),
-  channel: z.enum(["email", "sms", "in_app", "admin"]).optional(),
+  channel: z.enum(["email", "sms", "in_app", "push", "webhook"]).optional(),
   type:    z.string().min(1).optional(),
   status:  z.enum(["pending", "sent", "failed", "read"]).optional(),
 });

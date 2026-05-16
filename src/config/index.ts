@@ -76,4 +76,16 @@ export const config = {
 
   // ── Logging ────────────────────────────────────────────────────────────────
   logLevel: optional('LOG_LEVEL', 'info'),
+
+  // ── VTPass ─────────────────────────────────────────────────────────────────
+  // All optional — system falls back to mock provider when absent.
+  // Populate VTPASS_* env vars to enable the live adapter.
+  vtpass: {
+    baseUrl:   optional('VTPASS_BASE_URL',   ''),
+    username:  optional('VTPASS_USERNAME',   ''),
+    password:  optional('VTPASS_PASSWORD',   ''),
+    apiKey:    optional('VTPASS_API_KEY',    ''),
+    publicKey: optional('VTPASS_PUBLIC_KEY', ''),
+    secretKey: optional('VTPASS_SECRET_KEY', ''),
+  },
 } as const;
