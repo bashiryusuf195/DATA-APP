@@ -39,3 +39,23 @@ export interface ProviderPurchaseResult {
 
   raw_response?: unknown;
 }
+
+export interface VerifyTransactionResult {
+  found: boolean;
+  status: "successful" | "pending" | "failed";
+  provider_reference?: string;
+  message: string;
+  raw_response?: unknown;
+}
+
+export interface ProviderBalance {
+  available: number;
+  currency: string;
+  raw_response?: unknown;
+}
+
+export interface ProviderHealthResult {
+  healthy: boolean;
+  latency_ms?: number;
+  message: string;
+}

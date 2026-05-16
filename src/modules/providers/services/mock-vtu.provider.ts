@@ -5,6 +5,9 @@ import type { VTUProvider } from "./provider.interface";
 import type {
   ProviderPurchaseInput,
   ProviderPurchaseResult,
+  VerifyTransactionResult,
+  ProviderBalance,
+  ProviderHealthResult,
 } from "../types/provider.types";
 
 export class MockVTUProvider implements VTUProvider {
@@ -40,6 +43,32 @@ export class MockVTUProvider implements VTUProvider {
         mock: true,
         input,
       },
+    };
+  }
+
+  async verifyTransaction(reference: string): Promise<VerifyTransactionResult> {
+    return {
+      found: true,
+      status: "successful",
+      provider_reference: randomUUID(),
+      message: "Mock transaction verified successfully",
+      raw_response: { mock: true, reference },
+    };
+  }
+
+  async getBalance(): Promise<ProviderBalance> {
+    return {
+      available: 999999.99,
+      currency: "NGN",
+      raw_response: { mock: true },
+    };
+  }
+
+  async healthCheck(): Promise<ProviderHealthResult> {
+    return {
+      healthy: true,
+      latency_ms: 0,
+      message: "Mock provider is always healthy",
     };
   }
 }
