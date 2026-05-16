@@ -10,7 +10,8 @@
     "worker": "tsx watch src/workers/index.ts",
     "type-check": "tsc --noEmit",
     "seed:wallets": "npx tsx scripts/seed-wallets.ts",
-    "test:wallet": "npx tsx tests/manual-wallet-test.ts"
+    "test:wallet": "npx tsx tests/manual-wallet-test.ts",
+    "clear:rate-limits": "npx tsx scripts/clear-rate-limits.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

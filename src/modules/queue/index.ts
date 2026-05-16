@@ -3,3 +3,4 @@ export * from "./jobs/airtime.job";
 
 import "./workers/airtime.worker";
 import "./workers/vtu-purchase.worker";
+import "../reconciliation/workers/reconciliation.worker";

@@ -4,6 +4,7 @@
 import { getDbInstance } from "../../../db/knex";
 import type { Request, Response, NextFunction } from "express";
 import { AppError } from "../../../shared/errors/AppError";
+import { failedLoginLimiter, getClientIp } from "../../../middleware/rateLimiter.redis";
 import { validateOrThrow }                       from "../middleware/validate";
 import {
   RegisterSchema,
@@ -77,6 +78,18 @@ export async function registerController(
   } catch (err) { next(err); }
 }
 
+// Returns true for wrong-credential errors that should increment the
+// failed-login counter. Other errors (DB down, account suspended, etc.)
+// should NOT burn a brute-force slot.
+function isCredentialError(err: unknown): boolean {
+  return (
+    err != null &&
+    typeof err === "object" &&
+    "code" in err &&
+    (err as { code: unknown }).code === "INVALID_CREDENTIALS"
+  );
+}
+
 // ── POST /auth/login ───────────────────────────────────────────
 
 export async function loginController(
@@ -84,12 +97,39 @@ export async function loginController(
 ): Promise<void> {
   try {
     const input = validateOrThrow(LoginSchema, req.body);
-    const db    = getDbInstance();
+    const ip    = getClientIp(req);
+    const email = input.email;
 
-    const { user, tokens, sessionId, rbac } = await login(db, req, {
-  ...input,
-  remember_me: input.remember_me ?? false,
-});
+    // ── Failed-login gate ──────────────────────────────────────
+    // Checked BEFORE the DB round-trip. Only wrong-password attempts
+    // increment this counter (see below), so a successful login never
+    // burns a brute-force slot and resets the counter entirely.
+    const { blocked, retryAfterSec } = await failedLoginLimiter.check(email, ip);
+    if (blocked) {
+      res.setHeader("Retry-After", String(retryAfterSec));
+      res.status(429).json({ error: "Too many requests", code: "RATE_LIMIT_EXCEEDED" });
+      return;
+    }
+
+    const db = getDbInstance();
+
+    let loginResult: Awaited<ReturnType<typeof login>>;
+    try {
+      loginResult = await login(db, req, {
+        ...input,
+        remember_me: input.remember_me ?? false,
+      });
+    } catch (loginErr) {
+      if (isCredentialError(loginErr)) {
+        await failedLoginLimiter.increment(email, ip);
+      }
+      throw loginErr;
+    }
+
+    // Successful login — clear failed-login counter for this email+IP.
+    await failedLoginLimiter.reset(email, ip);
+
+    const { user, tokens, sessionId, rbac } = loginResult;
     setAuthCookies(res, tokens.access_token, tokens.refresh_token);
 
     res.status(200).json({

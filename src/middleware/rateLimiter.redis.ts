@@ -14,7 +14,7 @@ local pttl = redis.call('PTTL', KEYS[1])
 return {current, pttl}
 `;
 
-function getClientIp(req: Request): string {
+export function getClientIp(req: Request): string {
   const fwd = req.headers["x-forwarded-for"];
   if (typeof fwd === "string") return fwd.split(",")[0].trim();
   return req.socket?.remoteAddress ?? "unknown";
@@ -108,11 +108,68 @@ function makeRedisLimiter({
 
 // ── Named limiters ────────────────────────────────────────────────────────────
 
-/** Auth — login: 5 per 15 min per IP */
+// ── Failed-login limiter ──────────────────────────────────────────────────────
+// Not express-rate-limit middleware — called explicitly from loginController
+// so only FAILED attempts count, and a successful login resets the counter.
+//
+// Key: rl:login_failed:<email_lc>:<ip>   Window: 15 min   Max: 5 failures
+
+const FAILED_LOGIN_MAX_ATTEMPTS = 5;
+const FAILED_LOGIN_WINDOW_MS    = 15 * 60 * 1000;
+
+function failedLoginKey(email: string, ip: string): string {
+  return `rl:login_failed:${email.toLowerCase()}:${ip}`;
+}
+
+export const failedLoginLimiter = {
+  async check(
+    email: string,
+    ip: string
+  ): Promise<{ blocked: boolean; retryAfterSec: number }> {
+    try {
+      const raw = await redis.get(failedLoginKey(email, ip));
+      if (raw !== null && parseInt(raw, 10) >= FAILED_LOGIN_MAX_ATTEMPTS) {
+        const pttl = await redis.pttl(failedLoginKey(email, ip));
+        return {
+          blocked:       true,
+          retryAfterSec: Math.ceil((pttl > 0 ? pttl : FAILED_LOGIN_WINDOW_MS) / 1000),
+        };
+      }
+      return { blocked: false, retryAfterSec: 0 };
+    } catch {
+      return { blocked: false, retryAfterSec: 0 }; // fail open
+    }
+  },
+
+  async increment(email: string, ip: string): Promise<void> {
+    try {
+      await redis.eval(
+        LUA_INCREMENT,
+        1,
+        failedLoginKey(email, ip),
+        FAILED_LOGIN_WINDOW_MS.toString()
+      );
+    } catch {
+      // ignore — fail open
+    }
+  },
+
+  async reset(email: string, ip: string): Promise<void> {
+    try {
+      await redis.del(failedLoginKey(email, ip));
+    } catch {
+      // ignore
+    }
+  },
+};
+
+/** Auth — login: 30 requests per 15 min per IP (soft flood guard).
+ *  Credential-based brute-force protection is handled separately by
+ *  failedLoginLimiter, which only counts actual failed attempts. */
 export const loginRateLimiter = makeRedisLimiter({
   prefix:       "login",
   windowMs:     15 * 60 * 1000,
-  max:          5,
+  max:          30,
   keyGenerator: getClientIp,
 });
 
