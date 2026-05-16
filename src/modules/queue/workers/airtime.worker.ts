@@ -11,6 +11,9 @@ import {
 } from "../../transactions/services/transaction.service";
 
 import { walletService } from "../../wallet/services/wallet-api.service";
+import { createNotification } from "../../notifications/services/notification.service";
+
+console.log("[AIRTIME WORKER MODULE LOADED v3]");
 
 export const airtimeWorker = createWorker(
   "airtime-purchases",
@@ -76,6 +79,34 @@ export const airtimeWorker = createWorker(
       },
     });
 
+    const notifType = providerResult.success ? "purchase_successful" : "purchase_failed";
+    console.log(
+      "[AIRTIME WORKER] [NOTIFICATION CREATE START]",
+      `| user_id=${transaction.user_id}`,
+      `| reference=${data.reference}`,
+      `| notifType=${notifType}`
+    );
+    try {
+      const notifId = await createNotification({
+        user_id: transaction.user_id,
+        channel: "in_app",
+        type:    notifType,
+        title:   providerResult.success ? "Transaction Successful" : "Transaction Failed",
+        message: providerResult.success
+          ? "Your airtime purchase was successful."
+          : "Your airtime purchase failed and has been refunded.",
+        metadata: {
+          reference: data.reference,
+          type:      "airtime",
+          amount:    data.amount,
+          ...(providerResult.success ? {} : { failure_reason: providerResult.message }),
+        },
+      });
+      console.log("[AIRTIME WORKER] [NOTIFICATION CREATE SUCCESS] id:", notifId);
+    } catch (notifErr) {
+      console.error("[AIRTIME WORKER] [NOTIFICATION CREATE FAILED]", notifErr);
+    }
+
     console.log("[AIRTIME WORKER] Completed:", data.reference);
   }
 );
@@ -135,6 +166,26 @@ airtimeWorker.on("failed", async (job, err) => {
         status: "failed",
         failure_reason: err.message,
       });
+    }
+
+    try {
+      await createNotification({
+        user_id:  null,
+        channel:  "admin",
+        type:     "worker_job_permanently_failed",
+        title:    "Worker Job Permanently Failed",
+        message:  `Airtime job "${job.name}" for reference ${data?.reference ?? "unknown"} permanently failed after ${job.attemptsMade} attempts: ${err.message}`,
+        metadata: {
+          queue_name:    "airtime-purchases",
+          job_id:        job.id,
+          reference:     data?.reference ?? null,
+          user_id:       data?.user_id   ?? null,
+          error_message: err.message,
+          retry_count:   job.attemptsMade,
+        },
+      });
+    } catch (notifErr) {
+      console.error("[AIRTIME WORKER] Failed to create admin notification:", (notifErr as Error).message);
     }
 
     console.log(

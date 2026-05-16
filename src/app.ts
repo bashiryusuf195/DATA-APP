@@ -31,6 +31,8 @@ import { adminQueueRouter } from "./modules/queue/routes/admin-queue.routes";
 import { webhookRouter } from "./modules/webhooks/routes/webhook.routes";
 import { adminWebhookRouter } from "./modules/webhooks/routes/admin-webhook.routes";
 import { adminReconciliationRouter } from "./modules/reconciliation/routes/admin-reconciliation.routes";
+import { notificationsRouter }       from "./modules/notifications/routes/notifications.routes";
+import { adminNotificationsRouter }  from "./modules/notifications/routes/admin-notifications.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -67,6 +69,8 @@ app.use("/admin", adminCatalogRouter);
 app.use("/admin", adminQueueRouter);
 app.use("/admin", adminWebhookRouter);
 app.use("/admin", adminReconciliationRouter);
+app.use("/admin", adminNotificationsRouter);
+app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
