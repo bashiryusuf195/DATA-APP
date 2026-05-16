@@ -5,11 +5,13 @@ import { Router } from "express";
 
 import { authenticate }       from "../middleware/authenticate";
 import {
-  loginLimiter,
-  registerLimiter,
   refreshLimiter,
   changePasswordLimiter,
 } from "../middleware/rateLimiter";
+import {
+  loginRateLimiter,
+  registerRateLimiter,
+} from "../../../middleware/rateLimiter.redis";
 import {
   registerController,
   loginController,
@@ -22,8 +24,8 @@ import {
 const router = Router();
 
 // ── Public routes (no auth required) ──────────────────────────
-router.post("/register",        registerLimiter,    registerController);
-router.post("/login",           loginLimiter,       loginController);
+router.post("/register",        registerRateLimiter, registerController);
+router.post("/login",           loginRateLimiter,    loginController);
 router.post("/refresh",         refreshLimiter,     refreshController);
 
 // ── Protected routes (authenticate middleware required) ────────

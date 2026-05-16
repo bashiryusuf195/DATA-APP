@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { authenticate } from "../../auth/middleware/authenticate";
+import { balanceRateLimiter } from "../../../middleware/rateLimiter.redis";
 
 import {
   getBalanceController,
@@ -16,6 +17,7 @@ const router = Router();
 router.get(
   "/balance",
   authenticate,
+  balanceRateLimiter,
   getBalanceController
 );
 
