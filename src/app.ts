@@ -28,6 +28,8 @@ import { transactionRouter } from "./modules/transactions/routes/transaction.rou
 import { catalogRouter } from "./modules/catalog/routes/catalog.routes";
 import { adminCatalogRouter } from "./modules/catalog/routes/admin-catalog.routes";
 import { adminQueueRouter } from "./modules/queue/routes/admin-queue.routes";
+import { webhookRouter } from "./modules/webhooks/routes/webhook.routes";
+import { adminWebhookRouter } from "./modules/webhooks/routes/admin-webhook.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -62,6 +64,8 @@ app.use("/transactions", transactionRouter);
 app.use("/services", catalogRouter);
 app.use("/admin", adminCatalogRouter);
 app.use("/admin", adminQueueRouter);
+app.use("/admin", adminWebhookRouter);
+app.use("/webhooks", webhookRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.

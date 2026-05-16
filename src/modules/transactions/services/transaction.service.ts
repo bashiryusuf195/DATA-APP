@@ -74,6 +74,21 @@ export async function getTransactionByReferenceForUser(
     .first();
 }
 
+export async function mergeTransactionMetadata(
+  reference: string,
+  additionalMetadata: Record<string, unknown>
+): Promise<void> {
+  await db("transactions")
+    .where({ reference })
+    .update({
+      metadata: db.raw(
+        "COALESCE(metadata, '{}'::jsonb) || ?::jsonb",
+        [JSON.stringify(additionalMetadata)]
+      ),
+      updated_at: new Date(),
+    });
+}
+
 export async function getUserTransactions(
   userId: string,
   options: {
