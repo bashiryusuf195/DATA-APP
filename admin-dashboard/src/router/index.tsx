@@ -20,10 +20,11 @@ import { QueueMonitorPage }   from '@/pages/QueueMonitor'
 import { FailedJobsPage }     from '@/pages/FailedJobs'
 import { WebhookEventsPage }    from '@/pages/WebhookEvents'
 import { JournalBatchesPage }   from '@/pages/JournalBatches'
+import { AuditLogsPage }        from '@/pages/AuditLogs'
 import { NotFoundPage }         from '@/pages/NotFound'
 
 import {
-  Shield, Tag, Globe, Landmark, ClipboardList,
+  Shield, Tag, Globe, Landmark,
   UserCheck, Lock, Gauge, Scale, Cpu, MessageSquare, Flag, Megaphone,
   RotateCcw, Package, List, AlertTriangle,
 } from 'lucide-react'
@@ -195,23 +196,7 @@ export const router = createBrowserRouter([
       { path: '/attempts',     element: <AttemptsPage /> },
 
       // ── Security ───────────────────────────────────────────────────────────
-      {
-        path: '/audit-logs',
-        element: (
-          <PlaceholderPage
-            title="Audit Logs"
-            subtitle="Immutable log of all data changes and admin actions"
-            icon={<ClipboardList className="h-10 w-10" />}
-            features={[
-              'Full action audit trail',
-              'Filter by actor, resource and action type',
-              'Before/after diff viewer',
-              'Export to CSV or SIEM',
-              'Tamper-evident log storage',
-            ]}
-          />
-        ),
-      },
+      { path: '/audit-logs', element: <AuditLogsPage /> },
       {
         path: '/admin-activity',
         element: (

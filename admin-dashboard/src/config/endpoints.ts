@@ -39,7 +39,7 @@ export const ENDPOINTS = {
   // ─── Planned (backend route not yet implemented) ─────────────────────────
   walletLedger:           ep('/admin/wallet-ledger',           'GET',  'available', 'Ledger Explorer',
                              'Admin-scoped wallet ledger with filtering'),
-  auditLogs:              ep('/admin/audit-logs',              'GET',  'planned', 'Audit Logs'),
+  auditLogs:              ep('/admin/audit-logs',              'GET',  'available', 'Audit Logs'),
   adminActivity:          ep('/admin/admin-activity',          'GET',  'planned', 'Admin Activity'),
   sessions:               ep('/admin/sessions',                'GET',  'planned', 'Sessions'),
   rateLimits:             ep('/admin/rate-limits',             'GET',  'planned', 'Rate Limits'),

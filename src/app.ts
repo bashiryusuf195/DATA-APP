@@ -39,6 +39,8 @@ import { adminProviderAttemptsRouter } from "./modules/providers/routes/admin-pr
 import { adminHealthMetricsRouter }    from "./modules/providers/routes/admin-health-metrics.routes";
 import { adminWalletRouter }           from "./modules/wallet/routes/admin-wallet.routes";
 import { adminUsersRouter }            from "./modules/auth/routes/admin-users.routes";
+import { adminAuditRouter }            from "./modules/audit/routes/admin-audit.routes";
+import { adminAuditMiddleware }        from "./middleware/adminAudit";
 import "./modules/queue";
 export const app = express();
 
@@ -72,6 +74,10 @@ app.use(requestLogger);
 app.use(standardLimiter);
 
 // ── 6. Routes ─────────────────────────────────────────────────────────────────
+// Admin audit middleware fires on res.on("finish") — registers before routes so
+// it captures every admin request that goes through the chain.
+app.use('/admin', adminAuditMiddleware);
+
 app.use('/api/v1', rootRouter);
 app.use("/auth", authRouter);
 app.use("/wallet", walletRouter);
@@ -88,6 +94,7 @@ app.use("/admin", adminProviderAttemptsRouter);
 app.use("/admin", adminHealthMetricsRouter);
 app.use("/admin", adminWalletRouter);
 app.use("/admin", adminUsersRouter);
+app.use("/admin", adminAuditRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);
 

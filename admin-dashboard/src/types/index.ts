@@ -238,6 +238,38 @@ export interface WebhookEvent {
   created_at: string
 }
 
+// ── Admin Audit Logs ─────────────────────────────────────────────────────────
+
+export type AuditOutcome = 'success' | 'failure' | 'partial'
+
+export interface AdminAuditLog {
+  id: string
+  admin_id: string
+  admin_email: string | null
+  action: string
+  description: string
+  resource_type: string | null
+  resource_id: string | null
+  outcome: AuditOutcome
+  error_message: string | null
+  ip_address: string | null
+  user_agent: string | null
+  request_id: string | null
+  request_method: string | null
+  endpoint_path: string | null
+  response_status: number | null
+  created_at: string
+}
+
+export interface AdminAuditLogDetail extends AdminAuditLog {
+  old_values: Record<string, unknown>
+  new_values: Record<string, unknown>
+  request_body: Record<string, unknown> | null
+  request_params: Record<string, unknown> | null
+  request_query: Record<string, unknown> | null
+  metadata: Record<string, unknown>
+}
+
 // ── Admin Ledger ──────────────────────────────────────────────────────────────
 
 export interface AdminLedgerEntry {
