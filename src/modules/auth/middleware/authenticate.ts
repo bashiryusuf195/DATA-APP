@@ -88,8 +88,21 @@ export async function authenticate(
     req.sessionId = session.id as string;
 
     next();
-  } catch (err) {
-    next(err);
+  } catch (err: unknown) {
+    // Belt-and-suspenders: if any jose JWT error escapes verifySupabaseJwt's
+    // own try/catch, convert it to 401 here so it never becomes a 500.
+    const isJoseError =
+      err instanceof Error &&
+      (err.name === 'JWTExpired' ||
+       err.name === 'JWTInvalid' ||
+       err.name === 'JWSInvalid' ||
+       err.name === 'JWTClaimValidationFailed')
+
+    if (isJoseError) {
+      return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired access token'))
+    }
+
+    next(err)
   }
 }
 

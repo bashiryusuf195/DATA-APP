@@ -27,8 +27,10 @@ export function errorHandler(
   next: NextFunction,
 ): void {
 
-  // ── Our own AppError subclasses ───────────────────────────────────────────
+  // ── Our own AppError (and all subclasses, including shared/errors/AppError) ──
+  // shared/errors/AppError extends this class, so instanceof works for both.
   if (err instanceof AppError) {
+    // Auth errors (4xx) are expected — log as warning, not error.
     if (err.statusCode >= 500) {
       logger.error('app_error', {
         code:       err.code,
@@ -51,8 +53,9 @@ export function errorHandler(
     }
 
     res.status(err.statusCode).json({
-      error:   err.message,
+      success: false,
       code:    err.code,
+      message: err.message,
       traceId: req.traceId,
       ...(err.meta ? { details: err.meta } : {}),
     });
@@ -62,8 +65,9 @@ export function errorHandler(
   // ── Zod validation errors ─────────────────────────────────────────────────
   if (err instanceof ZodError) {
     res.status(400).json({
-      error:   'Request validation failed.',
+      success: false,
       code:    'VALIDATION_ERROR',
+      message: 'Request validation failed.',
       traceId: req.traceId,
       details: err.flatten().fieldErrors,
     });
@@ -81,14 +85,12 @@ export function errorHandler(
     userId:  req.user?.id,
   });
 
-  // In development, show the raw error message for easier debugging
-  const errMessage = err instanceof Error ? err.message : String(err);
-
   res.status(500).json({
-    error:   'An unexpected error occurred. Please try again or contact support.',
+    success: false,
     code:    'INTERNAL_ERROR',
+    message: 'An unexpected error occurred. Please try again or contact support.',
     traceId: req.traceId,
-    ...(config.isDev ? { debug: errMessage } : {}),
+    ...(config.isDev ? { debug: (err instanceof Error ? err.message : String(err)) } : {}),
   });
 }
 
@@ -96,7 +98,8 @@ export function errorHandler(
 // Registered after all routes. Any request that didn't match a route ends here.
 export function notFoundHandler(req: Request, res: Response): void {
   res.status(404).json({
-    error: `Route ${req.method} ${req.path} does not exist.`,
-    code:  'NOT_FOUND',
+    success: false,
+    code:    'NOT_FOUND',
+    message: `Route ${req.method} ${req.path} does not exist.`,
   });
 }

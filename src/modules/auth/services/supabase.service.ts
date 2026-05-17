@@ -66,14 +66,17 @@ export async function verifySupabaseJwt(
     });
 
     return payload as unknown as SupabaseJwtPayload;
-  } catch (err) {
-    console.error("JWT verify failed:", err);
+  } catch (err: unknown) {
+    // Distinguish expired tokens from genuinely invalid ones for cleaner logging.
+    const isExpired =
+      err instanceof Error &&
+      (err.name === 'JWTExpired' || err.message.includes('"exp" claim'))
 
-    throw new AppError(
-      401,
-      "TOKEN_INVALID",
-      "Invalid or expired access token"
-    );
+    if (isExpired) {
+      throw new AppError(401, 'TOKEN_EXPIRED', 'Access token has expired. Please log in again.')
+    }
+
+    throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired access token')
   }
 }
 
