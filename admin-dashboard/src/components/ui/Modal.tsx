@@ -36,15 +36,15 @@ export function Modal({ open, onClose, title, subtitle, children, footer, size =
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      {/* Panel */}
+      {/* Panel — flex column so header/footer stick and body scrolls */}
       <div
         className={cn(
-          'relative w-full rounded-2xl bg-surface-1 border border-border shadow-2xl animate-slide-in',
+          'relative w-full flex flex-col max-h-[90vh] rounded-2xl bg-surface-1 border border-border shadow-2xl animate-slide-in',
           sizeClasses[size]
         )}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-border">
+        {/* Header — never shrinks */}
+        <div className="flex-shrink-0 flex items-start justify-between p-5 border-b border-border">
           <div>
             <h2 className="text-base font-semibold text-ink">{title}</h2>
             {subtitle && <p className="text-xs text-ink-muted mt-0.5">{subtitle}</p>}
@@ -53,11 +53,11 @@ export function Modal({ open, onClose, title, subtitle, children, footer, size =
             <X className="h-4 w-4" />
           </Button>
         </div>
-        {/* Body */}
-        <div className="p-5">{children}</div>
-        {/* Footer */}
+        {/* Body — takes remaining space and scrolls when content overflows */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5">{children}</div>
+        {/* Footer — never shrinks, always visible */}
         {footer && (
-          <div className="flex items-center justify-end gap-2 p-5 border-t border-border">
+          <div className="flex-shrink-0 flex items-center justify-end gap-2 p-5 border-t border-border bg-surface-1 rounded-b-2xl">
             {footer}
           </div>
         )}

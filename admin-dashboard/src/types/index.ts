@@ -368,6 +368,93 @@ export interface UserRole {
   expires_at: string | null
 }
 
+// ── Service Catalog ───────────────────────────────────────────────────────────
+
+export type ServiceType = 'airtime' | 'data' | 'electricity' | 'cable_tv' | 'exam_pin' | 'identity_verification'
+
+export interface CatalogService {
+  id: string
+  slug: string
+  name: string
+  service_type: ServiceType
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ServicePlan {
+  id: string
+  service_id: string
+  provider_code: string
+  name: string
+  variation_code: string
+  amount: string        // DECIMAL comes back as string from Postgres
+  cost_price: string | null
+  selling_price: string | null
+  is_variable_amount: boolean
+  metadata: Record<string, unknown>
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // provider routing overrides
+  primary_provider_code: string | null
+  fallback_provider_code: string | null
+  provider_variation_code: string | null
+  provider_metadata: Record<string, unknown>
+  // joined
+  service_slug: string
+  service_name: string
+  service_type: ServiceType
+}
+
+export interface CreateServiceInput {
+  slug: string
+  name: string
+  service_type: ServiceType
+  is_active?: boolean
+}
+
+export interface UpdateServiceInput {
+  slug?: string
+  name?: string
+  service_type?: ServiceType
+  is_active?: boolean
+}
+
+export interface CreateServicePlanInput {
+  service_id: string
+  provider_code: string
+  name: string
+  variation_code: string
+  amount: number
+  cost_price?: number | null
+  selling_price?: number | null
+  is_variable_amount?: boolean
+  metadata?: Record<string, unknown>
+  is_active?: boolean
+  primary_provider_code?: string | null
+  fallback_provider_code?: string | null
+  provider_variation_code?: string | null
+  provider_metadata?: Record<string, unknown>
+}
+
+export interface UpdateServicePlanInput {
+  service_id?: string
+  provider_code?: string
+  name?: string
+  variation_code?: string
+  amount?: number
+  cost_price?: number | null
+  selling_price?: number | null
+  is_variable_amount?: boolean
+  metadata?: Record<string, unknown>
+  is_active?: boolean
+  primary_provider_code?: string | null
+  fallback_provider_code?: string | null
+  provider_variation_code?: string | null
+  provider_metadata?: Record<string, unknown>
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export type SettingValueType = 'text' | 'number' | 'boolean' | 'json'

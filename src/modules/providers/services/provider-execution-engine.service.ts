@@ -32,11 +32,17 @@ export interface TransactionForExecution {
   currency:              string;
 }
 
+export interface PlanProviderOverrides {
+  primary_provider_code:  string | null | undefined;
+  fallback_provider_code: string | null | undefined;
+}
+
 export interface ExecuteWithFailoverParams {
   service_type:          ProviderServiceType;
   purchase_input:        ProviderPurchaseInput;
   transaction_reference: string;
   transaction:           TransactionForExecution;
+  plan_overrides?:       PlanProviderOverrides;
 }
 
 export interface RejectedProvider {
@@ -100,7 +106,8 @@ class ProviderExecutionEngine {
     // ── Resolve ordered provider candidates ───────────────────────────────────
     const { candidates, rejectedProviders } = await this.resolveProviderCandidates(
       service_type,
-      new Set(alreadyFailedCodes)
+      new Set(alreadyFailedCodes),
+      params.plan_overrides,
     );
 
     if (candidates.length === 0) {
@@ -240,8 +247,9 @@ class ProviderExecutionEngine {
   // ── Candidate resolution ───────────────────────────────────────────────────
 
   private async resolveProviderCandidates(
-    serviceType: ProviderServiceType,
-    skipCodes:   Set<string>
+    serviceType:    ProviderServiceType,
+    skipCodes:      Set<string>,
+    planOverrides?: PlanProviderOverrides,
   ): Promise<{ candidates: ProviderCandidate[]; rejectedProviders: RejectedProvider[] }> {
     const candidates:        ProviderCandidate[] = [];
     const rejectedProviders: RejectedProvider[]  = [];
@@ -252,7 +260,23 @@ class ProviderExecutionEngine {
       rejectedProviders.push({ provider_code: code, reason: "ALREADY_ATTEMPTED" });
     }
 
-    // 1. Routing-rule path (primary → fallback)
+    // 1. Plan-level overrides (highest priority — set per service plan)
+    if (planOverrides?.primary_provider_code) {
+      const primary = planOverrides.primary_provider_code;
+      console.log(`[ROUTING] plan override → primary '${primary}' for ${serviceType}`);
+      await this.tryAddCandidate(primary, serviceType, false, seen, candidates, rejectedProviders);
+      if (planOverrides.fallback_provider_code) {
+        await this.tryAddCandidate(
+          planOverrides.fallback_provider_code, serviceType, true, seen, candidates, rejectedProviders
+        );
+      }
+      // Skip service-level routing rules when plan overrides are present
+      if (candidates.length > 0) {
+        // Still fall through to priority-based for additional fallback capacity
+      }
+    }
+
+    // 2. Routing-rule path (primary → fallback)
     let rule = null;
     try {
       rule = await getActiveRoutingRule(serviceType);

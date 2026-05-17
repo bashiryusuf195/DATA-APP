@@ -57,6 +57,8 @@ export const ENDPOINTS = {
   serviceAvailability:    ep('/admin/service-availability',    'GET',  'planned', 'Service Availability'),
   paystackTxns:           ep('/admin/paystack-transactions',   'GET',  'planned', 'Paystack Transactions'),
   virtualAccounts:        ep('/admin/virtual-accounts',        'GET',  'planned', 'Virtual Accounts'),
+  adminServices:          ep('/admin/services',                 'GET',  'available', 'Services Catalog'),
+  adminServicePlans:      ep('/admin/service-plans',           'GET',  'available', 'Service Plans'),
   roles:                  ep('/admin/roles',                   'GET',  'available', 'Roles & Permissions'),
   permissions:            ep('/admin/permissions',             'GET',  'available', 'Permissions Matrix'),
   revenueAnalytics:       ep('/admin/revenue/analytics',       'GET',  'planned', 'Revenue Analytics'),

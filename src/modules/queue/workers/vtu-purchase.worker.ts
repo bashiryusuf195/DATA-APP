@@ -7,6 +7,8 @@ import {
   updateTransactionStatus,
 } from "../../transactions/services/transaction.service";
 import { createNotification } from "../../notifications/services/notification.service";
+import { getPlanByVariationCode } from "../../catalog/services/catalog.service";
+import type { PlanProviderOverrides } from "../../providers/services/provider-execution-engine.service";
 
 console.log("[VTU WORKER MODULE LOADED v4]");
 
@@ -37,11 +39,24 @@ export const vtuPurchaseWorker = createWorker(
       throw new Error("Forced worker crash");
     }
 
+    // Resolve plan-level provider overrides — takes precedence over routing rules.
+    let planOverrides: PlanProviderOverrides | undefined;
+    if (data.variation_code) {
+      const plan = await getPlanByVariationCode(data.service_type, data.variation_code).catch(() => null);
+      if (plan?.primary_provider_code) {
+        planOverrides = {
+          primary_provider_code:  plan.primary_provider_code as string,
+          fallback_provider_code: (plan.fallback_provider_code as string | null) ?? null,
+        };
+      }
+    }
+
     // Execution engine handles: provider selection, capability check, health
     // awareness, failover, refund on failure, transaction status update,
     // and user notification.
     const result = await providerExecutionEngine.executeWithFailover({
       service_type: data.service_type,
+      plan_overrides: planOverrides,
       purchase_input: {
         service_type:     data.service_type,
         amount:           data.amount,

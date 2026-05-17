@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { AppError } from "../../../shared/errors/AppError";
 import {
+  adminListServices,
+  adminListServicePlans,
   createCatalogService,
   updateCatalogService,
   createServicePlan,
@@ -57,6 +59,10 @@ const CreateServicePlanSchema = z.object({
   is_variable_amount: z.boolean().default(false),
   metadata: z.record(z.unknown()).default({}),
   is_active: z.boolean().default(true),
+  primary_provider_code: z.string().max(100).nullable().optional(),
+  fallback_provider_code: z.string().max(100).nullable().optional(),
+  provider_variation_code: z.string().max(100).nullable().optional(),
+  provider_metadata: z.record(z.unknown()).default({}),
 });
 
 const UpdateServicePlanSchema = z
@@ -71,12 +77,56 @@ const UpdateServicePlanSchema = z
     is_variable_amount: z.boolean().optional(),
     metadata: z.record(z.unknown()).optional(),
     is_active: z.boolean().optional(),
+    primary_provider_code: z.string().max(100).nullable().optional(),
+    fallback_provider_code: z.string().max(100).nullable().optional(),
+    provider_variation_code: z.string().max(100).nullable().optional(),
+    provider_metadata: z.record(z.unknown()).optional(),  // keep optional on update — only set when explicitly sent
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "At least one field must be provided",
   });
 
-// ── Controllers ───────────────────────────────────────────────────────────────
+// ── List controllers ──────────────────────────────────────────────────────────
+
+export async function listServicesAdminController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const service_type = typeof req.query.service_type === "string" ? req.query.service_type : undefined;
+    const is_active =
+      req.query.is_active === "true" ? true
+      : req.query.is_active === "false" ? false
+      : undefined;
+    const services = await adminListServices({ service_type, is_active });
+    res.json({ success: true, data: services });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listServicePlansAdminController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const service_id = typeof req.query.service_id === "string" ? req.query.service_id : undefined;
+    const provider_code = typeof req.query.provider_code === "string" ? req.query.provider_code : undefined;
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const is_active =
+      req.query.is_active === "true" ? true
+      : req.query.is_active === "false" ? false
+      : undefined;
+    const plans = await adminListServicePlans({ service_id, provider_code, search, is_active });
+    res.json({ success: true, data: plans });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Write controllers ─────────────────────────────────────────────────────────
 
 export async function createServiceController(
   req: Request,

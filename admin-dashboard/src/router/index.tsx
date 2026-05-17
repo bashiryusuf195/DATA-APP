@@ -23,12 +23,15 @@ import { JournalBatchesPage }   from '@/pages/JournalBatches'
 import { AuditLogsPage }        from '@/pages/AuditLogs'
 import { RolesPage }            from '@/pages/Roles'
 import { SettingsPage }         from '@/pages/Settings'
+import { ServicesPage }         from '@/pages/Services'
+import { ServicePlansPage }     from '@/pages/ServicePlans'
+import { PricingPage }          from '@/pages/Pricing'
 import { NotFoundPage }         from '@/pages/NotFound'
 
 import {
-  Tag, Globe, Landmark,
+  Globe, Landmark,
   UserCheck, Lock, Gauge, Scale, Cpu, MessageSquare, Flag, Megaphone,
-  RotateCcw, Package, List, AlertTriangle,
+  RotateCcw, AlertTriangle,
 } from 'lucide-react'
 
 export const router = createBrowserRouter([
@@ -72,54 +75,9 @@ export const router = createBrowserRouter([
       { path: '/revenue', element: <RevenuePage /> },
 
       // ── Services ───────────────────────────────────────────────────────────
-      {
-        path: '/services',
-        element: (
-          <PlaceholderPage
-            title="Services Catalog"
-            subtitle="Manage VTU services offered on the platform"
-            icon={<Package className="h-10 w-10" />}
-            features={[
-              'Add and configure service types',
-              'Enable / disable per service',
-              'Service metadata and descriptions',
-              'Provider-to-service mapping',
-            ]}
-          />
-        ),
-      },
-      {
-        path: '/service-plans',
-        element: (
-          <PlaceholderPage
-            title="Service Plans"
-            subtitle="Data plans, cable bouquets and electricity token types"
-            icon={<List className="h-10 w-10" />}
-            features={[
-              'Import plans from providers',
-              'Custom plan creation',
-              'Plan availability toggle',
-              'Plan metadata and descriptions',
-            ]}
-          />
-        ),
-      },
-      {
-        path: '/pricing',
-        element: (
-          <PlaceholderPage
-            title="Pricing"
-            subtitle="Service pricing, margins and fee configuration"
-            icon={<Tag className="h-10 w-10" />}
-            features={[
-              'Set markup percentages per service',
-              'User-tier based pricing',
-              'Promotional pricing windows',
-              'Fee transparency configuration',
-            ]}
-          />
-        ),
-      },
+      { path: '/services',       element: <ServicesPage /> },
+      { path: '/service-plans',  element: <ServicePlansPage /> },
+      { path: '/pricing',        element: <PricingPage /> },
       {
         path: '/service-availability',
         element: (
