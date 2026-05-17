@@ -34,9 +34,10 @@ export const ENDPOINTS = {
   walletBalance:     ep('/wallet/balance',                'GET', 'available', 'Wallet Monitor'),
   transactions:      ep('/transactions',                  'GET', 'available', 'Transactions'),
 
+  adminUsers:             ep('/admin/users',                   'GET',  'available', 'Users'),
+
   // ─── Planned (backend route not yet implemented) ─────────────────────────
-  adminUsers:             ep('/admin/users',                   'GET',  'planned', 'Users'),
-  walletLedger:           ep('/wallet/ledger',                 'GET',  'planned', 'Ledger Explorer',
+  walletLedger:           ep('/admin/wallet-ledger',           'GET',  'available', 'Ledger Explorer',
                              'Admin-scoped wallet ledger with filtering'),
   auditLogs:              ep('/admin/audit-logs',              'GET',  'planned', 'Audit Logs'),
   adminActivity:          ep('/admin/admin-activity',          'GET',  'planned', 'Admin Activity'),
@@ -48,7 +49,7 @@ export const ENDPOINTS = {
   disputes:               ep('/admin/disputes',                'GET',  'planned', 'Disputes'),
   complaints:             ep('/admin/complaints',              'GET',  'planned', 'Complaints'),
   broadcast:              ep('/admin/broadcast',               'POST', 'planned', 'Broadcast Notifications'),
-  journalBatches:         ep('/admin/journal-batches',         'GET',  'planned', 'Journal Batches'),
+  journalBatches:         ep('/admin/journal-batches',         'GET',  'available', 'Journal Batches'),
   refunds:                ep('/admin/refunds',                 'GET',  'planned', 'Refunds'),
   services:               ep('/admin/services',                'GET',  'planned', 'Services Catalog'),
   servicePlans:           ep('/admin/service-plans',           'GET',  'planned', 'Service Plans'),

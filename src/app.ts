@@ -38,6 +38,7 @@ import { adminRoutingRulesRouter }     from "./modules/providers/routes/admin-ro
 import { adminProviderAttemptsRouter } from "./modules/providers/routes/admin-provider-attempts.routes";
 import { adminHealthMetricsRouter }    from "./modules/providers/routes/admin-health-metrics.routes";
 import { adminWalletRouter }           from "./modules/wallet/routes/admin-wallet.routes";
+import { adminUsersRouter }            from "./modules/auth/routes/admin-users.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -86,6 +87,7 @@ app.use("/admin", adminRoutingRulesRouter);
 app.use("/admin", adminProviderAttemptsRouter);
 app.use("/admin", adminHealthMetricsRouter);
 app.use("/admin", adminWalletRouter);
+app.use("/admin", adminUsersRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);
 

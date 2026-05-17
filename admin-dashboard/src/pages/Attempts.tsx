@@ -7,6 +7,7 @@ import { BoolBadge } from '@/components/shared/StatusBadge'
 import { Pagination } from '@/components/shared/Pagination'
 import { StatCard } from '@/components/shared/StatCard'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { Drawer } from '@/components/shared/Drawer'
 import { Button, Input, Select, Badge, Card } from '@/components/ui'
 import { SkeletonTable, SkeletonCard } from '@/components/ui/Skeleton'
 import { fmtDate, fmtLatency, truncate, fmtPercent } from '@/utils/format'
@@ -30,6 +31,7 @@ export function AttemptsPage() {
   const [refSearch, setRefSearch] = useState('')
   const [providerFilter, setProviderFilter] = useState('')
   const [successFilter, setSuccessFilter] = useState<'' | 'true' | 'false'>('')
+  const [selected, setSelected] = useState<ProviderAttempt | null>(null)
   const limit = 20
 
   const debouncedRef = useDebounce(refSearch)
@@ -46,8 +48,8 @@ export function AttemptsPage() {
       }),
   })
 
-  const rows: ProviderAttempt[] = raw && 'data' in raw ? (raw.data as ProviderAttempt[]) : []
-  const total = raw && 'total' in raw ? (raw.total ?? rows.length) : rows.length
+  const rows: ProviderAttempt[] = raw?.data ?? []
+  const total = raw?.total ?? rows.length
 
   const successful = rows.filter((a) => a.success).length
   const avgLatency = rows.length
@@ -118,6 +120,8 @@ export function AttemptsPage() {
             <DataTable
               data={rows}
               rowKey={(a) => a.id}
+              onRowClick={setSelected}
+              emptyMessage="No provider attempts found."
               columns={[
                 {
                   key: 'ref',
@@ -188,6 +192,66 @@ export function AttemptsPage() {
           </>
         )}
       </Card>
+
+      {/* Detail drawer */}
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title="Provider Attempt Detail"
+        subtitle={selected ? `${selected.provider_code} · attempt #${selected.attempt_number}` : ''}
+        width="lg"
+      >
+        {selected && (
+          <div className="space-y-4 text-sm">
+            <Row label="Reference"    value={<span className="font-mono text-xs break-all">{selected.transaction_reference}</span>} />
+            <Row label="Provider"     value={<span className="font-mono text-accent">{selected.provider_code}</span>} />
+            <Row label="Attempt #"    value={<span className="font-bold">{selected.attempt_number}</span>} />
+            <Row label="Result"       value={<BoolBadge value={selected.success} trueLabel="Success" falseLabel="Failed" />} />
+            <Row label="Latency"      value={<span className="font-mono">{fmtLatency(selected.latency_ms)}</span>} />
+            <Row label="Date"         value={fmtDate(selected.created_at)} />
+            {selected.error_classification && (
+              <Row label="Error Class" value={
+                <Badge variant={ERROR_CLASS_VARIANTS[selected.error_classification] ?? 'neutral'} size="sm">
+                  {selected.error_classification}
+                </Badge>
+              } />
+            )}
+            {selected.error_message && (
+              <div>
+                <p className="text-xs text-ink-faint font-medium mb-1.5">Error Message</p>
+                <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 p-3">
+                  <p className="text-xs text-rose-300">{selected.error_message}</p>
+                </div>
+              </div>
+            )}
+            {selected.request_payload && Object.keys(selected.request_payload).length > 0 && (
+              <div>
+                <p className="text-xs text-ink-faint font-medium mb-1.5">Request Payload</p>
+                <pre className="text-xs bg-surface-2 rounded-lg p-3 overflow-auto max-h-48 text-ink-muted">
+                  {JSON.stringify(selected.request_payload, null, 2)}
+                </pre>
+              </div>
+            )}
+            {selected.response_payload && Object.keys(selected.response_payload).length > 0 && (
+              <div>
+                <p className="text-xs text-ink-faint font-medium mb-1.5">Response Payload</p>
+                <pre className="text-xs bg-surface-2 rounded-lg p-3 overflow-auto max-h-48 text-ink-muted">
+                  {JSON.stringify(selected.response_payload, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-xs text-ink-faint w-28 shrink-0">{label}</span>
+      <span className="text-sm text-ink text-right">{value}</span>
     </div>
   )
 }

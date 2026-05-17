@@ -6,9 +6,10 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DataTable } from '@/components/shared/DataTable'
 import { ProviderHealthBadge, CircuitBadge, BoolBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { Drawer } from '@/components/shared/Drawer'
 import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
-import { fmtDate } from '@/utils/format'
+import { fmtDate, fmtPercent } from '@/utils/format'
 import type { Provider, UpdateProviderInput, ProviderCircuitState } from '@/types'
 import { RefreshCw, Edit, Activity, ShieldOff, ShieldCheck } from 'lucide-react'
 import { ENDPOINTS } from '@/config/endpoints'
@@ -23,9 +24,15 @@ const SERVICE_OPTIONS = [
   { value: 'exam_pin', label: 'Exam PIN' },
 ]
 
+function errMsg(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) return err.response?.data?.message ?? err.message ?? fallback
+  return fallback
+}
+
 export function ProvidersPage() {
   const qc = useQueryClient()
   const [editProvider, setEditProvider] = useState<Provider | null>(null)
+  const [selected, setSelected] = useState<Provider | null>(null)
   const [form, setForm] = useState<UpdateProviderInput>({})
 
   const { data: providers = [], isLoading, error, refetch } = useQuery({
@@ -49,9 +56,7 @@ export function ProvidersPage() {
       toast.success('Provider updated')
       setEditProvider(null)
     },
-    onError: (err) => {
-      toast.error(axios.isAxiosError(err) ? err.response?.data?.message : 'Update failed')
-    },
+    onError: (err) => toast.error(errMsg(err, 'Update failed')),
   })
 
   const healthCheckMutation = useMutation({
@@ -109,6 +114,8 @@ export function ProvidersPage() {
           <DataTable
             data={providers}
             rowKey={(p) => p.id}
+            onRowClick={setSelected}
+            emptyMessage="No providers configured yet."
             columns={[
               {
                 key: 'name',
@@ -176,7 +183,7 @@ export function ProvidersPage() {
                 render: (p) => {
                   const m = metricsByCode[p.provider_code]
                   return (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                       {m?.circuit_open && (
                         <Button
                           variant="ghost"
@@ -301,6 +308,82 @@ export function ProvidersPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Detail drawer */}
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title="Provider Detail"
+        subtitle={selected?.display_name ?? ''}
+      >
+        {selected && (() => {
+          const m = metricsByCode[selected.provider_code]
+          const total = m ? m.success_count + m.failure_count : 0
+          return (
+            <div className="space-y-4 text-sm">
+              <Row label="Code"        value={<span className="font-mono text-xs">{selected.provider_code}</span>} />
+              <Row label="Display Name" value={selected.display_name} />
+              <Row label="Status"      value={<BoolBadge value={selected.is_active} trueLabel="Active" falseLabel="Inactive" />} />
+              <Row label="Health"      value={<ProviderHealthBadge status={selected.health_status} />} />
+              <Row label="Priority"    value={<span className="font-mono font-semibold">{selected.priority}</span>} />
+              <Row label="Services"    value={
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {(selected.supported_services ?? []).map((s) => (
+                    <Badge key={s} variant="neutral" size="sm">{s}</Badge>
+                  ))}
+                </div>
+              } />
+              <Row label="Created"     value={fmtDate(selected.created_at)} />
+              <Row label="Updated"     value={fmtDate(selected.updated_at)} />
+
+              {m && (
+                <>
+                  <div className="border-t border-border my-2" />
+                  <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">Circuit Metrics</p>
+                  <Row label="Circuit"          value={<CircuitBadge open={m.circuit_open} />} />
+                  <Row label="Success Rate"     value={fmtPercent(m.success_count, total)} />
+                  <Row label="Successes"        value={<span className="text-emerald-400 font-semibold">{m.success_count}</span>} />
+                  <Row label="Failures"         value={<span className="text-rose-400 font-semibold">{m.failure_count}</span>} />
+                  <Row label="Consecutive Fail" value={<span className="text-amber-400 font-semibold">{m.consecutive_failures}</span>} />
+                  {m.last_success_at && <Row label="Last Success" value={fmtDate(m.last_success_at)} />}
+                  {m.last_failure_at && <Row label="Last Failure" value={fmtDate(m.last_failure_at)} />}
+                </>
+              )}
+
+              <div className="border-t border-border pt-3 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Edit className="h-3.5 w-3.5" />}
+                  onClick={() => { setSelected(null); openEdit(selected) }}
+                >
+                  Edit
+                </Button>
+                {m?.circuit_open && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon={<ShieldCheck className="h-3.5 w-3.5" />}
+                    loading={resetCircuitMutation.isPending}
+                    onClick={() => resetCircuitMutation.mutate(selected.provider_code)}
+                  >
+                    Reset Circuit
+                  </Button>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+      </Drawer>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-xs text-ink-faint w-32 shrink-0">{label}</span>
+      <span className="text-sm text-ink text-right">{value}</span>
     </div>
   )
 }

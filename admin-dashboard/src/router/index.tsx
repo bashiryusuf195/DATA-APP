@@ -18,12 +18,14 @@ import { WalletPage }         from '@/pages/Wallets'
 import { NotificationsPage }  from '@/pages/Notifications'
 import { QueueMonitorPage }   from '@/pages/QueueMonitor'
 import { FailedJobsPage }     from '@/pages/FailedJobs'
-import { NotFoundPage }       from '@/pages/NotFound'
+import { WebhookEventsPage }    from '@/pages/WebhookEvents'
+import { JournalBatchesPage }   from '@/pages/JournalBatches'
+import { NotFoundPage }         from '@/pages/NotFound'
 
 import {
-  Shield, Tag, Globe, Plug, Landmark, ClipboardList,
+  Shield, Tag, Globe, Landmark, ClipboardList,
   UserCheck, Lock, Gauge, Scale, Cpu, MessageSquare, Flag, Megaphone,
-  FileText, RotateCcw, Package, List, AlertTriangle,
+  RotateCcw, Package, List, AlertTriangle,
 } from 'lucide-react'
 
 export const router = createBrowserRouter([
@@ -60,24 +62,8 @@ export const router = createBrowserRouter([
       },
 
       // ── Finance ────────────────────────────────────────────────────────────
-      { path: '/ledger',          element: <LedgerExplorerPage /> },
-      {
-        path: '/journal-batches',
-        element: (
-          <PlaceholderPage
-            title="Journal Batches"
-            subtitle="Double-entry accounting journal batch management"
-            icon={<FileText className="h-10 w-10" />}
-            features={[
-              'Create and post journal batches',
-              'Double-entry ledger entries',
-              'Batch approval workflows',
-              'Export to accounting systems',
-              'Reconciliation reports',
-            ]}
-          />
-        ),
-      },
+      { path: '/ledger',           element: <LedgerExplorerPage /> },
+      { path: '/journal-batches', element: <JournalBatchesPage /> },
       { path: '/funding', element: <FundingPage /> },
       {
         path: '/refunds',
@@ -181,22 +167,7 @@ export const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: '/webhooks',
-        element: (
-          <PlaceholderPage
-            title="Webhook Events"
-            subtitle="Incoming webhook payloads from payment providers"
-            icon={<Plug className="h-10 w-10" />}
-            features={[
-              'Real-time webhook event log',
-              'Payload inspection and replay',
-              'HMAC signature verification status',
-              'Webhook delivery failure alerts',
-            ]}
-          />
-        ),
-      },
+      { path: '/webhooks', element: <WebhookEventsPage /> },
       {
         path: '/virtual-accounts',
         element: (

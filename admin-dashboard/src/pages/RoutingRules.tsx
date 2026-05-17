@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { DataTable } from '@/components/shared/DataTable'
 import { BoolBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { Drawer } from '@/components/shared/Drawer'
 import { Button, Badge, Modal, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtDate } from '@/utils/format'
@@ -26,11 +27,17 @@ const blankForm = (): CreateRoutingRuleInput => ({
   is_active: true,
 })
 
+function errMsg(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) return err.response?.data?.message ?? err.message ?? fallback
+  return fallback
+}
+
 export function RoutingRulesPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState<'create' | { rule: RoutingRule } | null>(null)
   const [form, setForm] = useState<CreateRoutingRuleInput>(blankForm())
   const [filterService, setFilterService] = useState('')
+  const [selected, setSelected] = useState<RoutingRule | null>(null)
 
   const { data: rules = [], isLoading, error, refetch } = useQuery({
     queryKey: ['routing-rules'],
@@ -46,6 +53,8 @@ export function RoutingRulesPage() {
     .filter((p) => p.is_active)
     .map((p) => ({ value: p.provider_code, label: p.display_name }))
 
+  const providerNameByCode = Object.fromEntries(providers.map((p) => [p.provider_code, p.display_name]))
+
   const createMutation = useMutation({
     mutationFn: (body: CreateRoutingRuleInput) => routingApi.create(body),
     onSuccess: () => {
@@ -53,8 +62,7 @@ export function RoutingRulesPage() {
       toast.success('Routing rule created')
       setModal(null)
     },
-    onError: (err) =>
-      toast.error(axios.isAxiosError(err) ? err.response?.data?.message : 'Failed to create rule'),
+    onError: (err) => toast.error(errMsg(err, 'Failed to create rule')),
   })
 
   const updateMutation = useMutation({
@@ -65,7 +73,7 @@ export function RoutingRulesPage() {
       toast.success('Rule updated')
       setModal(null)
     },
-    onError: () => toast.error('Update failed'),
+    onError: (err) => toast.error(errMsg(err, 'Update failed')),
   })
 
   const openCreate = () => { setForm(blankForm()); setModal('create') }
@@ -126,6 +134,8 @@ export function RoutingRulesPage() {
           <DataTable
             data={filtered}
             rowKey={(r) => r.id}
+            onRowClick={setSelected}
+            emptyMessage="No routing rules configured yet."
             columns={[
               {
                 key: 'service',
@@ -166,7 +176,7 @@ export function RoutingRulesPage() {
                 header: '',
                 align: 'right',
                 render: (r) => (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="xs"
@@ -234,6 +244,76 @@ export function RoutingRulesPage() {
           />
         </div>
       </Modal>
+
+      {/* Detail drawer */}
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title="Routing Rule Detail"
+        subtitle={selected ? `${selected.service_type} routing` : ''}
+      >
+        {selected && (
+          <div className="space-y-4 text-sm">
+            <Row label="Service Type"      value={<Badge variant="accent">{selected.service_type}</Badge>} />
+            <Row label="Primary Provider"  value={
+              <div className="text-right">
+                <span className="font-mono text-sm">{selected.primary_provider_code}</span>
+                {providerNameByCode[selected.primary_provider_code] && (
+                  <p className="text-xs text-ink-faint">{providerNameByCode[selected.primary_provider_code]}</p>
+                )}
+              </div>
+            } />
+            <Row label="Fallback Provider" value={
+              selected.fallback_provider_code ? (
+                <div className="text-right">
+                  <span className="font-mono text-sm">{selected.fallback_provider_code}</span>
+                  {providerNameByCode[selected.fallback_provider_code] && (
+                    <p className="text-xs text-ink-faint">{providerNameByCode[selected.fallback_provider_code]}</p>
+                  )}
+                </div>
+              ) : <span className="text-ink-faint">None</span>
+            } />
+            <Row label="Status"            value={<BoolBadge value={selected.is_active} trueLabel="Active" falseLabel="Inactive" />} />
+            <Row label="Created"           value={fmtDate(selected.created_at)} />
+            <Row label="Updated"           value={fmtDate(selected.updated_at)} />
+
+            <div className="border-t border-border pt-3 flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Edit className="h-3.5 w-3.5" />}
+                onClick={() => { setSelected(null); openEdit(selected) }}
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={
+                  selected.is_active
+                    ? <ToggleRight className="h-3.5 w-3.5 text-emerald-400" />
+                    : <ToggleLeft className="h-3.5 w-3.5 text-ink-faint" />
+                }
+                onClick={() => {
+                  updateMutation.mutate({ id: selected.id, body: { is_active: !selected.is_active } })
+                  setSelected(null)
+                }}
+              >
+                {selected.is_active ? 'Deactivate' : 'Activate'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-xs text-ink-faint w-36 shrink-0">{label}</span>
+      <span className="text-sm text-ink text-right">{value}</span>
     </div>
   )
 }

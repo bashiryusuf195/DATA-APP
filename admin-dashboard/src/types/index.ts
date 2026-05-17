@@ -223,6 +223,83 @@ export interface FailedJob {
   created_at: string
 }
 
+// ── Webhook Events ────────────────────────────────────────────────────────
+
+export type WebhookEventStatus = 'processed' | 'failed' | 'duplicate' | 'unhandled' | 'pending'
+
+export interface WebhookEvent {
+  id: string
+  source: string
+  event_type: string
+  reference?: string | null
+  status: WebhookEventStatus
+  payload: Record<string, unknown>
+  error_message?: string | null
+  created_at: string
+}
+
+// ── Admin Ledger ──────────────────────────────────────────────────────────────
+
+export interface AdminLedgerEntry {
+  id: string
+  wallet_id: string
+  user_id: string | null
+  journal_batch_id: string
+  entry_type: 'debit' | 'credit'
+  amount: number
+  signed_amount: number
+  currency: string
+  running_balance: number | null
+  description: string
+  reference_type: string | null
+  reference_id: string | null
+  created_at: string
+}
+
+export interface AdminJournalBatch {
+  id: string
+  status: string
+  description: string
+  reference_type: string | null
+  reference_id: string | null
+  idempotency_key: string | null
+  total_credit: number
+  total_debit: number
+  entry_count: number
+  balanced: boolean
+  created_at: string
+}
+
+export interface AdminJournalBatchDetail {
+  id: string
+  status: string
+  description: string
+  reference_type: string | null
+  reference_id: string | null
+  idempotency_key: string | null
+  posted_at: string | null
+  reversed_at: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  summary: {
+    total_credit: number
+    total_debit: number
+    net: number
+    entry_count: number
+    balanced: boolean
+  }
+  entries: AdminLedgerEntry[]
+  linked_transaction: {
+    id: string
+    reference: string
+    type: string
+    status: string
+    amount: number
+    currency: string
+  } | null
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface PaginationParams {
