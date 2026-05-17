@@ -12,6 +12,7 @@ export interface ProviderAttempt {
   response_payload:      Record<string, unknown>;
   success:               boolean;
   error_message:         string | null;
+  error_classification:  string | null;
   latency_ms:            number | null;
   created_at:            Date;
 }
@@ -24,6 +25,7 @@ export interface RecordAttemptInput {
   response_payload:      Record<string, unknown>;
   success:               boolean;
   error_message:         string | null;
+  error_classification?: string | null;
   latency_ms:            number | null;
 }
 
@@ -42,6 +44,7 @@ export async function recordProviderAttempt(
       response_payload:      JSON.stringify(input.response_payload),
       success:               input.success,
       error_message:         input.error_message,
+      error_classification:  input.error_classification ?? null,
       latency_ms:            input.latency_ms,
       created_at:            new Date(),
     })
@@ -110,6 +113,7 @@ function coerce(row: Record<string, unknown>): ProviderAttempt {
     response_payload:      (row.response_payload as Record<string, unknown>) ?? {},
     success:               row.success as boolean,
     error_message:         (row.error_message as string | null) ?? null,
+    error_classification:  (row.error_classification as string | null) ?? null,
     latency_ms:            row.latency_ms != null ? Number(row.latency_ms) : null,
     created_at:            new Date(row.created_at as string),
   };

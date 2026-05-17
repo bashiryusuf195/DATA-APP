@@ -7,8 +7,14 @@ import {
   getSuccessfulAttempt,
   getFailedAttemptProviderCodes,
 } from "./provider-attempts.service";
-import { updateTransactionStatus, mergeTransactionMetadata } from "../../transactions/services/transaction.service";
+import { updateTransactionStatus } from "../../transactions/services/transaction.service";
 import { createNotification } from "../../notifications/services/notification.service";
+import {
+  recordSuccess as metricsRecordSuccess,
+  recordFailure as metricsRecordFailure,
+  isCircuitOpen,
+} from "./provider-health-metrics.service";
+import { classifyError } from "./error-classifier.service";
 import type { VTUProvider } from "./provider.interface";
 import type { ProviderPurchaseInput, ProviderPurchaseResult, ProviderServiceType } from "../types/provider.types";
 
@@ -33,20 +39,27 @@ export interface ExecuteWithFailoverParams {
   transaction:           TransactionForExecution;
 }
 
+export interface RejectedProvider {
+  provider_code: string;
+  reason:        string;
+}
+
 export interface ExecuteWithFailoverResult {
-  success:             boolean;
-  provider_result:     ProviderPurchaseResult | null;
-  final_provider:      string | null;
-  attempted_providers: string[];
-  failover_triggered:  boolean;
-  total_attempts:      number;
-  idempotent_replay:   boolean;
+  success:              boolean;
+  provider_result:      ProviderPurchaseResult | null;
+  final_provider:       string | null;
+  attempted_providers:  string[];
+  rejected_providers:   RejectedProvider[];
+  failover_triggered:   boolean;
+  total_attempts:       number;
+  idempotent_replay:    boolean;
+  total_latency_ms:     number;
 }
 
 interface ProviderCandidate {
-  providerCode:   string;
-  provider:       VTUProvider;
-  isFailover:     boolean;
+  providerCode: string;
+  provider:     VTUProvider;
+  isFailover:   boolean;
 }
 
 // ── Engine ────────────────────────────────────────────────────────────────────
@@ -59,16 +72,16 @@ class ProviderExecutionEngine {
     params: ExecuteWithFailoverParams
   ): Promise<ExecuteWithFailoverResult> {
     const { service_type, purchase_input, transaction_reference, transaction } = params;
-
     const tag = `[ENGINE][${transaction_reference}]`;
+    const executionStartedAt = new Date();
 
-    // ── Guard: terminal state (in case of unexpected replay) ─────────────────
+    // ── Guard: terminal state ─────────────────────────────────────────────────
     if (transaction.status === "successful" || transaction.status === "failed") {
       console.log(`${tag} Already in terminal state (${transaction.status}) — skipping`);
       return this.idempotentResult(transaction.status === "successful");
     }
 
-    // ── Idempotency: successful provider attempt already recorded ─────────────
+    // ── Idempotency: successful attempt already recorded ─────────────────────
     const existingSuccess = await getSuccessfulAttempt(transaction_reference);
     if (existingSuccess) {
       console.log(
@@ -78,32 +91,35 @@ class ProviderExecutionEngine {
       return this.idempotentResult(true, existingSuccess.provider_code);
     }
 
-    // ── Providers already tried in a previous BullMQ attempt ──────────────────
+    // ── Providers already tried in a previous BullMQ attempt ─────────────────
     const alreadyFailedCodes = await getFailedAttemptProviderCodes(transaction_reference);
     if (alreadyFailedCodes.length > 0) {
       console.log(`${tag} Skipping previously failed providers:`, alreadyFailedCodes.join(", "));
     }
 
     // ── Resolve ordered provider candidates ───────────────────────────────────
-    const candidates = await this.resolveProviderCandidates(
+    const { candidates, rejectedProviders } = await this.resolveProviderCandidates(
       service_type,
       new Set(alreadyFailedCodes)
     );
 
     if (candidates.length === 0) {
-      console.warn(`${tag} No eligible providers available for ${service_type}`);
-      await this.handleAllFailed(params, [], "No eligible providers configured or available");
+      const reason = "No eligible providers configured or available";
+      console.warn(`${tag} ${reason} for ${service_type}`, `| rejected=${rejectedProviders.length}`);
+      await this.handleAllFailed(params, [], rejectedProviders, reason, executionStartedAt);
       return {
         success: false, provider_result: null, final_provider: null,
-        attempted_providers: [], failover_triggered: false, total_attempts: 0, idempotent_replay: false,
+        attempted_providers: [], rejected_providers: rejectedProviders,
+        failover_triggered: false, total_attempts: 0, idempotent_replay: false,
+        total_latency_ms: Date.now() - executionStartedAt.getTime(),
       };
     }
 
     // ── Execute with provider-level failover ──────────────────────────────────
-    const attemptedProviders: string[]      = [];
-    let failoverTriggered                   = false;
-    let attemptNumber                       = alreadyFailedCodes.length + 1;
-    let lastError                           = "All providers exhausted";
+    const attemptedProviders: string[] = [];
+    let failoverTriggered              = false;
+    let attemptNumber                  = alreadyFailedCodes.length + 1;
+    let lastError                      = "All providers exhausted";
 
     for (const candidate of candidates) {
       const { providerCode, provider, isFailover } = candidate;
@@ -118,7 +134,7 @@ class ProviderExecutionEngine {
         `| service=${service_type}`
       );
 
-      const start  = Date.now();
+      const start = Date.now();
       let result: ProviderPurchaseResult | null = null;
       let errorMsg: string | null = null;
 
@@ -132,12 +148,15 @@ class ProviderExecutionEngine {
       const latencyMs = Date.now() - start;
       const success   = result?.success === true;
 
-      // Sanitise request before persisting — strip sensitive fields
+      const rawError  = errorMsg ?? (result?.success ? null : (result?.message ?? null));
+      const errorClass = rawError ? classifyError(rawError) : null;
+
+      // Sanitise request — strip phone/account numbers for audit
       const safeRequest: Record<string, unknown> = {
-        service_type:    purchase_input.service_type,
-        amount:          purchase_input.amount,
-        variation_code:  purchase_input.variation_code ?? null,
-        reference:       purchase_input.reference,
+        service_type:   purchase_input.service_type,
+        amount:         purchase_input.amount,
+        variation_code: purchase_input.variation_code ?? null,
+        reference:      purchase_input.reference,
       };
 
       await recordProviderAttempt({
@@ -147,34 +166,51 @@ class ProviderExecutionEngine {
         request_payload:       safeRequest,
         response_payload:      (result?.raw_response as Record<string, unknown>) ?? {},
         success,
-        error_message:         errorMsg ?? (result?.success ? null : (result?.message ?? null)),
+        error_message:         rawError,
+        error_classification:  errorClass,
         latency_ms:            latencyMs,
       });
+
+      // Update circuit breaker metrics
+      if (success) {
+        await metricsRecordSuccess(providerCode).catch((e: Error) =>
+          console.error(`${tag} metricsRecordSuccess failed (non-fatal):`, e.message)
+        );
+      } else {
+        await metricsRecordFailure(providerCode).catch((e: Error) =>
+          console.error(`${tag} metricsRecordFailure failed (non-fatal):`, e.message)
+        );
+      }
 
       attemptNumber++;
 
       if (success && result) {
+        const totalLatencyMs = Date.now() - executionStartedAt.getTime();
         console.log(
           `${tag} Provider '${providerCode}' succeeded`,
           `| latency=${latencyMs}ms`,
+          `| totalLatency=${totalLatencyMs}ms`,
           `| failover_triggered=${failoverTriggered}`
         );
-        await this.handleSuccess(params, result, attemptedProviders, failoverTriggered);
+        await this.handleSuccess(params, result, attemptedProviders, rejectedProviders, failoverTriggered, executionStartedAt);
         return {
           success:             true,
           provider_result:     result,
           final_provider:      providerCode,
           attempted_providers: attemptedProviders,
+          rejected_providers:  rejectedProviders,
           failover_triggered:  failoverTriggered,
           total_attempts:      attemptedProviders.length,
           idempotent_replay:   false,
+          total_latency_ms:    totalLatencyMs,
         };
       }
 
-      lastError = errorMsg ?? result?.message ?? `Provider '${providerCode}' returned failure`;
+      lastError = rawError ?? `Provider '${providerCode}' returned failure`;
       console.warn(
         `${tag} Provider '${providerCode}' failed — trying next`,
         `| reason=${lastError}`,
+        `| classification=${errorClass ?? "unknown"}`,
         `| latency=${latencyMs}ms`
       );
     }
@@ -183,29 +219,38 @@ class ProviderExecutionEngine {
     console.error(
       `${tag} All providers exhausted`,
       `| tried=${attemptedProviders.join(", ")}`,
+      `| rejected=${rejectedProviders.map((r) => r.provider_code).join(", ")}`,
       `| service=${service_type}`
     );
-    await this.handleAllFailed(params, attemptedProviders, lastError);
+    await this.handleAllFailed(params, attemptedProviders, rejectedProviders, lastError, executionStartedAt);
 
     return {
       success:             false,
       provider_result:     null,
       final_provider:      null,
       attempted_providers: attemptedProviders,
+      rejected_providers:  rejectedProviders,
       failover_triggered:  failoverTriggered,
       total_attempts:      attemptedProviders.length,
       idempotent_replay:   false,
+      total_latency_ms:    Date.now() - executionStartedAt.getTime(),
     };
   }
 
   // ── Candidate resolution ───────────────────────────────────────────────────
 
   private async resolveProviderCandidates(
-    serviceType:   ProviderServiceType,
-    skipCodes:     Set<string>
-  ): Promise<ProviderCandidate[]> {
-    const candidates: ProviderCandidate[] = [];
+    serviceType: ProviderServiceType,
+    skipCodes:   Set<string>
+  ): Promise<{ candidates: ProviderCandidate[]; rejectedProviders: RejectedProvider[] }> {
+    const candidates:        ProviderCandidate[] = [];
+    const rejectedProviders: RejectedProvider[]  = [];
     const seen = new Set<string>(skipCodes);
+
+    // Track skipped-from-previous-attempts as rejected
+    for (const code of skipCodes) {
+      rejectedProviders.push({ provider_code: code, reason: "ALREADY_ATTEMPTED" });
+    }
 
     // 1. Routing-rule path (primary → fallback)
     let rule = null;
@@ -216,34 +261,17 @@ class ProviderExecutionEngine {
     }
 
     if (rule) {
-      const primaryCode = rule.primary_provider_code;
-      if (!seen.has(primaryCode)) {
-        const provider = this.tryGetProvider(primaryCode);
-        if (provider && await this.isProviderEligible(primaryCode, serviceType)) {
-          candidates.push({ providerCode: primaryCode, provider, isFailover: false });
-          seen.add(primaryCode);
-          console.log(`[ENGINE] Routing rule → primary '${primaryCode}' for ${serviceType}`);
-        } else {
-          console.warn(`[ENGINE] Primary provider '${primaryCode}' ineligible for ${serviceType}`);
-        }
-      }
-
+      await this.tryAddCandidate(
+        rule.primary_provider_code, serviceType, false, seen, candidates, rejectedProviders
+      );
       if (rule.fallback_provider_code) {
-        const fallbackCode = rule.fallback_provider_code;
-        if (!seen.has(fallbackCode)) {
-          const provider = this.tryGetProvider(fallbackCode);
-          if (provider && await this.isProviderEligible(fallbackCode, serviceType)) {
-            candidates.push({ providerCode: fallbackCode, provider, isFailover: true });
-            seen.add(fallbackCode);
-            console.log(`[ENGINE] Routing rule → fallback '${fallbackCode}' for ${serviceType}`);
-          } else {
-            console.warn(`[ENGINE] Fallback provider '${fallbackCode}' ineligible for ${serviceType}`);
-          }
-        }
+        await this.tryAddCandidate(
+          rule.fallback_provider_code, serviceType, true, seen, candidates, rejectedProviders
+        );
       }
     }
 
-    // 2. Priority-based path (active + healthy + supports service_type + not already included)
+    // 2. Priority-based path (active + supports service_type + not already included)
     const configs = await db("provider_configs")
       .where({ is_active: true })
       .whereRaw("supported_services @> ?::jsonb", [JSON.stringify([serviceType])])
@@ -253,19 +281,49 @@ class ProviderExecutionEngine {
     for (const config of configs) {
       const code = config.provider_code as string;
       if (seen.has(code)) continue;
-
-      const provider = this.tryGetProvider(code);
-      if (!provider) continue;
-
-      candidates.push({
-        providerCode: code,
-        provider,
-        isFailover:   candidates.length > 0,
-      });
-      seen.add(code);
+      await this.tryAddCandidate(
+        code, serviceType, candidates.length > 0, seen, candidates, rejectedProviders
+      );
     }
 
-    return candidates;
+    return { candidates, rejectedProviders };
+  }
+
+  private async tryAddCandidate(
+    providerCode:      string,
+    serviceType:       ProviderServiceType,
+    isFailover:        boolean,
+    seen:              Set<string>,
+    candidates:        ProviderCandidate[],
+    rejectedProviders: RejectedProvider[]
+  ): Promise<void> {
+    if (seen.has(providerCode)) return;
+
+    // Circuit breaker check
+    const circuitOpen = await isCircuitOpen(providerCode).catch(() => false);
+    if (circuitOpen) {
+      console.warn(`[ENGINE] Provider '${providerCode}' skipped — circuit open`);
+      rejectedProviders.push({ provider_code: providerCode, reason: "CIRCUIT_OPEN" });
+      seen.add(providerCode);
+      return;
+    }
+
+    const eligible = await this.isProviderEligible(providerCode, serviceType);
+    if (!eligible) {
+      rejectedProviders.push({ provider_code: providerCode, reason: "INELIGIBLE" });
+      seen.add(providerCode);
+      return;
+    }
+
+    const provider = this.tryGetProvider(providerCode);
+    if (!provider) {
+      rejectedProviders.push({ provider_code: providerCode, reason: "NOT_IN_REGISTRY" });
+      seen.add(providerCode);
+      return;
+    }
+
+    candidates.push({ providerCode, provider, isFailover });
+    seen.add(providerCode);
   }
 
   // ── Eligibility check ──────────────────────────────────────────────────────
@@ -285,17 +343,25 @@ class ProviderExecutionEngine {
   // ── Success handler ────────────────────────────────────────────────────────
 
   private async handleSuccess(
-    params:              ExecuteWithFailoverParams,
-    result:              ProviderPurchaseResult,
-    attemptedProviders:  string[],
-    failoverTriggered:   boolean
+    params:             ExecuteWithFailoverParams,
+    result:             ProviderPurchaseResult,
+    attemptedProviders: string[],
+    rejectedProviders:  RejectedProvider[],
+    failoverTriggered:  boolean,
+    executionStartedAt: Date
   ): Promise<void> {
+    const executionCompletedAt = new Date();
     const executionMeta = {
-      attempted_providers: attemptedProviders,
-      failover_triggered:  failoverTriggered,
-      final_provider:      result.provider,
-      total_attempts:      attemptedProviders.length,
-      all_failed:          false,
+      attempted_providers:    attemptedProviders,
+      rejected_providers:     rejectedProviders,
+      failover_triggered:     failoverTriggered,
+      final_provider:         result.provider,
+      failure_stage:          null,
+      total_attempts:         attemptedProviders.length,
+      all_failed:             false,
+      execution_started_at:   executionStartedAt.toISOString(),
+      execution_completed_at: executionCompletedAt.toISOString(),
+      total_latency_ms:       executionCompletedAt.getTime() - executionStartedAt.getTime(),
     };
 
     await updateTransactionStatus(params.transaction_reference, {
@@ -330,11 +396,13 @@ class ProviderExecutionEngine {
   private async handleAllFailed(
     params:             ExecuteWithFailoverParams,
     attemptedProviders: string[],
-    reason:             string
+    rejectedProviders:  RejectedProvider[],
+    reason:             string,
+    executionStartedAt: Date
   ): Promise<void> {
     const { transaction_reference, transaction, service_type } = params;
+    const executionCompletedAt = new Date();
 
-    // Refund if the user's wallet was debited before the worker ran
     let refundBatchId: string | null = null;
     const srcId  = transaction.source_wallet_id;
     const destId = transaction.destination_wallet_id;
@@ -355,7 +423,7 @@ class ProviderExecutionEngine {
         console.log(`[ENGINE] Refund issued | ref=${transaction_reference} | batch=${refundBatchId}`);
       } catch (refundErr) {
         console.error(
-          `[ENGINE] Refund failed (non-fatal — manual intervention required) | ref=${transaction_reference}:`,
+          `[ENGINE] Refund failed (manual intervention required) | ref=${transaction_reference}:`,
           (refundErr as Error).message
         );
       }
@@ -366,16 +434,19 @@ class ProviderExecutionEngine {
       failure_reason: reason,
       metadata: {
         execution: {
-          attempted_providers: attemptedProviders,
-          failover_triggered:  attemptedProviders.length > 1,
-          final_provider:      null,
-          total_attempts:      attemptedProviders.length,
-          all_failed:          true,
-          failure_reason:      reason,
+          attempted_providers:    attemptedProviders,
+          rejected_providers:     rejectedProviders,
+          failover_triggered:     attemptedProviders.length > 1,
+          final_provider:         null,
+          failure_stage:          "provider_exhausted",
+          total_attempts:         attemptedProviders.length,
+          all_failed:             true,
+          failure_reason:         reason,
+          execution_started_at:   executionStartedAt.toISOString(),
+          execution_completed_at: executionCompletedAt.toISOString(),
+          total_latency_ms:       executionCompletedAt.getTime() - executionStartedAt.getTime(),
         },
-        refund: refundBatchId
-          ? { journal_batch_id: refundBatchId }
-          : null,
+        refund: refundBatchId ? { journal_batch_id: refundBatchId } : null,
       },
     });
 
@@ -414,9 +485,11 @@ class ProviderExecutionEngine {
       provider_result:     null,
       final_provider:      finalProvider,
       attempted_providers: [],
+      rejected_providers:  [],
       failover_triggered:  false,
       total_attempts:      0,
       idempotent_replay:   true,
+      total_latency_ms:    0,
     };
   }
 }
