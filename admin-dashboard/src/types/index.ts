@@ -332,6 +332,71 @@ export interface AdminJournalBatchDetail {
   } | null
 }
 
+// ── Roles & Permissions ───────────────────────────────────────────────────────
+
+export interface AdminRole {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  is_system: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  permission_count: number
+  user_count: number
+}
+
+export interface PermissionEntry {
+  id: string
+  action: string
+  description: string | null
+}
+
+export interface PermissionGroup {
+  resource: string
+  permissions: PermissionEntry[]
+}
+
+export interface UserRole {
+  role_id: string
+  role_name: string
+  role_slug: string
+  assigned_at: string
+  assigned_by: string | null
+  assigned_by_email: string | null
+  expires_at: string | null
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+export type SettingValueType = 'text' | 'number' | 'boolean' | 'json'
+
+export interface SettingEntry {
+  key: string
+  value: string | null
+  value_type: SettingValueType
+  label: string
+  description: string | null
+  category: string
+  is_secret: boolean
+  updated_by: string | null
+  updated_at: string
+}
+
+export interface SettingsByCategory {
+  [category: string]: SettingEntry[]
+}
+
+export interface EnvironmentInfo {
+  node_version: string
+  uptime_seconds: number
+  memory_mb: { rss: number; heap_used: number; heap_total: number }
+  redis_healthy: boolean
+  db_healthy: boolean
+  env: string
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface PaginationParams {

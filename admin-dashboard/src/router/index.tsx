@@ -21,10 +21,12 @@ import { FailedJobsPage }     from '@/pages/FailedJobs'
 import { WebhookEventsPage }    from '@/pages/WebhookEvents'
 import { JournalBatchesPage }   from '@/pages/JournalBatches'
 import { AuditLogsPage }        from '@/pages/AuditLogs'
+import { RolesPage }            from '@/pages/Roles'
+import { SettingsPage }         from '@/pages/Settings'
 import { NotFoundPage }         from '@/pages/NotFound'
 
 import {
-  Shield, Tag, Globe, Landmark,
+  Tag, Globe, Landmark,
   UserCheck, Lock, Gauge, Scale, Cpu, MessageSquare, Flag, Megaphone,
   RotateCcw, Package, List, AlertTriangle,
 } from 'lucide-react'
@@ -44,23 +46,7 @@ export const router = createBrowserRouter([
 
       // ── Users ──────────────────────────────────────────────────────────────
       { path: '/users', element: <UsersPage /> },
-      {
-        path: '/roles',
-        element: (
-          <PlaceholderPage
-            title="Roles & Permissions"
-            subtitle="Role-based access control for admin users"
-            icon={<Shield className="h-10 w-10" />}
-            features={[
-              'Create and manage custom roles',
-              'Fine-grained permission assignment',
-              'Role inheritance and hierarchies',
-              'Audit log for role changes',
-              'Bulk permission updates',
-            ]}
-          />
-        ),
-      },
+      { path: '/roles', element: <RolesPage /> },
 
       // ── Finance ────────────────────────────────────────────────────────────
       { path: '/ledger',           element: <LedgerExplorerPage /> },
@@ -356,6 +342,7 @@ export const router = createBrowserRouter([
       // ── System ─────────────────────────────────────────────────────────────
       { path: '/wallets',       element: <WalletPage /> },
       { path: '/notifications', element: <NotificationsPage /> },
+      { path: '/settings',      element: <SettingsPage /> },
 
       // ── Catch-all ──────────────────────────────────────────────────────────
       { path: '*', element: <NotFoundPage /> },

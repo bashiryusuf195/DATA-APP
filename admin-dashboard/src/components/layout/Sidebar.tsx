@@ -45,6 +45,8 @@ import {
   MessageSquare,
   Flag,
   Megaphone,
+  // System
+  SlidersHorizontal,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -158,12 +160,13 @@ const nav: NavSection[] = [
     items: [
       { to: '/wallets',       label: 'Wallet Monitor', icon: <Wallet className="h-4 w-4" /> },
       { to: '/notifications', label: 'Notifications',  icon: <Bell className="h-4 w-4" /> },
+      { to: '/settings',      label: 'Settings',       icon: <SlidersHorizontal className="h-4 w-4" /> },
     ],
   },
 ]
 
 // Sections closed by default to keep sidebar manageable on first load
-const DEFAULT_CLOSED = new Set(['services', 'payments', 'security', 'support'])
+const DEFAULT_CLOSED = new Set(['services', 'payments', 'support'])
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUiStore()

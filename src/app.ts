@@ -40,6 +40,8 @@ import { adminHealthMetricsRouter }    from "./modules/providers/routes/admin-he
 import { adminWalletRouter }           from "./modules/wallet/routes/admin-wallet.routes";
 import { adminUsersRouter }            from "./modules/auth/routes/admin-users.routes";
 import { adminAuditRouter }            from "./modules/audit/routes/admin-audit.routes";
+import { adminRolesRouter }            from "./modules/auth/routes/admin-roles.routes";
+import { adminSettingsRouter }         from "./modules/settings/routes/admin-settings.routes";
 import { adminAuditMiddleware }        from "./middleware/adminAudit";
 import "./modules/queue";
 export const app = express();
@@ -94,6 +96,8 @@ app.use("/admin", adminProviderAttemptsRouter);
 app.use("/admin", adminHealthMetricsRouter);
 app.use("/admin", adminWalletRouter);
 app.use("/admin", adminUsersRouter);
+app.use("/admin", adminRolesRouter);
+app.use("/admin", adminSettingsRouter);
 app.use("/admin", adminAuditRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);

@@ -57,8 +57,11 @@ export const ENDPOINTS = {
   serviceAvailability:    ep('/admin/service-availability',    'GET',  'planned', 'Service Availability'),
   paystackTxns:           ep('/admin/paystack-transactions',   'GET',  'planned', 'Paystack Transactions'),
   virtualAccounts:        ep('/admin/virtual-accounts',        'GET',  'planned', 'Virtual Accounts'),
-  roles:                  ep('/admin/roles',                   'GET',  'planned', 'Roles & Permissions'),
+  roles:                  ep('/admin/roles',                   'GET',  'available', 'Roles & Permissions'),
+  permissions:            ep('/admin/permissions',             'GET',  'available', 'Permissions Matrix'),
   revenueAnalytics:       ep('/admin/revenue/analytics',       'GET',  'planned', 'Revenue Analytics'),
+  settings:               ep('/admin/settings',                'GET',  'available', 'Settings'),
+  settingsEnvironment:    ep('/admin/settings/environment',    'GET',  'available', 'Environment Info'),
 } as const
 
 export type EndpointKey = keyof typeof ENDPOINTS
