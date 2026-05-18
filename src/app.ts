@@ -43,6 +43,7 @@ import { adminAuditRouter }            from "./modules/audit/routes/admin-audit.
 import { adminRolesRouter }            from "./modules/auth/routes/admin-roles.routes";
 import { adminSettingsRouter }         from "./modules/settings/routes/admin-settings.routes";
 import { adminSupportRouter }          from "./modules/support/routes/admin-support.routes";
+import { adminFinanceRouter }          from "./modules/finance/routes/admin-finance.routes";
 import { adminAuditMiddleware }        from "./middleware/adminAudit";
 import "./modules/queue";
 export const app = express();
@@ -100,6 +101,7 @@ app.use("/admin", adminUsersRouter);
 app.use("/admin", adminRolesRouter);
 app.use("/admin", adminSettingsRouter);
 app.use("/admin", adminSupportRouter);
+app.use("/admin", adminFinanceRouter);
 app.use("/admin", adminAuditRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);

@@ -26,15 +26,19 @@ import { SettingsPage }         from '@/pages/Settings'
 import { ServicesPage }         from '@/pages/Services'
 import { ServicePlansPage }     from '@/pages/ServicePlans'
 import { PricingPage }          from '@/pages/Pricing'
-import { TicketsPage }          from '@/pages/Tickets'
-import { DisputesPage }         from '@/pages/Disputes'
-import { ComplaintsPage }       from '@/pages/Complaints'
-import { NotFoundPage }         from '@/pages/NotFound'
+import { TicketsPage }              from '@/pages/Tickets'
+import { DisputesPage }             from '@/pages/Disputes'
+import { ComplaintsPage }           from '@/pages/Complaints'
+import { ReconciliationPage }       from '@/pages/Reconciliation'
+import { ReconciliationIssuesPage } from '@/pages/ReconciliationIssues'
+import { ProviderBalancesPage }     from '@/pages/ProviderBalances'
+import { RefundsPage }              from '@/pages/Refunds'
+import { ProfitAnalysisPage }       from '@/pages/ProfitAnalysis'
+import { NotFoundPage }             from '@/pages/NotFound'
 
 import {
   Globe, Landmark,
-  UserCheck, Lock, Gauge, Scale, Cpu, Megaphone,
-  RotateCcw, AlertTriangle,
+  UserCheck, Lock, Gauge, Cpu, Megaphone,
 } from 'lucide-react'
 
 export const router = createBrowserRouter([
@@ -54,28 +58,22 @@ export const router = createBrowserRouter([
       { path: '/users', element: <UsersPage /> },
       { path: '/roles', element: <RolesPage /> },
 
-      // ── Finance ────────────────────────────────────────────────────────────
-      { path: '/ledger',           element: <LedgerExplorerPage /> },
+      // ── Finance (canonical /finance/* routes) ─────────────────────────────
+      { path: '/finance/reconciliation-reports', element: <ReconciliationPage /> },
+      { path: '/finance/reconciliation-issues',  element: <ReconciliationIssuesPage /> },
+      { path: '/finance/revenue',                element: <RevenuePage /> },
+      { path: '/finance/provider-balances',      element: <ProviderBalancesPage /> },
+      { path: '/finance/profit-analysis',        element: <ProfitAnalysisPage /> },
+      { path: '/finance/refunds-reversals',      element: <RefundsPage /> },
+
+      // ── Finance (ledger / journal / funding keep flat paths) ───────────────
+      { path: '/ledger',          element: <LedgerExplorerPage /> },
       { path: '/journal-batches', element: <JournalBatchesPage /> },
-      { path: '/funding', element: <FundingPage /> },
-      {
-        path: '/refunds',
-        element: (
-          <PlaceholderPage
-            title="Refunds & Reversals"
-            subtitle="Manage transaction refunds and account reversals"
-            icon={<RotateCcw className="h-10 w-10" />}
-            features={[
-              'Initiate full and partial refunds',
-              'Automated reversal for failed debits',
-              'Refund approval queue',
-              'Refund status tracking',
-              'Provider-level reversal support',
-            ]}
-          />
-        ),
-      },
-      { path: '/revenue', element: <RevenuePage /> },
+      { path: '/funding',         element: <FundingPage /> },
+
+      // ── Finance (legacy path redirects so bookmarks keep working) ──────────
+      { path: '/refunds',         element: <Navigate to="/finance/refunds-reversals"      replace /> },
+      { path: '/revenue',         element: <Navigate to="/finance/revenue"                replace /> },
 
       // ── Services ───────────────────────────────────────────────────────────
       { path: '/services',       element: <ServicesPage /> },
@@ -194,41 +192,10 @@ export const router = createBrowserRouter([
       },
 
       // ── Operations ─────────────────────────────────────────────────────────
-      { path: '/queue-monitor', element: <QueueMonitorPage /> },
-      { path: '/failed-jobs',   element: <FailedJobsPage /> },
-      {
-        path: '/reconciliation',
-        element: (
-          <PlaceholderPage
-            title="Reconciliation Reports"
-            subtitle="Match platform records against provider statements"
-            icon={<Scale className="h-10 w-10" />}
-            features={[
-              'Automated daily reconciliation runs',
-              'Provider statement import',
-              'Discrepancy detection and alerting',
-              'Manual match and override',
-              'Export reconciliation certificates',
-            ]}
-          />
-        ),
-      },
-      {
-        path: '/reconciliation-issues',
-        element: (
-          <PlaceholderPage
-            title="Reconciliation Issues"
-            subtitle="Unresolved discrepancies requiring investigation"
-            icon={<AlertTriangle className="h-10 w-10" />}
-            features={[
-              'Open issue queue',
-              'Assign issues to team members',
-              'Resolution workflow and notes',
-              'Auto-close on reconciliation pass',
-            ]}
-          />
-        ),
-      },
+      { path: '/queue-monitor',         element: <QueueMonitorPage /> },
+      { path: '/failed-jobs',           element: <FailedJobsPage /> },
+      { path: '/reconciliation',        element: <Navigate to="/finance/reconciliation-reports" replace /> },
+      { path: '/reconciliation-issues', element: <Navigate to="/finance/reconciliation-issues"  replace /> },
       {
         path: '/worker-health',
         element: (

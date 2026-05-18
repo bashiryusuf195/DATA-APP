@@ -41,6 +41,7 @@ import {
   Monitor,
   Scale,
   Cpu,
+  BarChart2,
   // Support
   MessageSquare,
   Flag,
@@ -82,11 +83,21 @@ const nav: NavSection[] = [
     key: 'finance',
     title: 'Finance',
     items: [
-      { to: '/ledger',          label: 'Ledger Explorer',   icon: <BookOpen className="h-4 w-4" /> },
-      { to: '/journal-batches', label: 'Journal Batches',   icon: <FileText className="h-4 w-4" /> },
-      { to: '/funding',         label: 'Funding',           icon: <CreditCard className="h-4 w-4" /> },
-      { to: '/refunds',         label: 'Refunds',           icon: <RotateCcw className="h-4 w-4" /> },
-      { to: '/revenue',         label: 'Revenue Analytics', icon: <TrendingUp className="h-4 w-4" /> },
+      { to: '/finance/reconciliation-reports', label: 'Reconciliation Reports', icon: <Scale className="h-4 w-4" /> },
+      { to: '/finance/reconciliation-issues',  label: 'Reconciliation Issues',  icon: <AlertTriangle className="h-4 w-4" /> },
+      { to: '/finance/revenue',                label: 'Revenue Analytics',      icon: <TrendingUp className="h-4 w-4" /> },
+      { to: '/finance/provider-balances',      label: 'Provider Balances',      icon: <BarChart2 className="h-4 w-4" /> },
+      { to: '/finance/profit-analysis',        label: 'Profit Analysis',        icon: <TrendingUp className="h-4 w-4" /> },
+      { to: '/finance/refunds-reversals',      label: 'Refunds & Reversals',    icon: <RotateCcw className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: 'ledger',
+    title: 'Ledger',
+    items: [
+      { to: '/ledger',          label: 'Ledger Explorer', icon: <BookOpen className="h-4 w-4" /> },
+      { to: '/journal-batches', label: 'Journal Batches', icon: <FileText className="h-4 w-4" /> },
+      { to: '/funding',         label: 'Funding',         icon: <CreditCard className="h-4 w-4" /> },
     ],
   },
   {
@@ -139,10 +150,9 @@ const nav: NavSection[] = [
     key: 'operations',
     title: 'Operations',
     items: [
-      { to: '/queue-monitor',         label: 'Queue Monitor',   icon: <Monitor className="h-4 w-4" /> },
-      { to: '/failed-jobs',           label: 'Failed Jobs',     icon: <AlertTriangle className="h-4 w-4" /> },
-      { to: '/reconciliation',        label: 'Reconciliation',  icon: <Scale className="h-4 w-4" /> },
-      { to: '/worker-health',         label: 'Worker Health',   icon: <Cpu className="h-4 w-4" /> },
+      { to: '/queue-monitor', label: 'Queue Monitor', icon: <Monitor className="h-4 w-4" /> },
+      { to: '/failed-jobs',   label: 'Failed Jobs',   icon: <AlertTriangle className="h-4 w-4" /> },
+      { to: '/worker-health', label: 'Worker Health', icon: <Cpu className="h-4 w-4" /> },
     ],
   },
   {
@@ -167,7 +177,7 @@ const nav: NavSection[] = [
 ]
 
 // Sections closed by default to keep sidebar manageable on first load
-const DEFAULT_CLOSED = new Set(['services', 'payments'])
+const DEFAULT_CLOSED = new Set(['services', 'payments', 'ledger'])
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUiStore()

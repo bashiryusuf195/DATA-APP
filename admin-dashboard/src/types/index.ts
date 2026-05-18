@@ -598,6 +598,141 @@ export interface EnvironmentInfo {
   env: string
 }
 
+// ── Reconciliation ────────────────────────────────────────────────────────────
+
+export type ReconReportStatus = 'pending' | 'running' | 'completed' | 'failed'
+export type IssueSeverity     = 'low' | 'medium' | 'high' | 'critical'
+
+export interface ReconciliationReport {
+  id: string
+  report_type: string
+  started_at: string
+  completed_at: string | null
+  status: ReconReportStatus
+  total_checked: number
+  total_issues: number
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface ReconciliationIssue {
+  id: string
+  report_id: string
+  transaction_reference: string | null
+  issue_type: string
+  severity: IssueSeverity
+  description: string
+  metadata: Record<string, unknown>
+  resolved: boolean
+  created_at: string
+}
+
+// ── Finance ───────────────────────────────────────────────────────────────────
+
+export interface RevenueSummary {
+  total_transactions: number
+  successful_count: number
+  failed_count: number
+  pending_count: number
+  total_volume: number
+  total_fees: number
+  net_volume: number
+}
+
+export interface ServiceBreakdown {
+  service: string
+  count: number
+  volume: number
+  fees: number
+}
+
+export interface DailyTrend {
+  date: string
+  total: number
+  successful: number
+  failed: number
+  volume: number
+  fees: number
+}
+
+export interface ProviderBalance {
+  provider_code: string
+  display_name: string
+  is_active: boolean
+  total_transactions: number
+  successful_count: number
+  failed_count: number
+  volume_processed: number
+  fees_generated: number
+  success_rate: number
+}
+
+export interface ProfitTotals {
+  gross_revenue: number
+  total_gmv: number
+  transaction_count: number
+  avg_fee: number
+  avg_transaction_value: number
+}
+
+export interface ServiceProfitRow {
+  service: string
+  count: number
+  volume: number
+  revenue: number
+  margin_pct: number
+}
+
+export interface WeeklyTrend {
+  week: string
+  count: number
+  volume: number
+  revenue: number
+}
+
+export interface Refund {
+  id: string
+  transaction_id: string
+  user_id: string
+  wallet_id: string | null
+  status: string
+  amount: string
+  currency: string
+  reason: string
+  notes: string | null
+  requested_by: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  processed_at: string | null
+  failure_reason: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  transaction_reference: string | null
+  transaction_amount: string | null
+  transaction_status: string | null
+}
+
+export interface Reversal {
+  id: string
+  transaction_id: string
+  user_id: string
+  status: string
+  amount: string
+  currency: string
+  reason: string
+  initiated_by: string | null
+  processed_at: string | null
+  failure_reason: string | null
+  provider_reversal_ref: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  transaction_reference: string | null
+  transaction_amount: string | null
+  transaction_status: string | null
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface PaginationParams {
