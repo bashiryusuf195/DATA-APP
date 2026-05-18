@@ -3,12 +3,8 @@ node_modules/
 
 # Build output
 dist/
-coverage/
 
 # Environment — NEVER commit .env or any variant
 .env
 .env.*
 !.env.example
-
-# Generated
-/src/generated/prisma

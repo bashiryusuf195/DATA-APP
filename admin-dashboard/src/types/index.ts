@@ -789,6 +789,142 @@ export interface NotificationJobStats {
   cancelled:  number
 }
 
+// ── KYC / Compliance / Risk ────────────────────────────────────────────────────
+
+export type KycLevel = 'none' | 'tier_1' | 'tier_2' | 'tier_3'
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical'
+export type FlagType = 'suspicious_volume' | 'duplicate_funding' | 'fraud_suspected' | 'chargeback_risk' | 'account_takeover' | 'manual_review'
+export type FlagSeverity = 'low' | 'medium' | 'high' | 'critical'
+export type FlagStatus = 'open' | 'investigating' | 'resolved' | 'dismissed'
+export type BlacklistEntityType = 'user' | 'email' | 'phone' | 'bvn' | 'nin' | 'ip' | 'card'
+
+export interface KycUser {
+  id: string
+  email: string
+  phone: string | null
+  username: string | null
+  status: string
+  kyc_level: KycLevel
+  created_at: string
+  first_name: string | null
+  last_name: string | null
+  user_name: string
+  bvn: string | null
+  nin: string | null
+  bvn_verified: boolean
+  nin_verified: boolean
+  risk_score: number | null
+  risk_level: RiskLevel | null
+}
+
+export interface KycStats {
+  total_users: number
+  verified_tier1: number
+  verified_tier2: number
+  verified_tier3: number
+  pending: number
+  bvn_verified: number
+  nin_verified: number
+}
+
+export interface KycVerification {
+  id: string
+  user_id: string | null
+  verification_type: string
+  status: string
+  provider: string | null
+  provider_ref: string | null
+  verified_at: string | null
+  failure_reason: string | null
+  initiated_by: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  email: string | null
+  phone: string | null
+  username: string | null
+  user_name: string | null
+}
+
+export interface RiskFlag {
+  id: string
+  user_id: string | null
+  flag_type: FlagType
+  severity: FlagSeverity
+  status: FlagStatus
+  title: string
+  description: string | null
+  evidence: Record<string, unknown>
+  transaction_ref: string | null
+  flagged_by: string | null
+  assigned_to: string | null
+  resolved_by: string | null
+  resolved_at: string | null
+  resolution_notes: string | null
+  created_at: string
+  updated_at: string
+  email: string | null
+  phone: string | null
+  username: string | null
+  user_name: string | null
+}
+
+export interface RiskFlagStats {
+  open: number
+  investigating: number
+  resolved: number
+  dismissed: number
+  critical: number
+  high: number
+}
+
+export interface ComplianceReport {
+  id: string
+  report_type: string
+  title: string
+  period_start: string | null
+  period_end: string | null
+  summary: string | null
+  status: string
+  generated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BlacklistEntry {
+  id: string
+  entity_type: BlacklistEntityType
+  entity_value: string
+  reason: string
+  notes: string | null
+  added_by: string | null
+  removed_by: string | null
+  removed_at: string | null
+  is_active: boolean
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface FrozenAccount {
+  id: string
+  email: string
+  phone: string | null
+  username: string | null
+  status: string
+  kyc_level: KycLevel
+  frozen_at: string | null
+  frozen_by: string | null
+  frozen_reason: string | null
+  created_at: string
+  updated_at: string
+  first_name?: string | null
+  last_name?: string | null
+  user_name?: string | null
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface PaginationParams {

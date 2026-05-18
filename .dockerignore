@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+coverage
+.git
+.gitignore
+README.md
+DEPLOYMENT.md
+admin-dashboard
+tests
+scripts
+*.md
+.github

@@ -52,6 +52,11 @@ import {
   FileText as FileTemplate,
   Clock as ClockIcon,
   Radio,
+  // Compliance
+  ShieldCheck,
+  FileBarChart2,
+  Ban,
+  Snowflake,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -176,6 +181,17 @@ const nav: NavSection[] = [
       { to: '/communication/templates',     label: 'Templates',       icon: <FileTemplate className="h-4 w-4" /> },
       { to: '/communication/queue',         label: 'Queue',           icon: <ClockIcon    className="h-4 w-4" /> },
       { to: '/communication/broadcasts',    label: 'Broadcast Center', icon: <Radio       className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: 'compliance',
+    title: 'Compliance',
+    items: [
+      { to: '/compliance/kyc',             label: 'KYC Monitoring',     icon: <ShieldCheck    className="h-4 w-4" /> },
+      { to: '/compliance/risk-flags',      label: 'Risk Flags',         icon: <Flag           className="h-4 w-4" /> },
+      { to: '/compliance/reports',         label: 'Compliance Reports', icon: <FileBarChart2  className="h-4 w-4" /> },
+      { to: '/compliance/blacklist',       label: 'Blacklist',          icon: <Ban            className="h-4 w-4" /> },
+      { to: '/compliance/frozen-accounts', label: 'Frozen Accounts',    icon: <Snowflake      className="h-4 w-4" /> },
     ],
   },
   {

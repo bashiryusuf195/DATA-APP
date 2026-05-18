@@ -20,7 +20,7 @@ const walletService = new WalletService(db);
 
 // ── Worker ────────────────────────────────────────────────────────────────────
 
-createWorker("paystack-webhooks", async (job: Job) => {
+export const paystackWebhookWorker = createWorker("paystack-webhooks", async (job: Job) => {
   const { webhook_event_id, reference, event } = job.data as PaystackWebhookJobPayload;
   const log = (msg: string, extra?: Record<string, unknown>) =>
     console.log(`[PAYSTACK-WORKER] ${msg}`, extra ? JSON.stringify(extra) : "");

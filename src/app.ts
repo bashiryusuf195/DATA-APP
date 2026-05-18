@@ -44,6 +44,7 @@ import { adminRolesRouter }            from "./modules/auth/routes/admin-roles.r
 import { adminSettingsRouter }         from "./modules/settings/routes/admin-settings.routes";
 import { adminSupportRouter }          from "./modules/support/routes/admin-support.routes";
 import { adminFinanceRouter }          from "./modules/finance/routes/admin-finance.routes";
+import { adminComplianceRouter }       from "./modules/compliance/routes/admin-compliance.routes";
 import { adminAuditMiddleware }        from "./middleware/adminAudit";
 import "./modules/queue";
 export const app = express();
@@ -102,6 +103,7 @@ app.use("/admin", adminRolesRouter);
 app.use("/admin", adminSettingsRouter);
 app.use("/admin", adminSupportRouter);
 app.use("/admin", adminFinanceRouter);
+app.use("/admin", adminComplianceRouter);
 app.use("/admin", adminAuditRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);

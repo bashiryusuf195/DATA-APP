@@ -7,7 +7,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/server.js",
+    "start:prod": "node dist/server.js",
     "worker": "tsx watch src/workers/index.ts",
+    "worker:prod": "node dist/workers/index.js",
+    "migrate:prod": "npx knex --knexfile knexfile.ts migrate:latest",
     "type-check": "tsc --noEmit",
     "seed:wallets": "npx tsx scripts/seed-wallets.ts",
     "test:wallet": "npx tsx tests/manual-wallet-test.ts",
@@ -31,6 +34,7 @@
     "pg": "^8.11.3",
     "uuid": "^9.0.0",
     "winston": "^3.11.0",
+    "knex": "^3.2.10",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -43,7 +47,6 @@
     "@types/node": "^20.10.0",
     "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
-    "knex": "^3.2.10",
     "prisma": "^7.8.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.6.0",

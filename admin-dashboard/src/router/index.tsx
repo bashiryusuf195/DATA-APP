@@ -38,6 +38,11 @@ import { ProviderBalancesPage }     from '@/pages/ProviderBalances'
 import { RefundsPage }              from '@/pages/Refunds'
 import { ProfitAnalysisPage }       from '@/pages/ProfitAnalysis'
 import { NotFoundPage }             from '@/pages/NotFound'
+import { KycMonitoringPage }        from '@/pages/KycMonitoring'
+import { RiskFlagsPage }            from '@/pages/RiskFlags'
+import { ComplianceReportsPage }    from '@/pages/ComplianceReports'
+import { BlacklistPage }            from '@/pages/Blacklist'
+import { FrozenAccountsPage }       from '@/pages/FrozenAccounts'
 
 import {
   Globe, Landmark,
@@ -239,6 +244,13 @@ export const router = createBrowserRouter([
       // ── System ─────────────────────────────────────────────────────────────
       { path: '/wallets',   element: <WalletPage /> },
       { path: '/settings',  element: <SettingsPage /> },
+
+      // ── Compliance ─────────────────────────────────────────────────────────
+      { path: '/compliance/kyc',             element: <KycMonitoringPage /> },
+      { path: '/compliance/risk-flags',      element: <RiskFlagsPage /> },
+      { path: '/compliance/reports',         element: <ComplianceReportsPage /> },
+      { path: '/compliance/blacklist',       element: <BlacklistPage /> },
+      { path: '/compliance/frozen-accounts', element: <FrozenAccountsPage /> },
 
       // ── Catch-all ──────────────────────────────────────────────────────────
       { path: '*', element: <NotFoundPage /> },

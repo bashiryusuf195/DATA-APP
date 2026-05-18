@@ -1,61 +1,54 @@
 // src/workers/index.ts
 //
-// Entry point for the background worker process.
-// Run with:  npm run worker
+// Standalone background worker process entry point.
+// Run with:  npm run worker:prod  (production)
+//            npm run worker        (dev, with tsx watch)
 //
 // This process is SEPARATE from the API server (src/server.ts).
-// In production you run both in parallel:
-//   Process 1: npm start        ← handles HTTP requests
-//   Process 2: npm run worker   ← processes background jobs
-//
-// Workers are added here as each module is built.
-// For now, this file starts cleanly and logs that it is ready.
+// In production both run in parallel:
+//   Process 1: npm run start:prod   ← handles HTTP requests
+//   Process 2: npm run worker:prod  ← processes background jobs
 
-import '../config/index';    // ensure .env is loaded first
-import { logger }    from '../lib/logger';
-import { redis }     from '../config/redis';
-import { config }    from '../config';
+import '../config/index';
+import { logger }  from '../lib/logger';
+import { redis }   from '../config/redis';
+import { config }  from '../config';
+
+// Importing each worker registers it with BullMQ (side-effect on module load).
+// Exported instances are needed for graceful shutdown.
+import { airtimeWorker }         from '../modules/queue/workers/airtime.worker';
+import { vtuPurchaseWorker }     from '../modules/queue/workers/vtu-purchase.worker';
+import { paystackWebhookWorker } from '../modules/queue/workers/paystack-webhook.worker';
+import { reconciliationWorker }  from '../modules/reconciliation/workers/reconciliation.worker';
+import { notificationWorker }    from '../modules/notifications/workers/notification.worker';
+
+const workers = [
+  airtimeWorker,
+  vtuPurchaseWorker,
+  paystackWebhookWorker,
+  reconciliationWorker,
+  notificationWorker,
+];
 
 async function startWorkers() {
   logger.info('Worker process starting…', {
     env:     config.env,
     version: config.appVersion,
+    queues:  ['airtime-purchases', 'vtu-purchases', 'paystack-webhooks', 'vtu-reconciliation', 'vtu-notifications'],
   });
 
-  // Connect Redis (lazy connect needs an explicit connect() call)
   await redis.connect().catch(() => {
-    // If Redis is already connected (e.g. re-import), this throws — ignore it
+    // ioredis lazyConnect: ignore if already connected
   });
   logger.info('Redis connected (workers)');
 
-  // ── Register workers here as modules are built ────────────────────────────
-  // const { transactionWorker }    = await import('./transaction.worker');
-  // const { webhookWorker }        = await import('./webhook.worker');
-  // const { reconciliationWorker } = await import('./reconciliation.worker');
-  // const { notificationWorker }   = await import('./notification.worker');
+  logger.info('Workers ready — waiting for jobs…', { count: workers.length });
 
-  logger.info('Workers ready — waiting for jobs…', {
-    queues: [
-      'vtu-transactions (pending)',
-      'vtu-webhooks-inbound (pending)',
-      'vtu-notifications (pending)',
-      'vtu-reconciliation (pending)',
-    ],
-  });
-
-  // ── Graceful shutdown ─────────────────────────────────────────────────────
-  // When the process receives SIGTERM (container stop) or SIGINT (Ctrl+C),
-  // finish in-flight jobs then exit cleanly.
   async function shutdown(signal: string) {
-    logger.info(`Worker received ${signal} — shutting down…`);
+    logger.info(`Worker received ${signal} — shutting down gracefully…`);
 
-    // Close individual workers once they are registered:
-    // await Promise.all([
-    //   transactionWorker.close(),
-    //   webhookWorker.close(),
-    //   reconciliationWorker.close(),
-    //   notificationWorker.close(),
-    // ]);
+    await Promise.allSettled(workers.map((w) => w.close()));
+    logger.info('All workers closed');
 
     await redis.quit();
     logger.info('Worker process exited cleanly.');
