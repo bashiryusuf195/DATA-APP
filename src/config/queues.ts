@@ -11,6 +11,7 @@
 //   1. Queue names are constants — never type them as strings elsewhere.
 //   2. All queues share the same Redis connection.
 //   3. Default job options apply to every job unless overridden.
+//   4. Queue names must NOT contain ":" — use hyphens instead.
 
 import { Queue } from 'bullmq';
 import { redis } from './redis';
@@ -18,17 +19,17 @@ import { redis } from './redis';
 const connection = redis;
 
 // ── Queues ────────────────────────────────────────────────────────────────────
-export const transactionQueue    = new Queue('vtu:transactions',    { connection });
-export const webhookQueue        = new Queue('vtu:webhooks_inbound',{ connection });
-export const notificationQueue   = new Queue('vtu:notifications',   { connection });
-export const reconciliationQueue = new Queue('vtu:reconciliation',  { connection });
-export const riskEventQueue      = new Queue('vtu:risk_events',     { connection });
-export const providerHealthQueue = new Queue('vtu:provider_health', { connection });
+export const transactionQueue    = new Queue('vtu-transactions',    { connection });
+export const webhookQueue        = new Queue('vtu-webhooks-inbound',{ connection });
+export const notificationQueue   = new Queue('vtu-notifications',   { connection });
+export const reconciliationQueue = new Queue('vtu-reconciliation',  { connection });
+export const riskEventQueue      = new Queue('vtu-risk-events',     { connection });
+export const providerHealthQueue = new Queue('vtu-provider-health', { connection });
 
 // Dead-Letter Queues — jobs land here after all retry attempts are exhausted
-export const dlqTransactions     = new Queue('vtu:dlq:transactions', { connection });
-export const dlqWebhooks         = new Queue('vtu:dlq:webhooks',     { connection });
-export const dlqNotifications    = new Queue('vtu:dlq:notifications',{ connection });
+export const dlqTransactions     = new Queue('vtu-dlq-transactions', { connection });
+export const dlqWebhooks         = new Queue('vtu-dlq-webhooks',     { connection });
+export const dlqNotifications    = new Queue('vtu-dlq-notifications',{ connection });
 
 // ── Default job options ───────────────────────────────────────────────────────
 // 4 attempts total: initial try + 3 retries with exponential backoff

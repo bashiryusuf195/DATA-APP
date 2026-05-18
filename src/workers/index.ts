@@ -36,10 +36,10 @@ async function startWorkers() {
 
   logger.info('Workers ready — waiting for jobs…', {
     queues: [
-      'vtu:transactions (pending)',
-      'vtu:webhooks_inbound (pending)',
-      'vtu:notifications (pending)',
-      'vtu:reconciliation (pending)',
+      'vtu-transactions (pending)',
+      'vtu-webhooks-inbound (pending)',
+      'vtu-notifications (pending)',
+      'vtu-reconciliation (pending)',
     ],
   });
 

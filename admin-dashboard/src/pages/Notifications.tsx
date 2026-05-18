@@ -2,111 +2,185 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { notificationsApi } from '@/api/notifications.api'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { FilterBar } from '@/components/shared/FilterBar'
+import { DataTable } from '@/components/shared/DataTable'
 import { Pagination } from '@/components/shared/Pagination'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
-import { Button, Badge, Card } from '@/components/ui'
-import { SkeletonTable } from '@/components/ui/Skeleton'
+import { MetricCard } from '@/components/shared/MetricCard'
+import { Button, Badge, Card, Select } from '@/components/ui'
+import { SkeletonTable, SkeletonCard } from '@/components/ui/Skeleton'
 import { fmtRelative } from '@/utils/format'
 import type { Notification } from '@/types'
-import { RefreshCw, Bell, Info, AlertTriangle, CheckCircle, ShoppingBag } from 'lucide-react'
+import {
+  RefreshCw, Bell, CheckCircle2, XCircle, Clock, Mail,
+  MessageSquare, Smartphone, Wifi, Eye,
+} from 'lucide-react'
 import { cn } from '@/utils/cn'
-import { ENDPOINTS } from '@/config/endpoints'
 
-const TYPE_ICON: Record<string, React.ReactNode> = {
-  purchase_successful: <CheckCircle className="h-4 w-4 text-emerald-400" />,
-  purchase_failed:     <AlertTriangle className="h-4 w-4 text-rose-400" />,
-  admin_alert:         <AlertTriangle className="h-4 w-4 text-amber-400" />,
-  wallet_funded:       <ShoppingBag className="h-4 w-4 text-cyan-400" />,
+const CHANNEL_ICON: Record<string, React.ReactNode> = {
+  email:  <Mail         className="h-3.5 w-3.5" />,
+  sms:    <MessageSquare className="h-3.5 w-3.5" />,
+  push:   <Smartphone   className="h-3.5 w-3.5" />,
+  in_app: <Bell         className="h-3.5 w-3.5" />,
+  webhook:<Wifi         className="h-3.5 w-3.5" />,
 }
 
-const getIcon = (type: string) => TYPE_ICON[type] ?? <Info className="h-4 w-4 text-ink-faint" />
+const STATUS_COLOR: Record<string, string> = {
+  sent:    'text-emerald-400',
+  failed:  'text-rose-400',
+  pending: 'text-amber-400',
+  read:    'text-ink-faint',
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, 'success' | 'danger' | 'warning' | 'neutral'> = {
+    sent: 'success', failed: 'danger', pending: 'warning', read: 'neutral',
+  }
+  return <Badge variant={map[status] ?? 'neutral'}>{status}</Badge>
+}
+
+type N = Notification & { user_email?: string; user_name?: string }
 
 export function NotificationsPage() {
-  const [page, setPage] = useState(1)
-  const [channel, setChannel] = useState<'admin' | 'my'>('admin')
-  const limit = 20
+  const [page,    setPage]    = useState(1)
+  const [channel, setChannel] = useState('')
+  const [status,  setStatus]  = useState('')
+  const limit = 25
 
   const { data: raw, isLoading, error, refetch } = useQuery({
-    queryKey: ['notifications', { channel, page, limit }],
-    queryFn: () =>
-      channel === 'admin'
-        ? notificationsApi.adminList({ page, limit })
-        : notificationsApi.myList({ page, limit }),
+    queryKey: ['admin-notifications', { channel, status, page, limit }],
+    queryFn: () => notificationsApi.adminList({ channel: channel || undefined, status: status || undefined, page, limit }),
   })
 
-  const rows: Notification[] = raw && 'data' in raw ? (raw.data as Notification[]) : []
-  const total = raw && 'total' in raw ? (raw.total ?? rows.length) : rows.length
+  const rows  = (raw?.data ?? []) as N[]
+  const total = raw?.total ?? 0
+  const stats = raw?.stats ?? { sent: 0, failed: 0, pending: 0, read: 0 }
 
-  if (error) return <ErrorMessage error={error} onRetry={() => void refetch()} endpoint={ENDPOINTS.notifications.path} />
+  const columns = [
+    {
+      key: 'channel',
+      header: 'Channel',
+      render: (n: N) => (
+        <div className="flex items-center gap-1.5">
+          <span className={cn('text-ink-faint', STATUS_COLOR[n.status])}>{CHANNEL_ICON[n.channel]}</span>
+          <Badge variant="neutral" size="sm">{n.channel}</Badge>
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (n: N) => (
+        <span className="text-xs font-mono text-ink-muted">{n.type.replace(/_/g, ' ')}</span>
+      ),
+    },
+    {
+      key: 'title',
+      header: 'Title / Message',
+      render: (n: N) => (
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-ink truncate max-w-[260px]">{n.title}</p>
+          <p className="text-xs text-ink-faint truncate max-w-[260px]">{n.message}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'recipient',
+      header: 'Recipient',
+      render: (n: N) => (
+        <span className="text-xs text-ink-muted">
+          {(n as N).user_email ?? (n.user_id ? n.user_id.slice(0, 8) + '…' : <span className="text-ink-faint">system</span>)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (n: N) => <StatusBadge status={n.status} />,
+    },
+    {
+      key: 'created_at',
+      header: 'Sent',
+      render: (n: N) => (
+        <span className="text-xs text-ink-faint whitespace-nowrap">{fmtRelative(n.created_at)}</span>
+      ),
+    },
+  ]
+
+  if (error) return <ErrorMessage error={error} onRetry={() => void refetch()} endpoint="/admin/notifications" />
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Notifications"
-        subtitle="System and user notifications"
+        subtitle="Full log of all notifications sent across channels"
         actions={
           <Button variant="secondary" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />}
             onClick={() => void refetch()}>Refresh</Button>
         }
       />
 
-      {/* Channel toggle */}
-      <div className="flex gap-2">
-        {(['admin', 'my'] as const).map((c) => (
-          <button
-            key={c}
-            onClick={() => { setChannel(c); setPage(1) }}
-            className={cn(
-              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-              channel === c
-                ? 'bg-accent-subtle text-accent'
-                : 'text-ink-muted hover:text-ink hover:bg-surface-2'
-            )}
-          >
-            {c === 'admin' ? 'System / Admin' : 'My notifications'}
-          </button>
-        ))}
-      </div>
-
-      <Card padding="none">
+      {/* Stats */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {isLoading ? (
-          <div className="p-5"><SkeletonTable rows={8} /></div>
-        ) : rows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Bell className="h-10 w-10 text-ink-faint opacity-40 mb-3" />
-            <p className="text-sm text-ink-faint">No notifications found</p>
-          </div>
+          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
           <>
-            <div className="divide-y divide-border/50">
-              {rows.map((n) => (
-                <div
-                  key={n.id}
-                  className={cn(
-                    'flex gap-3 px-5 py-4 transition-colors',
-                    !n.read && 'bg-accent-subtle/30'
-                  )}
-                >
-                  <div className="mt-0.5 shrink-0">{getIcon(n.type)}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={cn('text-sm', n.read ? 'text-ink-muted' : 'font-semibold text-ink')}>
-                        {n.title}
-                      </p>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="neutral" size="sm">{n.channel}</Badge>
-                        {!n.read && (
-                          <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{n.message}</p>
-                    <p className="text-[11px] text-ink-faint mt-1">{fmtRelative(n.created_at)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="px-4 pb-4">
+            <MetricCard label="Sent"    value={stats.sent.toLocaleString()}    icon={<CheckCircle2 className="h-4 w-4" />} variant="success" />
+            <MetricCard label="Failed"  value={stats.failed.toLocaleString()}  icon={<XCircle      className="h-4 w-4" />} variant="danger"  />
+            <MetricCard label="Pending" value={stats.pending.toLocaleString()} icon={<Clock        className="h-4 w-4" />} variant="default" />
+            <MetricCard label="Read"    value={stats.read.toLocaleString()}    icon={<Eye          className="h-4 w-4" />} variant="default" />
+          </>
+        )}
+      </div>
+
+      {/* Filters */}
+      <FilterBar>
+        <Select
+          value={channel}
+          onChange={(e) => { setChannel(e.target.value); setPage(1) }}
+          options={[
+            { value: '',        label: 'All channels' },
+            { value: 'email',   label: 'Email' },
+            { value: 'sms',     label: 'SMS' },
+            { value: 'push',    label: 'Push' },
+            { value: 'in_app',  label: 'In-App' },
+            { value: 'webhook', label: 'Webhook' },
+          ]}
+          className="w-36"
+        />
+        <Select
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+          options={[
+            { value: '',        label: 'All statuses' },
+            { value: 'sent',    label: 'Sent' },
+            { value: 'failed',  label: 'Failed' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'read',    label: 'Read' },
+          ]}
+          className="w-36"
+        />
+        {(channel || status) && (
+          <Button variant="ghost" size="sm" onClick={() => { setChannel(''); setStatus(''); setPage(1) }}>
+            Clear
+          </Button>
+        )}
+      </FilterBar>
+
+      {/* Table */}
+      <Card>
+        {isLoading ? (
+          <SkeletonTable rows={8} />
+        ) : (
+          <>
+            <DataTable
+              columns={columns}
+              data={rows}
+              rowKey={(n) => n.id}
+              emptyMessage="No notifications found."
+            />
+            <div className="px-4 pb-2">
               <Pagination page={page} limit={limit} total={total} onPage={setPage} />
             </div>
           </>

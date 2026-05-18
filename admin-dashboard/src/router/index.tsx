@@ -15,7 +15,10 @@ import { TransactionsPage }   from '@/pages/Transactions'
 import { AttemptsPage }       from '@/pages/Attempts'
 import { HealthMetricsPage }  from '@/pages/HealthMetrics'
 import { WalletPage }         from '@/pages/Wallets'
-import { NotificationsPage }  from '@/pages/Notifications'
+import { NotificationsPage }           from '@/pages/Notifications'
+import { NotificationTemplatesPage }  from '@/pages/NotificationTemplates'
+import { NotificationQueuePage }      from '@/pages/NotificationQueue'
+import { BroadcastCenterPage }        from '@/pages/BroadcastCenter'
 import { QueueMonitorPage }   from '@/pages/QueueMonitor'
 import { FailedJobsPage }     from '@/pages/FailedJobs'
 import { WebhookEventsPage }    from '@/pages/WebhookEvents'
@@ -38,7 +41,7 @@ import { NotFoundPage }             from '@/pages/NotFound'
 
 import {
   Globe, Landmark,
-  UserCheck, Lock, Gauge, Cpu, Megaphone,
+  UserCheck, Lock, Gauge, Cpu,
 } from 'lucide-react'
 
 export const router = createBrowserRouter([
@@ -222,28 +225,20 @@ export const router = createBrowserRouter([
       { path: '/tickets',    element: <Navigate to="/support/tickets"    replace /> },
       { path: '/disputes',   element: <Navigate to="/support/disputes"   replace /> },
       { path: '/complaints', element: <Navigate to="/support/complaints" replace /> },
-      {
-        path: '/broadcast',
-        element: (
-          <PlaceholderPage
-            title="Broadcast Notifications"
-            subtitle="Send system-wide messages to users"
-            icon={<Megaphone className="h-10 w-10" />}
-            features={[
-              'Send to all users or targeted segments',
-              'In-app, email and SMS channels',
-              'Scheduled and recurring broadcasts',
-              'Delivery and open rate analytics',
-              'Template library',
-            ]}
-          />
-        ),
-      },
+      // ── Communication ──────────────────────────────────────────────────────
+      { path: '/communication/notifications', element: <NotificationsPage /> },
+      { path: '/communication/templates',     element: <NotificationTemplatesPage /> },
+      { path: '/communication/queue',         element: <NotificationQueuePage /> },
+      { path: '/communication/broadcasts',    element: <BroadcastCenterPage /> },
+      // Legacy paths — redirect so old bookmarks keep working
+      { path: '/notifications',          element: <Navigate to="/communication/notifications" replace /> },
+      { path: '/notification-templates', element: <Navigate to="/communication/templates"     replace /> },
+      { path: '/notification-queue',     element: <Navigate to="/communication/queue"         replace /> },
+      { path: '/broadcast',              element: <Navigate to="/communication/broadcasts"    replace /> },
 
       // ── System ─────────────────────────────────────────────────────────────
-      { path: '/wallets',       element: <WalletPage /> },
-      { path: '/notifications', element: <NotificationsPage /> },
-      { path: '/settings',      element: <SettingsPage /> },
+      { path: '/wallets',   element: <WalletPage /> },
+      { path: '/settings',  element: <SettingsPage /> },
 
       // ── Catch-all ──────────────────────────────────────────────────────────
       { path: '*', element: <NotFoundPage /> },

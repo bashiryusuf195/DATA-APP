@@ -48,6 +48,10 @@ import {
   Megaphone,
   // System
   SlidersHorizontal,
+  // Communication
+  FileText as FileTemplate,
+  Clock as ClockIcon,
+  Radio,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -162,16 +166,24 @@ const nav: NavSection[] = [
       { to: '/support/tickets',    label: 'Support Tickets', icon: <MessageSquare className="h-4 w-4" /> },
       { to: '/support/disputes',   label: 'Disputes',        icon: <Flag className="h-4 w-4" /> },
       { to: '/support/complaints', label: 'Complaints',      icon: <Megaphone className="h-4 w-4" /> },
-      { to: '/broadcast',          label: 'Broadcast',       icon: <Bell className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key: 'communication',
+    title: 'Communication',
+    items: [
+      { to: '/communication/notifications', label: 'Notifications',    icon: <Bell         className="h-4 w-4" /> },
+      { to: '/communication/templates',     label: 'Templates',       icon: <FileTemplate className="h-4 w-4" /> },
+      { to: '/communication/queue',         label: 'Queue',           icon: <ClockIcon    className="h-4 w-4" /> },
+      { to: '/communication/broadcasts',    label: 'Broadcast Center', icon: <Radio       className="h-4 w-4" /> },
     ],
   },
   {
     key: 'system',
     title: 'System',
     items: [
-      { to: '/wallets',       label: 'Wallet Monitor', icon: <Wallet className="h-4 w-4" /> },
-      { to: '/notifications', label: 'Notifications',  icon: <Bell className="h-4 w-4" /> },
-      { to: '/settings',      label: 'Settings',       icon: <SlidersHorizontal className="h-4 w-4" /> },
+      { to: '/wallets',   label: 'Wallet Monitor', icon: <Wallet            className="h-4 w-4" /> },
+      { to: '/settings',  label: 'Settings',       icon: <SlidersHorizontal className="h-4 w-4" /> },
     ],
   },
 ]

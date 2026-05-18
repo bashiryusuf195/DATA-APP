@@ -204,6 +204,7 @@ export interface Notification {
   type: NotificationType
   title: string
   message: string
+  status: string
   read: boolean
   metadata?: Record<string, unknown>
   created_at: string
@@ -731,6 +732,61 @@ export interface Reversal {
   transaction_reference: string | null
   transaction_amount: string | null
   transaction_status: string | null
+}
+
+// ── Notification System ───────────────────────────────────────────────────────
+
+export type NotificationJobChannel = 'email' | 'sms' | 'push' | 'in_app' | 'broadcast'
+export type NotificationJobStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled'
+export type NotificationRecipientType = 'user' | 'all' | 'segment'
+
+export interface NotificationTemplate {
+  id: string
+  name: string
+  type: string
+  notification_type: string
+  subject: string | null
+  body: string
+  variables: string[]
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NotificationJob {
+  id: string
+  type: NotificationJobChannel
+  notification_type: string
+  recipient_type: NotificationRecipientType
+  recipient_id: string | null
+  recipient_email: string | null
+  recipient_phone: string | null
+  recipient_user_email: string | null
+  recipient_name: string | null
+  subject: string | null
+  body: string
+  status: NotificationJobStatus
+  retry_count: number
+  max_retries: number
+  scheduled_at: string | null
+  processed_at: string | null
+  failed_at: string | null
+  failure_reason: string | null
+  template_id: string | null
+  metadata: Record<string, unknown>
+  idempotency_key: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NotificationJobStats {
+  pending:    number
+  processing: number
+  sent:       number
+  failed:     number
+  cancelled:  number
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
