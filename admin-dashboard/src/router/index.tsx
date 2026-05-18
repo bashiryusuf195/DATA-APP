@@ -26,11 +26,14 @@ import { SettingsPage }         from '@/pages/Settings'
 import { ServicesPage }         from '@/pages/Services'
 import { ServicePlansPage }     from '@/pages/ServicePlans'
 import { PricingPage }          from '@/pages/Pricing'
+import { TicketsPage }          from '@/pages/Tickets'
+import { DisputesPage }         from '@/pages/Disputes'
+import { ComplaintsPage }       from '@/pages/Complaints'
 import { NotFoundPage }         from '@/pages/NotFound'
 
 import {
   Globe, Landmark,
-  UserCheck, Lock, Gauge, Scale, Cpu, MessageSquare, Flag, Megaphone,
+  UserCheck, Lock, Gauge, Scale, Cpu, Megaphone,
   RotateCcw, AlertTriangle,
 } from 'lucide-react'
 
@@ -244,41 +247,14 @@ export const router = createBrowserRouter([
         ),
       },
 
-      // ── Support ────────────────────────────────────────────────────────────
-      {
-        path: '/disputes',
-        element: (
-          <PlaceholderPage
-            title="Disputes"
-            subtitle="User-raised transaction disputes and resolutions"
-            icon={<MessageSquare className="h-10 w-10" />}
-            features={[
-              'Dispute submission and tracking',
-              'Link disputes to transactions',
-              'Resolution workflow with SLA',
-              'Automated refund on resolution',
-              'Dispute analytics and trends',
-            ]}
-          />
-        ),
-      },
-      {
-        path: '/complaints',
-        element: (
-          <PlaceholderPage
-            title="Complaints"
-            subtitle="General user complaints and support tickets"
-            icon={<Flag className="h-10 w-10" />}
-            features={[
-              'Complaint intake and triage',
-              'Assign to support agents',
-              'SLA tracking and escalation',
-              'Resolution notes and history',
-              'NPS and satisfaction scoring',
-            ]}
-          />
-        ),
-      },
+      // ── Customer Support ───────────────────────────────────────────────────
+      { path: '/support/tickets',    element: <TicketsPage /> },
+      { path: '/support/disputes',   element: <DisputesPage /> },
+      { path: '/support/complaints', element: <ComplaintsPage /> },
+      // Legacy flat paths — redirect so bookmarks don't break
+      { path: '/tickets',    element: <Navigate to="/support/tickets"    replace /> },
+      { path: '/disputes',   element: <Navigate to="/support/disputes"   replace /> },
+      { path: '/complaints', element: <Navigate to="/support/complaints" replace /> },
       {
         path: '/broadcast',
         element: (

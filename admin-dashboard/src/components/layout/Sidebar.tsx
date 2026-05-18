@@ -147,11 +147,12 @@ const nav: NavSection[] = [
   },
   {
     key: 'support',
-    title: 'Support',
+    title: 'Customer Support',
     items: [
-      { to: '/disputes',   label: 'Disputes',   icon: <MessageSquare className="h-4 w-4" /> },
-      { to: '/complaints', label: 'Complaints', icon: <Flag className="h-4 w-4" /> },
-      { to: '/broadcast',  label: 'Broadcast',  icon: <Megaphone className="h-4 w-4" /> },
+      { to: '/support/tickets',    label: 'Support Tickets', icon: <MessageSquare className="h-4 w-4" /> },
+      { to: '/support/disputes',   label: 'Disputes',        icon: <Flag className="h-4 w-4" /> },
+      { to: '/support/complaints', label: 'Complaints',      icon: <Megaphone className="h-4 w-4" /> },
+      { to: '/broadcast',          label: 'Broadcast',       icon: <Bell className="h-4 w-4" /> },
     ],
   },
   {
@@ -166,7 +167,7 @@ const nav: NavSection[] = [
 ]
 
 // Sections closed by default to keep sidebar manageable on first load
-const DEFAULT_CLOSED = new Set(['services', 'payments', 'support'])
+const DEFAULT_CLOSED = new Set(['services', 'payments'])
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUiStore()

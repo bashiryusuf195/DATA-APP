@@ -455,6 +455,120 @@ export interface UpdateServicePlanInput {
   provider_metadata?: Record<string, unknown>
 }
 
+// ── Support Tickets ───────────────────────────────────────────────────────────
+
+export type TicketStatus       = 'open' | 'pending' | 'resolved' | 'closed'
+export type TicketPriority     = 'low' | 'medium' | 'high' | 'urgent'
+export type TicketCategory     = 'complaint' | 'dispute' | 'inquiry' | 'technical' | 'billing'
+export type MessageSenderType  = 'admin' | 'customer' | 'system'
+
+export interface SupportTicket {
+  id: string
+  reference: string
+  user_id: string | null
+  user_email: string | null
+  transaction_reference: string | null
+  subject: string
+  description: string | null
+  status: TicketStatus
+  priority: TicketPriority
+  category: TicketCategory | null
+  assigned_to: string | null
+  assigned_to_email: string | null
+  resolution_notes: string | null
+  resolved_at: string | null
+  closed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SupportMessage {
+  id: string
+  ticket_id: string
+  sender_type: MessageSenderType
+  sender_id: string | null
+  sender_email: string | null
+  body: string
+  is_internal: boolean
+  attachments: unknown[]
+  created_at: string
+}
+
+export interface SupportTicketDetail extends SupportTicket {
+  messages: SupportMessage[]
+}
+
+export interface CreateTicketInput {
+  user_id?: string | null
+  user_email?: string | null
+  transaction_reference?: string | null
+  subject: string
+  description?: string | null
+  status?: TicketStatus
+  priority?: TicketPriority
+  category?: TicketCategory | null
+  assigned_to?: string | null
+  assigned_to_email?: string | null
+}
+
+export interface UpdateTicketInput {
+  status?: TicketStatus
+  priority?: TicketPriority
+  category?: TicketCategory | null
+  assigned_to?: string | null
+  assigned_to_email?: string | null
+  resolution_notes?: string | null
+}
+
+export interface AddMessageInput {
+  sender_type: MessageSenderType
+  sender_id?: string | null
+  sender_email?: string | null
+  body: string
+  is_internal?: boolean
+}
+
+// ── Disputes ──────────────────────────────────────────────────────────────────
+
+export type DisputeStatus     = 'open' | 'under_review' | 'escalated' | 'resolved' | 'rejected' | 'closed'
+export type DisputeType       = 'wrong_amount' | 'not_delivered' | 'duplicate_charge' | 'unauthorized' | 'provider_error' | 'other'
+export type DisputeResolution = 'refund_issued' | 'partial_refund' | 'no_action' | 'provider_credited' | 'rejected'
+
+export interface Dispute {
+  id: string
+  reference: string
+  ticket_id: string | null
+  user_id: string | null
+  user_email: string | null
+  transaction_reference: string | null
+  dispute_type: DisputeType
+  amount_disputed: string | null   // DECIMAL comes back as string from Postgres
+  currency: string
+  status: DisputeStatus
+  resolution: DisputeResolution | null
+  resolution_notes: string | null
+  resolved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateDisputeInput {
+  ticket_id?: string | null
+  user_id?: string | null
+  user_email?: string | null
+  transaction_reference?: string | null
+  dispute_type: DisputeType
+  amount_disputed?: number | null
+  currency?: string
+}
+
+export interface UpdateDisputeInput {
+  status?: DisputeStatus
+  resolution?: DisputeResolution | null
+  resolution_notes?: string | null
+  ticket_id?: string | null
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export type SettingValueType = 'text' | 'number' | 'boolean' | 'json'
