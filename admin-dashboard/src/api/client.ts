@@ -51,9 +51,15 @@ apiClient.interceptors.response.use(
     }
 
     if (status === 401) {
+      // If the 401 came from the login endpoint itself, it means wrong credentials —
+      // do NOT redirect; let the error propagate to the form's error handler so the
+      // user sees the message instead of silently reloading the login page.
+      const isLoginRequest = !!error.config?.url?.includes('/auth/login')
       useAuthStore.getState().clearAuth()
       delete apiClient.defaults.headers.common['Authorization']
-      window.location.href = '/login'
+      if (!isLoginRequest) {
+        window.location.href = '/login'
+      }
       return Promise.reject(error)
     }
 

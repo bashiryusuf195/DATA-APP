@@ -19,9 +19,11 @@ export function validate<T>(schema: ZodSchema<T>) {
         message: i.message,
         code:    i.code,
       }));
-      res.status(422).json({
+      res.status(400).json({
         success: false,
-        error: { code: "VALIDATION_ERROR", message: "Validation failed", details },
+        code:    "VALIDATION_ERROR",
+        message: "Validation failed",
+        details,
       });
       return;
     }
@@ -35,7 +37,7 @@ export function validateOrThrow<T>(schema: ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
   if (!result.success) {
     throw new AppError(
-      422,
+      400,
       "VALIDATION_ERROR",
       "Request validation failed",
       result.error.flatten().fieldErrors
@@ -57,9 +59,11 @@ export function validateQuery<T>(schema: ZodSchema<T>) {
         field:   i.path.join("."),
         message: i.message,
       }));
-      res.status(422).json({
+      res.status(400).json({
         success: false,
-        error: { code: "VALIDATION_ERROR", message: "Query validation failed", details },
+        code:    "VALIDATION_ERROR",
+        message: "Query validation failed",
+        details,
       });
       return;
     }

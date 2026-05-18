@@ -5,6 +5,8 @@ import type { Knex }   from "knex";
 import type { Request } from "express";
 import { createHash }  from "crypto";
 import bcrypt          from "bcryptjs";
+import { logger }      from "../../../lib/logger";
+import { config }      from "../../../config";
 
 import {
   supabaseSignIn,
@@ -180,6 +182,16 @@ export async function login(
     .where({ email: input.email })
     .whereNull("deleted_at")
     .first();
+
+  if (config.isDev) {
+    logger.debug("login_attempt", {
+      email:           input.email,
+      password_present: !!input.password,
+      user_found:       !!user,
+      user_status:      user?.status ?? null,
+      locked_until:     user?.locked_until ?? null,
+    });
+  }
 
   if (!user) {
     // Avoid email enumeration

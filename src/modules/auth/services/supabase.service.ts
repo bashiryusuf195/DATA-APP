@@ -12,6 +12,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import { env }                                from "../../../shared/config/env";
 import { AppError }                           from "../../../shared/errors/AppError";
+import { logger }                             from "../../../lib/logger";
+import { config }                             from "../../../config";
 const JWKS = createRemoteJWKSet(
   new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
 );
@@ -87,6 +89,18 @@ export async function verifySupabaseJwt(
  */
 export async function supabaseSignIn(email: string, password: string) {
   const { data, error } = await getAnonClient().auth.signInWithPassword({ email, password });
+
+  if (config.isDev) {
+    logger.debug("supabase_signin_result", {
+      email,
+      password_present: !!password,
+      session_present:  !!data?.session,
+      supabase_error:   error
+        ? { code: error.code, message: error.message, status: (error as { status?: number }).status ?? null }
+        : null,
+    });
+  }
+
   if (error || !data.session) {
     throw new AppError(401, "INVALID_CREDENTIALS", error?.message ?? "Invalid credentials");
   }

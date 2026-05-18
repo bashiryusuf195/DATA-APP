@@ -107,7 +107,12 @@ export async function loginController(
     const { blocked, retryAfterSec } = await failedLoginLimiter.check(email, ip);
     if (blocked) {
       res.setHeader("Retry-After", String(retryAfterSec));
-      res.status(429).json({ error: "Too many requests", code: "RATE_LIMIT_EXCEEDED" });
+      res.status(429).json({
+        success:    false,
+        code:       "RATE_LIMIT_EXCEEDED",
+        message:    `Too many failed login attempts. Try again in ${retryAfterSec} second${retryAfterSec === 1 ? "" : "s"}.`,
+        retryAfter: retryAfterSec,
+      });
       return;
     }
 
