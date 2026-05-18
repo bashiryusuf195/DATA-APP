@@ -1,7 +1,12 @@
 import { Router } from "express";
 
 import { authenticate } from "../../auth/middleware/authenticate";
-import { balanceRateLimiter } from "../../../middleware/rateLimiter.redis";
+import {
+  balanceRateLimiter,
+  fundingRateLimiter,
+  purchaseRateLimiter,
+} from "../../../middleware/rateLimiter.redis";
+import { idempotency } from "../../idempotency/middleware/idempotency.middleware";
 
 import {
   getBalanceController,
@@ -16,39 +21,13 @@ import {
 
 const router = Router();
 
-/**
- * Protected wallet routes
- */
-router.get(
-  "/balance",
-  authenticate,
-  balanceRateLimiter,
-  getBalanceController
-);
+router.get("/balance",  authenticate, balanceRateLimiter, getBalanceController);
+router.get("/ledger",   authenticate, balanceRateLimiter, getLedgerController);
 
-router.get(
-  "/ledger",
-  authenticate,
-  getLedgerController
-);
-router.post(
-  "/fund/initialize",
-  authenticate,
-  initializeFundingController
-);
-router.post(
-  "/fund/verify/:reference",
-  authenticate,
-  verifyFundingController
-);
-router.post(
-  "/fund-test",
-  authenticate,
-  fundTestController
-);
-router.post(
-  "/transfer",
-  authenticate,
-  transferController
-);
+router.post("/fund/initialize",       authenticate, fundingRateLimiter, idempotency, initializeFundingController);
+router.post("/fund/verify/:reference", authenticate, fundingRateLimiter, verifyFundingController);
+
+router.post("/fund-test", authenticate, fundTestController);
+router.post("/transfer",  authenticate, purchaseRateLimiter, transferController);
+
 export { router as walletRouter };

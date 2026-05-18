@@ -1,33 +1,24 @@
 // src/routes/index.ts
 //
 // Master router — mounts every sub-router under /api/v1.
-// app.ts imports and uses this single file.
-//
-// Current routes (skeleton — business logic added in later phases):
-//   /api/v1/health          health + readiness checks (public)
-//
-// Planned routes (uncomment as each module is implemented):
-//   /api/v1/auth            registration, PIN, profile
-//   /api/v1/services        service catalog (public)
-//   /api/v1/wallet          balance, ledger
-//   /api/v1/transactions    create + view transactions
-//   /api/v1/payment         fund wallet
-//   /api/v1/webhooks        payment gateway callbacks
-//   /api/v1/admin           admin operations
+// All public routes are available at both their direct paths (e.g. /auth/login)
+// and their versioned aliases (e.g. /api/v1/auth/login).
 
-import { Router }       from 'express';
-import { healthRouter } from './health.routes';
+import { Router } from 'express';
+import { healthRouter }       from './health.routes';
+import { authRouter }         from '../modules/auth/routes/auth.routes';
+import { walletRouter }       from '../modules/wallet/routes/wallet.routes';
+import { transactionRouter }  from '../modules/transactions/routes/transaction.routes';
+import { catalogRouter }      from '../modules/catalog/routes/catalog.routes';
+import { notificationsRouter } from '../modules/notifications/routes/notifications.routes';
+import { webhookRouter }      from '../modules/webhooks/routes/webhook.routes';
 
 export const rootRouter = Router();
 
-// ── Mounted routes ────────────────────────────────────────────────────────────
-rootRouter.use('/health', healthRouter);
-
-// Future modules are registered here as they are built:
-// rootRouter.use('/auth',         authRouter);
-// rootRouter.use('/services',     servicesRouter);
-// rootRouter.use('/wallet',       walletRouter);
-// rootRouter.use('/transactions', transactionsRouter);
-// rootRouter.use('/payment',      paymentRouter);
-// rootRouter.use('/webhooks',     webhooksRouter);
-// rootRouter.use('/admin',        adminRouter);
+rootRouter.use('/health',        healthRouter);
+rootRouter.use('/auth',          authRouter);
+rootRouter.use('/wallet',        walletRouter);
+rootRouter.use('/transactions',  transactionRouter);
+rootRouter.use('/services',      catalogRouter);
+rootRouter.use('/notifications', notificationsRouter);
+rootRouter.use('/webhooks',      webhookRouter);

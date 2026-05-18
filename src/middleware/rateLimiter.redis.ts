@@ -98,9 +98,12 @@ function makeRedisLimiter({
     store: new RedisStore(prefix, windowMs),
     keyGenerator,
     handler: (_req: Request, res: Response) => {
+      const retryAfter = res.getHeader("Retry-After");
       res.status(429).json({
-        error: "Too many requests",
-        code:  "RATE_LIMIT_EXCEEDED",
+        success:    false,
+        code:       "RATE_LIMIT_EXCEEDED",
+        message:    "Too many requests. Please try again later.",
+        retryAfter: retryAfter !== undefined ? Number(retryAfter) : undefined,
       });
     },
   });
@@ -211,4 +214,12 @@ export const webhookRateLimiter = makeRedisLimiter({
   windowMs:     60 * 1000,
   max:          120,
   keyGenerator: (req) => req.params.providerCode || getClientIp(req),
+});
+
+/** Wallet funding — initialize: 10 per 15 min per authenticated user */
+export const fundingRateLimiter = makeRedisLimiter({
+  prefix:       "funding",
+  windowMs:     15 * 60 * 1000,
+  max:          10,
+  keyGenerator: (req) => req.user?.id ?? getClientIp(req),
 });

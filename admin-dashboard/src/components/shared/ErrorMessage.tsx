@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw, ServerCrash, Unplug } from 'lucide-react'
+import { AlertTriangle, Clock, RefreshCw, ServerCrash, ShieldOff, Unplug } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { isAxiosError } from 'axios'
 import { cn } from '@/utils/cn'
@@ -27,6 +27,46 @@ export function ErrorMessage({ error, onRetry, endpoint, inline = false, statusO
       ? 'rounded-xl bg-surface-1 border border-border p-8'
       : 'py-16'
   )
+
+  // ── 403: forbidden ────────────────────────────────────────────────────────
+  if (status === 403) {
+    return (
+      <div className={outer}>
+        <div className="p-3 rounded-xl bg-rose-500/10">
+          <ShieldOff className="h-6 w-6 text-rose-400" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-ink mb-1">Access Denied</p>
+          <p className="text-xs text-ink-muted max-w-xs">
+            You do not have permission to view this resource. Contact your administrator if you believe this is an error.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 429: rate limited ──────────────────────────────────────────────────────
+  if (status === 429) {
+    const message = isAxiosError(error) ? error.message : undefined
+    return (
+      <div className={outer}>
+        <div className="p-3 rounded-xl bg-amber-500/10">
+          <Clock className="h-6 w-6 text-amber-400" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-ink mb-1">Too Many Requests</p>
+          <p className="text-xs text-ink-muted max-w-xs">
+            {message ?? 'You have made too many requests. Please wait a moment before trying again.'}
+          </p>
+        </div>
+        {onRetry && (
+          <Button variant="secondary" size="sm" onClick={onRetry} icon={<RefreshCw className="h-3.5 w-3.5" />}>
+            Retry
+          </Button>
+        )}
+      </div>
+    )
+  }
 
   // ── 404: endpoint does not exist ──────────────────────────────────────────
   if (status === 404) {

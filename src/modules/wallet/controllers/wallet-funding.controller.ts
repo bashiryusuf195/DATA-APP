@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { getDbInstance } from "../../../db/knex";
+import { logger } from "../../../lib/logger";
 import { paystackGateway } from "../services/paystack.service";
 import {
   createFundingTransaction,
@@ -71,10 +72,7 @@ export async function initializeFundingController(
       metadata:    { funding_transaction_id: fundingTx.id, user_id: userId },
     });
 
-    console.log("[FUNDING] Initialized Paystack transaction", {
-      reference,
-      user_id: userId,
-    });
+    logger.info("wallet_fund_initialized", { reference, user_id: userId });
 
     res.status(200).json({
       success: true,
@@ -140,7 +138,7 @@ export async function verifyFundingController(
 
     const verifyResult = await paystackGateway.verifyPayment(reference);
 
-    console.log("[FUNDING-VERIFY] Paystack verify result", {
+    logger.info("wallet_fund_verify_result", {
       reference,
       status:  verifyResult.status,
       channel: verifyResult.channel ?? "unknown",
@@ -260,12 +258,12 @@ export async function verifyFundingController(
         },
       });
     } catch (notifErr) {
-      console.error("[FUNDING-VERIFY] Notification failed (non-fatal):", (notifErr as Error).message);
+      logger.warn("wallet_fund_notification_failed", { reference, error: (notifErr as Error).message });
     }
 
-    console.log("[FUNDING-VERIFY] Wallet credited", {
+    logger.info("wallet_fund_credited", {
       reference,
-      user_id:   fundingTx.user_id,
+      user_id:    fundingTx.user_id,
       amount_ngn: amountNgn,
       idempotent: walletResult.idempotent,
     });

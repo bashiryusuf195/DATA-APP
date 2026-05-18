@@ -46,6 +46,7 @@ import { adminSupportRouter }          from "./modules/support/routes/admin-supp
 import { adminFinanceRouter }          from "./modules/finance/routes/admin-finance.routes";
 import { adminComplianceRouter }       from "./modules/compliance/routes/admin-compliance.routes";
 import { adminAuditMiddleware }        from "./middleware/adminAudit";
+import { publicAuditMiddleware }       from "./middleware/publicAudit";
 import "./modules/queue";
 export const app = express();
 
@@ -79,8 +80,9 @@ app.use(requestLogger);
 app.use(standardLimiter);
 
 // ── 6. Routes ─────────────────────────────────────────────────────────────────
-// Admin audit middleware fires on res.on("finish") — registers before routes so
-// it captures every admin request that goes through the chain.
+// Audit middlewares fire on res.on("finish") — register before routes so every
+// request passes through before dispatch.
+app.use(publicAuditMiddleware);
 app.use('/admin', adminAuditMiddleware);
 
 app.use('/api/v1', rootRouter);
@@ -116,5 +118,4 @@ app.use(notFoundHandler);
 // Must be the LAST middleware registered.
 // Express identifies error handlers by their 4-parameter signature.
 app.use(errorHandler);
-// ── 6. Routes ─────────────────────────────────────────────────────────────────
 

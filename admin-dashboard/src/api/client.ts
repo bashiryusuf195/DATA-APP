@@ -64,6 +64,14 @@ apiClient.interceptors.response.use(
       error.message = 'You do not have permission to perform this action.'
     } else if (status === 404) {
       // Keep the original message; ErrorMessage component handles 404 specially.
+    } else if (status === 429) {
+      const retryAfter = error.response?.headers?.['retry-after']
+      const seconds    = retryAfter ? Math.ceil(Number(retryAfter)) : null
+      error.message    = seconds
+        ? `Too many requests. Please wait ${seconds} second${seconds === 1 ? '' : 's'} before trying again.`
+        : 'Too many requests. Please wait a moment before trying again.'
+      // Attach for components that want to show a countdown.
+      error.retryAfterSeconds = seconds
     } else if (status != null && status >= 500) {
       error.message = `Server error (${status}). Please try again shortly.`
     }
