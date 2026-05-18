@@ -20,8 +20,11 @@ import { NotificationTemplatesPage }  from '@/pages/NotificationTemplates'
 import { NotificationQueuePage }      from '@/pages/NotificationQueue'
 import { BroadcastCenterPage }        from '@/pages/BroadcastCenter'
 import { QueueMonitorPage }   from '@/pages/QueueMonitor'
-import { FailedJobsPage }     from '@/pages/FailedJobs'
-import { WebhookEventsPage }    from '@/pages/WebhookEvents'
+import { FailedJobsPage }              from '@/pages/FailedJobs'
+import { FailedDeliveriesPage }       from '@/pages/FailedDeliveries'
+import { PaystackTransactionsPage }   from '@/pages/PaystackTransactions'
+import { WebhookEventsPage }        from '@/pages/WebhookEvents'
+import { WebhookDiagnosticsPage }  from '@/pages/WebhookDiagnostics'
 import { JournalBatchesPage }   from '@/pages/JournalBatches'
 import { AuditLogsPage }        from '@/pages/AuditLogs'
 import { RolesPage }            from '@/pages/Roles'
@@ -43,6 +46,7 @@ import { RiskFlagsPage }            from '@/pages/RiskFlags'
 import { ComplianceReportsPage }    from '@/pages/ComplianceReports'
 import { BlacklistPage }            from '@/pages/Blacklist'
 import { FrozenAccountsPage }       from '@/pages/FrozenAccounts'
+import { ManualWalletOpsPage }      from '@/pages/ManualWalletOps'
 
 import {
   Globe, Landmark,
@@ -105,22 +109,7 @@ export const router = createBrowserRouter([
       },
 
       // ── Payments ───────────────────────────────────────────────────────────
-      {
-        path: '/paystack',
-        element: (
-          <PlaceholderPage
-            title="Paystack Transactions"
-            subtitle="Paystack payment gateway transaction history"
-            icon={<Landmark className="h-10 w-10" />}
-            features={[
-              'Full Paystack transaction log',
-              'Charge and split history',
-              'Dispute and chargeback tracking',
-              'Settlement reconciliation',
-            ]}
-          />
-        ),
-      },
+      { path: '/paystack', element: <PaystackTransactionsPage /> },
       { path: '/webhooks', element: <WebhookEventsPage /> },
       {
         path: '/virtual-accounts',
@@ -200,6 +189,13 @@ export const router = createBrowserRouter([
       },
 
       // ── Operations ─────────────────────────────────────────────────────────
+      { path: '/operations/paystack-transactions', element: <PaystackTransactionsPage /> },
+      { path: '/operations/funding',               element: <FundingPage /> },
+      { path: '/operations/webhooks',              element: <WebhookEventsPage /> },
+      { path: '/operations/webhook-diagnostics',   element: <WebhookDiagnosticsPage /> },
+      { path: '/operations/provider-health',       element: <HealthMetricsPage /> },
+      { path: '/operations/failed-deliveries',     element: <FailedDeliveriesPage /> },
+      // Legacy paths — keep accessible but no longer in sidebar
       { path: '/queue-monitor',         element: <QueueMonitorPage /> },
       { path: '/failed-jobs',           element: <FailedJobsPage /> },
       { path: '/reconciliation',        element: <Navigate to="/finance/reconciliation-reports" replace /> },
@@ -242,8 +238,9 @@ export const router = createBrowserRouter([
       { path: '/broadcast',              element: <Navigate to="/communication/broadcasts"    replace /> },
 
       // ── System ─────────────────────────────────────────────────────────────
-      { path: '/wallets',   element: <WalletPage /> },
-      { path: '/settings',  element: <SettingsPage /> },
+      { path: '/wallets',              element: <WalletPage /> },
+      { path: '/settings',             element: <SettingsPage /> },
+      { path: '/system/wallet-adjust', element: <ManualWalletOpsPage /> },
 
       // ── Compliance ─────────────────────────────────────────────────────────
       { path: '/compliance/kyc',             element: <KycMonitoringPage /> },

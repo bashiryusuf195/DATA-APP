@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "../../../lib/logger";
 
 import {
   storeWebhookEvent,
@@ -37,19 +38,14 @@ export async function receiveWebhookController(
   const transactionReference = extractString(payload, "transaction_reference");
   const signatureValid       = TRUSTED_WITHOUT_SIGNATURE.has(providerCode);
 
-  // ── Diagnostic log: confirm route was entered ─────────────────────────────
-  console.log(
-    "[WEBHOOK] Route hit",
-    "| provider:", providerCode,
-    "| event_type:", eventType ?? "none",
-    "| transaction_reference:", transactionReference ?? "none",
-    "| signature_valid:", signatureValid
-  );
+  logger.info("webhook_received", {
+    provider:              providerCode,
+    event_type:            eventType ?? null,
+    transaction_reference: transactionReference ?? null,
+    signature_valid:       signatureValid,
+  });
 
   // ── Step 1: Persist the raw event ────────────────────────────────────────
-  // NOT wrapped in a catch-all — if the INSERT fails the real DB error
-  // propagates to Express's error handler and is returned to the caller.
-  // This is intentional: a swallowed 200 makes DB problems invisible.
   const insertPayload = {
     provider_code:         providerCode,
     event_type:            eventType,
@@ -57,8 +53,6 @@ export async function receiveWebhookController(
     transaction_reference: transactionReference,
     signature_valid:       signatureValid,
   };
-
-  console.log("[WEBHOOK] Insert payload:", JSON.stringify(insertPayload));
 
   let eventId: string;
 
@@ -70,10 +64,12 @@ export async function receiveWebhookController(
     });
 
     eventId = stored.id as string;
-    console.log("[WEBHOOK] Inserted row id:", eventId);
+    logger.info("webhook_stored", { webhook_event_id: eventId, provider: providerCode });
   } catch (storeErr) {
-    // Surface the real error — do NOT return 200 here.
-    console.error("[WEBHOOK] storeWebhookEvent FAILED:", storeErr);
+    logger.error("webhook_store_failed", {
+      provider: providerCode,
+      error:    (storeErr as Error).message,
+    });
     return next(storeErr);
   }
 
@@ -87,27 +83,25 @@ export async function receiveWebhookController(
           webhook_payload:     payload,
           webhook_received_at: new Date().toISOString(),
         });
-        console.log("[WEBHOOK] Transaction metadata updated:", transactionReference);
+        logger.info("webhook_transaction_metadata_updated", { reference: transactionReference });
       } else {
-        console.warn(
-          "[WEBHOOK] transaction_reference not found — no metadata update:",
-          transactionReference
-        );
+        logger.warn("webhook_transaction_not_found", { reference: transactionReference });
       }
     } catch (updateErr) {
-      console.error(
-        "[WEBHOOK] Failed to update transaction metadata (non-fatal):",
-        transactionReference,
-        updateErr
-      );
+      logger.error("webhook_transaction_update_failed", {
+        reference: transactionReference,
+        error:     (updateErr as Error).message,
+      });
     }
 
-    // Mark processed whenever an update was attempted — requirement 5.
     try {
       await markWebhookProcessed(eventId);
-      console.log("[WEBHOOK] Marked processed:", eventId);
+      logger.info("webhook_marked_processed", { webhook_event_id: eventId });
     } catch (markErr) {
-      console.error("[WEBHOOK] Failed to mark processed (non-fatal):", eventId, markErr);
+      logger.error("webhook_mark_processed_failed", {
+        webhook_event_id: eventId,
+        error:            (markErr as Error).message,
+      });
     }
   }
 

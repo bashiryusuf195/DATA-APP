@@ -231,12 +231,43 @@ export type WebhookEventStatus = 'processed' | 'failed' | 'duplicate' | 'unhandl
 export interface WebhookEvent {
   id: string
   source: string
-  event_type: string
+  event_type: string | null
   reference?: string | null
   status: WebhookEventStatus
+  signature_valid: boolean
   payload: Record<string, unknown>
   error_message?: string | null
+  processed_at?: string | null
   created_at: string
+}
+
+// ── Webhook Diagnostics ───────────────────────────────────────────────────────
+
+export interface WebhookLastEvent {
+  id: string
+  event_type: string | null
+  transaction_reference: string | null
+  signature_valid: boolean
+  processed: boolean
+  created_at: string
+  processed_at: string | null
+}
+
+export interface WebhookProcessingError {
+  error_message: string
+  failed_at: string
+  reference: string | null
+}
+
+export interface WebhookDiagnostics {
+  webhook_url_path:       string
+  total_events:           number
+  total_today:            number
+  processed_today:        number
+  invalid_sig_today:      number
+  last_event:             WebhookLastEvent | null
+  last_invalid_signature: WebhookLastEvent | null
+  last_processing_error:  WebhookProcessingError | null
 }
 
 // ── Admin Audit Logs ─────────────────────────────────────────────────────────
@@ -923,6 +954,50 @@ export interface FrozenAccount {
   first_name?: string | null
   last_name?: string | null
   user_name?: string | null
+}
+
+// ── Dashboard Metrics ─────────────────────────────────────────────────────────
+
+export interface DashboardMetrics {
+  users: {
+    total: number
+    active: number
+    suspended: number
+    new_today: number
+  }
+  wallets: {
+    total: number
+    total_balance: number
+  }
+  transactions: {
+    total: number
+    successful: number
+    failed: number
+    pending: number
+    total_volume: number
+    purchase_volume: number
+    today_count: number
+    today_successful_volume: number
+    recent_failed_24h: number
+  }
+  funding: {
+    total_volume: number
+    total_count: number
+    successful_count: number
+  }
+  providers: {
+    overall_success_rate: number
+    total_attempts: number
+  }
+  refunds: {
+    total: number
+    total_amount: number
+  }
+  support: {
+    open_tickets: number
+    pending_tickets: number
+  }
+  generated_at: string
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────

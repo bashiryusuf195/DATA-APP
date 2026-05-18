@@ -34,7 +34,6 @@ export function LoginPage() {
     setError('')
     try {
       const res = await authApi.login({ email, password })
-      console.log('[Login] API response:', res)
 
       // 1. Persist tokens + user in Zustand (written to localStorage by persist middleware)
       setAuth({
@@ -43,7 +42,6 @@ export function LoginPage() {
         session_id:    res.session_id,
         user:          res.user,
       })
-      console.log('[Login] Auth store after setAuth:', useAuthStore.getState())
 
       // 2. Also set the Authorization header directly on the Axios instance so the
       //    very next request — before the interceptor re-reads the store — is authenticated.
@@ -52,7 +50,6 @@ export function LoginPage() {
       toast.success('Welcome back!')
 
       // 3. Replace the history entry so the back-button doesn't return to /login
-      console.log('[Login] Navigating to /dashboard')
       navigate('/dashboard', { replace: true })
     } catch (err) {
       if (axios.isAxiosError(err)) {

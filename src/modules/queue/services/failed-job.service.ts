@@ -1,7 +1,18 @@
 import { randomUUID } from "crypto";
 import { getDbInstance } from "../../../db/knex";
+import { AppError } from "../../../lib/errors";
+import { airtimeQueue }         from "../queues/airtime.queue";
+import { vtuPurchaseQueue }     from "../queues/vtu-purchase.queue";
+import { paystackWebhookQueue } from "../queues/paystack-webhook.queue";
+import type { Queue } from "bullmq";
 
 const db = getDbInstance();
+
+const QUEUE_MAP: Record<string, Queue> = {
+  "airtime-purchases": airtimeQueue,
+  "vtu-purchases":     vtuPurchaseQueue,
+  "paystack-webhooks": paystackWebhookQueue,
+};
 
 export interface RecordFailedJobInput {
   queue_name: string;
@@ -40,4 +51,31 @@ export async function getFailedJobs(options: {
     .orderBy("failed_at", "desc")
     .limit(options.limit)
     .offset(options.offset);
+}
+
+export async function getFailedJobById(id: string) {
+  return db("failed_jobs").where({ id }).first();
+}
+
+export async function retryFailedJob(id: string): Promise<{ job_id: string | undefined }> {
+  const record = await getFailedJobById(id);
+  if (!record) {
+    throw new AppError("Failed job not found", "NOT_FOUND", 404);
+  }
+
+  const queue = QUEUE_MAP[record.queue_name as string];
+  if (!queue) {
+    throw new AppError(
+      `No queue registered for '${record.queue_name as string}'. Cannot retry.`,
+      "UNRETRYABLE_QUEUE",
+      422,
+    );
+  }
+
+  const newJob = await queue.add(
+    record.job_name as string,
+    record.payload as Record<string, unknown>,
+  );
+
+  return { job_id: newJob.id };
 }

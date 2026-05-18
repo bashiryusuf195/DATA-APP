@@ -14,6 +14,7 @@ import { createNotification } from "../../notifications/services/notification.se
 import { markWebhookProcessed } from "../../webhooks/services/webhook.service";
 import { getDbInstance } from "../../../db/knex";
 import { WalletService } from "../../../services/wallet/WalletService";
+import { logger } from "../../../lib/logger";
 
 const db           = getDbInstance();
 const walletService = new WalletService(db);
@@ -22,18 +23,12 @@ const walletService = new WalletService(db);
 
 export const paystackWebhookWorker = createWorker("paystack-webhooks", async (job: Job) => {
   const { webhook_event_id, reference, event } = job.data as PaystackWebhookJobPayload;
-  const log = (msg: string, extra?: Record<string, unknown>) =>
-    console.log(`[PAYSTACK-WORKER] ${msg}`, extra ? JSON.stringify(extra) : "");
-  const warn = (msg: string, extra?: Record<string, unknown>) =>
-    console.warn(`[PAYSTACK-WORKER] ${msg}`, extra ? JSON.stringify(extra) : "");
-  const err = (msg: string, e?: unknown) =>
-    console.error(`[PAYSTACK-WORKER] ${msg}`, (e as Error)?.message ?? e);
 
-  log("Processing job", { job_id: job.id, reference, event });
+  logger.info("paystack_webhook_job_start", { job_id: job.id, reference, event });
 
   // Only handle charge.success events
   if (event !== "charge.success") {
-    log("Skipping non-charge event", { event });
+    logger.info("paystack_webhook_job_skip", { event, reason: "non_charge_event" });
     await markWebhookProcessed(webhook_event_id).catch(() => {});
     return;
   }
@@ -42,23 +37,23 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
   const fundingTx = await getFundingTransactionByReference(reference);
 
   if (!fundingTx) {
-    warn("No funding_transaction found for reference — skipping", { reference });
+    logger.warn("paystack_webhook_no_funding_tx", { reference });
     await markWebhookProcessed(webhook_event_id).catch(() => {});
     return;
   }
 
   // ── 2. Idempotency gate ───────────────────────────────────────────────────
   if (fundingTx.verified) {
-    log("Already verified — skipping (idempotent replay)", { reference });
+    logger.info("paystack_webhook_already_verified", { reference, reason: "idempotent_replay" });
     await markWebhookProcessed(webhook_event_id).catch(() => {});
     return;
   }
 
   // ── 3. Verify with Paystack API — NEVER trust webhook payload alone ───────
-  log("Verifying with Paystack API", { reference });
+  logger.info("paystack_webhook_verify_start", { reference });
   const verifyResult = await paystackGateway.verifyPayment(reference);
 
-  log("Paystack verify result", {
+  logger.info("paystack_webhook_verify_result", {
     reference,
     status:  verifyResult.status,
     channel: verifyResult.channel ?? "unknown",
@@ -66,11 +61,11 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
 
   if (verifyResult.status !== "success") {
     await updateFundingTransaction(fundingTx.id, {
-      status:          verifyResult.status === "abandoned" ? "abandoned" : "failed",
+      status:             verifyResult.status === "abandoned" ? "abandoned" : "failed",
       provider_reference: verifyResult.gateway_reference,
     });
     await markWebhookProcessed(webhook_event_id).catch(() => {});
-    warn("Payment not successful — marked failed/abandoned", {
+    logger.warn("paystack_webhook_payment_not_successful", {
       reference,
       paystack_status: verifyResult.status,
     });
@@ -91,28 +86,25 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
     throw new Error(`Wallet not found for user ${fundingTx.user_id}`);
   }
 
-  // Amount in kobo → NGN
   const amountNgn = verifyResult.amount_kobo / 100;
 
-  // Idempotent: if idempotency_key was already processed, WalletService returns
-  // the existing journal_batch_id without double-crediting.
   const walletResult = await walletService.credit({
-    wallet_id:       userWallet.id,
+    wallet_id:        userWallet.id,
     contra_wallet_id: settlementWalletId,
-    amount:          amountNgn,
-    currency:        "NGN",
-    description:     `Wallet funding via Paystack (${reference})`,
-    idempotency_key: `paystack_credit_${reference}`,
-    reference_type:  "paystack_funding",
-    reference_id:    fundingTx.id,
-    metadata:        { reference, gateway: "paystack" },
+    amount:           amountNgn,
+    currency:         "NGN",
+    description:      `Wallet funding via Paystack (${reference})`,
+    idempotency_key:  `paystack_credit_${reference}`,
+    reference_type:   "paystack_funding",
+    reference_id:     fundingTx.id,
+    metadata:         { reference, gateway: "paystack" },
   });
 
-  log("Wallet credited", {
+  logger.info("paystack_webhook_wallet_credited", {
     reference,
-    amount_ngn:      amountNgn,
+    amount_ngn:       amountNgn,
     journal_batch_id: walletResult.journal_batch_id,
-    idempotent:      walletResult.idempotent,
+    idempotent:       walletResult.idempotent,
   });
 
   // ── 5. Create transactions record (idempotent: skip if already exists) ────
@@ -132,8 +124,8 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
       provider_reference:    verifyResult.gateway_reference,
       description:           "Wallet funding via Paystack",
       metadata: {
-        payment_channel:       verifyResult.channel,
-        paid_at:               verifyResult.paid_at?.toISOString() ?? null,
+        payment_channel:        verifyResult.channel,
+        paid_at:                verifyResult.paid_at?.toISOString() ?? null,
         funding_transaction_id: fundingTx.id,
       },
       processed_at: verifyResult.paid_at ?? new Date(),
@@ -159,18 +151,24 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
       message: `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? "Paystack"}.`,
       metadata: {
         reference,
-        amount_ngn:     amountNgn,
+        amount_ngn:      amountNgn,
         payment_channel: verifyResult.channel,
       },
     });
   } catch (notifErr) {
-    err("Failed to send wallet_funded notification (non-fatal)", notifErr);
+    logger.warn("paystack_webhook_notification_failed", {
+      reference,
+      error: (notifErr as Error).message,
+    });
   }
 
   // ── 8. Mark webhook processed ─────────────────────────────────────────────
-  await markWebhookProcessed(webhook_event_id).catch((e) => {
-    err("Failed to mark webhook processed (non-fatal)", e);
+  await markWebhookProcessed(webhook_event_id).catch((e: unknown) => {
+    logger.warn("paystack_webhook_mark_processed_failed", {
+      webhook_event_id,
+      error: (e as Error).message,
+    });
   });
 
-  log("Job complete", { reference, amount_ngn: amountNgn });
+  logger.info("paystack_webhook_job_complete", { reference, amount_ngn: amountNgn });
 });

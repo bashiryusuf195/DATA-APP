@@ -6,6 +6,8 @@ export interface FundingFilters {
   page?: number
   limit?: number
   status?: string
+  payment_gateway?: string
+  user_id?: string
   verified?: boolean
 }
 

@@ -3,6 +3,7 @@ import { paystackGateway } from "../../wallet/services/paystack.service";
 import { storeWebhookEvent } from "../services/webhook.service";
 import { paystackWebhookQueue } from "../../queue/queues/paystack-webhook.queue";
 import type { PaystackWebhookJobPayload } from "../../queue/jobs/paystack-webhook.job";
+import { logger } from "../../../lib/logger";
 
 // ── POST /webhooks/paystack ───────────────────────────────────────────────────
 //
@@ -17,9 +18,24 @@ export async function paystackWebhookController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const rawBody  = req.rawBody;
-    const payload  = (req.body ?? {}) as Record<string, unknown>;
+    const rawBody   = req.rawBody;
+    const payload   = (req.body ?? {}) as Record<string, unknown>;
     const signature = (req.headers["x-paystack-signature"] as string) ?? "";
+
+    const event     = typeof payload.event === "string" ? payload.event : null;
+    const data      = (payload.data && typeof payload.data === "object")
+      ? (payload.data as Record<string, unknown>)
+      : {};
+    const reference = typeof data.reference === "string" ? data.reference : null;
+
+    // ── Clear "received" log — satisfies requirement 4 ───────────────────────
+    logger.info("paystack_webhook_received", {
+      event,
+      reference,
+      has_raw_body:       Boolean(rawBody && rawBody.length > 0),
+      signature_present:  Boolean(signature),
+      content_length:     req.headers["content-length"] ?? null,
+    });
 
     // ── Signature verification ────────────────────────────────────────────────
     let signatureValid = false;
@@ -29,17 +45,15 @@ export async function paystackWebhookController(
     }
 
     if (!signatureValid) {
-      console.warn("[PAYSTACK-WEBHOOK] Invalid or missing signature — storing but not processing", {
-        has_raw_body: Boolean(rawBody),
+      logger.warn("paystack_webhook_invalid_signature", {
+        event,
+        reference,
+        has_raw_body:      Boolean(rawBody),
         signature_present: Boolean(signature),
       });
+    } else {
+      logger.info("paystack_webhook_signature_ok", { event, reference });
     }
-
-    const event     = typeof payload.event === "string" ? payload.event : null;
-    const data      = (payload.data && typeof payload.data === "object")
-      ? (payload.data as Record<string, unknown>)
-      : {};
-    const reference = typeof data.reference === "string" ? data.reference : null;
 
     // ── Store webhook event (always, for audit trail) ─────────────────────────
     let eventRecord: { id: string };
@@ -55,8 +69,15 @@ export async function paystackWebhookController(
         ),
         signature_valid: signatureValid,
       });
+
+      logger.info("paystack_webhook_stored", {
+        webhook_event_id: eventRecord.id,
+        event,
+        reference,
+        signature_valid:  signatureValid,
+      });
     } catch (storeErr) {
-      console.error("[PAYSTACK-WEBHOOK] Failed to store webhook event", storeErr);
+      logger.error("paystack_webhook_store_failed", { error: (storeErr as Error).message });
       return next(storeErr);
     }
 
@@ -74,13 +95,19 @@ export async function paystackWebhookController(
         backoff:  { type: "exponential", delay: 5_000 },
       });
 
-      console.log("[PAYSTACK-WEBHOOK] Enqueued processing job", {
+      logger.info("paystack_webhook_enqueued", {
         reference,
         webhook_event_id: eventRecord.id,
       });
     } else if (event === "charge.success" && !signatureValid) {
-      console.warn("[PAYSTACK-WEBHOOK] charge.success received but signature invalid — not processing", {
+      logger.warn("paystack_webhook_charge_success_rejected", {
+        reason:           "invalid_signature",
         reference,
+        webhook_event_id: eventRecord.id,
+      });
+    } else if (event && event !== "charge.success") {
+      logger.info("paystack_webhook_event_unhandled", {
+        event,
         webhook_event_id: eventRecord.id,
       });
     }

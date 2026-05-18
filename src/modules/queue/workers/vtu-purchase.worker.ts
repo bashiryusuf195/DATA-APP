@@ -9,8 +9,7 @@ import {
 import { createNotification } from "../../notifications/services/notification.service";
 import { getPlanByVariationCode } from "../../catalog/services/catalog.service";
 import type { PlanProviderOverrides } from "../../providers/services/provider-execution-engine.service";
-
-console.log("[VTU WORKER MODULE LOADED v4]");
+import { logger } from "../../../lib/logger";
 
 export const vtuPurchaseWorker = createWorker(
   "vtu-purchases",
@@ -18,13 +17,11 @@ export const vtuPurchaseWorker = createWorker(
   async (job) => {
     const data = job.data as VtuPurchaseJobPayload;
 
-    console.log(
-      "[VTU WORKER] Processing:",
-      data.reference,
-      data.service_type,
-      `| attemptsMade=${job.attemptsMade}`,
-      `| opts.attempts=${job.opts?.attempts ?? "unset"}`
-    );
+    logger.info("vtu_job_start", {
+      reference:    data.reference,
+      service_type: data.service_type,
+      attempt:      job.attemptsMade,
+    });
 
     const transaction = await getTransactionByReference(data.reference);
 
@@ -51,11 +48,8 @@ export const vtuPurchaseWorker = createWorker(
       }
     }
 
-    // Execution engine handles: provider selection, capability check, health
-    // awareness, failover, refund on failure, transaction status update,
-    // and user notification.
     const result = await providerExecutionEngine.executeWithFailover({
-      service_type: data.service_type,
+      service_type:   data.service_type,
       plan_overrides: planOverrides,
       purchase_input: {
         service_type:     data.service_type,
@@ -78,38 +72,35 @@ export const vtuPurchaseWorker = createWorker(
       },
     });
 
-    console.log(
-      "[VTU WORKER] Completed:", data.reference,
-      `| service=${data.service_type}`,
-      `| success=${result.success}`,
-      `| final_provider=${result.final_provider ?? "none"}`,
-      `| attempts=${result.total_attempts}`,
-      `| failover=${result.failover_triggered}`,
-      `| idempotent=${result.idempotent_replay}`
-    );
+    logger.info("vtu_job_complete", {
+      reference:        data.reference,
+      service_type:     data.service_type,
+      success:          result.success,
+      final_provider:   result.final_provider ?? "none",
+      total_attempts:   result.total_attempts,
+      failover:         result.failover_triggered,
+      idempotent:       result.idempotent_replay,
+    });
   }
 );
 
 vtuPurchaseWorker.on("active", (job) => {
-  console.log(
-    "[VTU WORKER ACTIVE]", job.id,
-    `| name=${job.name}`,
-    `| attemptsMade=${job.attemptsMade}`,
-    `| opts.attempts=${job.opts?.attempts ?? "unset"}`
-  );
+  logger.info("vtu_job_active", {
+    job_id:  job.id,
+    name:    job.name,
+    attempt: job.attemptsMade,
+  });
 });
 
 vtuPurchaseWorker.on("completed", (job) => {
-  console.log(
-    "[VTU WORKER COMPLETED]", job.id,
-    `| name=${job.name}`,
-    `| ref=${(job.data as VtuPurchaseJobPayload)?.reference ?? "unknown"}`
-  );
+  logger.info("vtu_job_completed", {
+    job_id:    job.id,
+    name:      job.name,
+    reference: (job.data as VtuPurchaseJobPayload)?.reference ?? "unknown",
+  });
 });
 
 // Fires after every failed attempt — record to dead-letter only when retries exhausted.
-// Note: engine handles provider-level failures gracefully (no throw). This handler
-// fires only for infrastructure failures (DB down, network, OOM).
 vtuPurchaseWorker.on("failed", async (job, err) => {
   if (!job) return;
 
@@ -117,13 +108,14 @@ vtuPurchaseWorker.on("failed", async (job, err) => {
   const maxAttempts = job.opts?.attempts ?? 3;
   const isFinal     = job.attemptsMade >= maxAttempts;
 
-  console.error(
-    "[VTU WORKER FAILED]", job.id,
-    `| attempt ${job.attemptsMade} of ${maxAttempts}`,
-    `| isFinal=${isFinal}`,
-    `| ref=${data?.reference ?? "unknown"}`,
-    `| err=${err.message}`
-  );
+  logger.error("vtu_job_failed", {
+    job_id:    job.id,
+    attempt:   job.attemptsMade,
+    max:       maxAttempts,
+    is_final:  isFinal,
+    reference: data?.reference ?? "unknown",
+    error:     err.message,
+  });
 
   if (!isFinal) return;
 
@@ -161,11 +153,11 @@ vtuPurchaseWorker.on("failed", async (job, err) => {
         retry_count:   job.attemptsMade,
       },
     }).catch((notifErr: unknown) => {
-      console.error("[VTU WORKER] Admin notification failed:", (notifErr as Error).message);
+      logger.warn("vtu_job_admin_notification_failed", { error: (notifErr as Error).message });
     });
 
-    console.log("[VTU WORKER] Dead-letter recorded for ref:", data?.reference ?? "unknown");
+    logger.info("vtu_job_dead_letter_recorded", { reference: data?.reference ?? "unknown" });
   } catch (recordErr) {
-    console.error("[VTU WORKER] Failed to record dead-letter:", recordErr);
+    logger.error("vtu_job_dead_letter_record_failed", { error: (recordErr as Error).message });
   }
 });

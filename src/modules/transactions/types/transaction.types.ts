@@ -9,6 +9,8 @@ export type TransactionStatus =
 export type TransactionType =
   | "wallet_funding"
   | "wallet_transfer"
+  | "manual_credit"
+  | "manual_debit"
   | "airtime"
   | "data"
   | "electricity"

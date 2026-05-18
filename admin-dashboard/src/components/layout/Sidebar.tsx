@@ -38,16 +38,17 @@ import {
   Lock,
   Gauge,
   // Operations
-  Monitor,
   Scale,
-  Cpu,
   BarChart2,
+  Webhook,
+  PackageX,
   // Support
   MessageSquare,
   Flag,
   Megaphone,
   // System
   SlidersHorizontal,
+  ArrowUpDown,
   // Communication
   FileText as FileTemplate,
   Clock as ClockIcon,
@@ -159,9 +160,12 @@ const nav: NavSection[] = [
     key: 'operations',
     title: 'Operations',
     items: [
-      { to: '/queue-monitor', label: 'Queue Monitor', icon: <Monitor className="h-4 w-4" /> },
-      { to: '/failed-jobs',   label: 'Failed Jobs',   icon: <AlertTriangle className="h-4 w-4" /> },
-      { to: '/worker-health', label: 'Worker Health', icon: <Cpu className="h-4 w-4" /> },
+      { to: '/operations/paystack-transactions', label: 'Paystack Txns',      icon: <CreditCard  className="h-4 w-4" /> },
+      { to: '/operations/funding',               label: 'Funding Ops',        icon: <Landmark    className="h-4 w-4" /> },
+      { to: '/operations/webhooks',              label: 'Webhook Logs',       icon: <Webhook     className="h-4 w-4" /> },
+      { to: '/operations/webhook-diagnostics',   label: 'Webhook Diagnostics', icon: <Activity   className="h-4 w-4" /> },
+      { to: '/operations/provider-health',       label: 'Provider Health',    icon: <HeartPulse  className="h-4 w-4" /> },
+      { to: '/operations/failed-deliveries',     label: 'Failed Deliveries',  icon: <PackageX    className="h-4 w-4" /> },
     ],
   },
   {
@@ -198,8 +202,9 @@ const nav: NavSection[] = [
     key: 'system',
     title: 'System',
     items: [
-      { to: '/wallets',   label: 'Wallet Monitor', icon: <Wallet            className="h-4 w-4" /> },
-      { to: '/settings',  label: 'Settings',       icon: <SlidersHorizontal className="h-4 w-4" /> },
+      { to: '/wallets',              label: 'Wallet Monitor',   icon: <Wallet            className="h-4 w-4" /> },
+      { to: '/system/wallet-adjust', label: 'Credit / Debit',   icon: <ArrowUpDown       className="h-4 w-4" /> },
+      { to: '/settings',             label: 'Settings',         icon: <SlidersHorizontal className="h-4 w-4" /> },
     ],
   },
 ]
