@@ -60,6 +60,8 @@ export async function getActivePlansForType(
       "service_plans.is_variable_amount",
       "service_plans.provider_code",
       "service_plans.metadata",
+      "service_plans.network_operator",
+      "service_plans.plan_category",
       "catalog_services.slug as service_slug",
       "catalog_services.name as service_name"
     );

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wifi, ArrowLeft } from 'lucide-react'
+import { Wifi, Phone, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card, Skeleton } from '@/components/ui'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { ResultModal } from '@/components/shared/ResultModal'
@@ -12,37 +12,97 @@ import { fmtCurrency } from '@/utils/format'
 import type { DataPurchaseInput } from '@/types'
 import { cn } from '@/utils/cn'
 
-const OPERATORS = [
-  { code: 'mtn',     label: 'MTN' },
-  { code: 'airtel',  label: 'Airtel' },
-  { code: 'glo',     label: 'Glo' },
-  { code: '9mobile', label: '9mobile' },
-]
+// Known operator display config — unknown operators fall back to a neutral style
+const NETWORK_META: Record<string, { label: string; activeClass: string }> = {
+  mtn:      { label: 'MTN',     activeClass: 'border-yellow-400 bg-yellow-50 text-yellow-800' },
+  airtel:   { label: 'Airtel',  activeClass: 'border-red-400   bg-red-50   text-red-800' },
+  glo:      { label: 'Glo',     activeClass: 'border-green-400 bg-green-50  text-green-800' },
+  '9mobile':{ label: '9mobile', activeClass: 'border-emerald-400 bg-emerald-50 text-emerald-800' },
+}
+
+function networkLabel(op: string) {
+  return NETWORK_META[op]?.label ?? op
+}
+function networkActiveClass(op: string) {
+  return NETWORK_META[op]?.activeClass ?? 'border-brand-600 bg-brand-50 text-brand-700'
+}
+
+// Formats DB category strings for display: 'sme' → 'SME', 'corporate' → 'Corporate'
+const CATEGORY_UPPER = new Set(['sme', 'vtu', 'cg'])
+function fmtCategory(cat: string): string {
+  const lower = cat.toLowerCase()
+  if (CATEGORY_UPPER.has(lower)) return lower.toUpperCase()
+  return cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()
+}
 
 export function DataPage() {
   const navigate = useNavigate()
   const [operator, setOperator] = useState('')
-  const [phone, setPhone]       = useState('')
+  const [category, setCategory] = useState('')
   const [planId, setPlanId]     = useState('')
+  const [phone, setPhone]       = useState('')
   const [errors, setErrors]     = useState<Record<string, string>>({})
 
   const { data: balance } = useWalletBalance()
   const { data: allPlans, isLoading: plansLoading } = useServicePlans('data', true)
   const purchase = useServicePurchase<DataPurchaseInput>(transactionsApi.buyData)
 
-  const filteredPlans = useMemo(() => {
+  // Step 1: distinct network operators present in active plans, in DB order
+  const networks = useMemo(() => {
+    if (!allPlans) return []
+    const seen = new Set<string>()
+    return allPlans
+      .filter(p => p.network_operator)
+      .reduce<string[]>((acc, p) => {
+        const op = p.network_operator!
+        if (!seen.has(op)) { seen.add(op); acc.push(op) }
+        return acc
+      }, [])
+  }, [allPlans])
+
+  // Step 2: distinct plan_categories for the selected operator
+  const categories = useMemo(() => {
     if (!allPlans || !operator) return []
-    return allPlans.filter((p) => (p.network_operator ?? '').toLowerCase().includes(operator))
+    const seen = new Set<string>()
+    return allPlans
+      .filter(p => p.network_operator === operator && p.plan_category)
+      .reduce<string[]>((acc, p) => {
+        const cat = p.plan_category!
+        if (!seen.has(cat)) { seen.add(cat); acc.push(cat) }
+        return acc
+      }, [])
   }, [allPlans, operator])
 
-  const selectedPlan = filteredPlans.find((p) => p.id === planId)
+  // Step 3: plans for the selected operator + category
+  const filteredPlans = useMemo(() => {
+    if (!allPlans || !operator || !category) return []
+    return allPlans.filter(
+      p => p.network_operator === operator && p.plan_category === category
+    )
+  }, [allPlans, operator, category])
+
+  const selectedPlan = filteredPlans.find(p => p.id === planId)
+
+  const handleNetworkChange = (op: string) => {
+    setOperator(op)
+    setCategory('')
+    setPlanId('')
+    setErrors(e => ({ ...e, operator: '', category: '', plan: '' }))
+  }
+
+  const handleCategoryChange = (cat: string) => {
+    setCategory(cat)
+    setPlanId('')
+    setErrors(e => ({ ...e, category: '', plan: '' }))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const errs: Record<string, string> = {}
-    if (!operator)           errs.operator = 'Select a network'
+    if (!operator)                                    errs.operator = 'Select a network'
+    if (operator && !category)                        errs.category = 'Select a plan type'
+    if (operator && category && !planId)              errs.plan     = 'Select a data plan'
     if (!phone.trim() || !/^0\d{10}$/.test(phone.trim())) errs.phone = 'Enter a valid 11-digit phone number'
-    if (!planId)             errs.plan = 'Select a data plan'
     if (selectedPlan && balance && selectedPlan.selling_price > balance.balance) errs.plan = 'Insufficient balance'
     if (Object.keys(errs).length) { setErrors(errs); return }
     purchase.requestConfirm({
@@ -50,7 +110,13 @@ export function DataPage() {
       amount:         selectedPlan!.selling_price,
       variation_code: selectedPlan!.variation_code,
       description:    `${selectedPlan!.name} for ${phone}`,
-      plan: { plan_id: selectedPlan!.id, variation_code: selectedPlan!.variation_code, plan_name: selectedPlan!.name, service_slug: 'data', service_name: 'Data' },
+      plan: {
+        plan_id:        selectedPlan!.id,
+        variation_code: selectedPlan!.variation_code,
+        plan_name:      selectedPlan!.name,
+        service_slug:   'data',
+        service_name:   'Data',
+      },
     })
   }
 
@@ -61,6 +127,7 @@ export function DataPage() {
       </button>
 
       <Card>
+        {/* Header */}
         <div className="flex items-center gap-2.5 mb-5">
           <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
             <Wifi className="h-5 w-5 text-blue-600" />
@@ -72,76 +139,146 @@ export function DataPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Operator */}
+
+          {/* ── Step 1: Network ── */}
           <div>
             <p className="text-sm font-medium text-ink mb-2">Select Network</p>
-            <div className="grid grid-cols-4 gap-2">
-              {OPERATORS.map(({ code, label }) => (
-                <button key={code} type="button"
-                  onClick={() => { setOperator(code); setPlanId(''); setErrors((e) => ({ ...e, operator: '' })) }}
-                  className={cn('py-2.5 rounded-xl text-xs font-semibold border-2 transition-all',
-                    operator === code ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-border text-ink-muted hover:border-brand-300'
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {plansLoading ? (
+              <div className="grid grid-cols-4 gap-2">
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-11 rounded-xl" />)}
+              </div>
+            ) : networks.length ? (
+              <div className="grid grid-cols-4 gap-2">
+                {networks.map(op => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => handleNetworkChange(op)}
+                    className={cn(
+                      'py-2.5 rounded-xl text-xs font-semibold border-2 transition-all',
+                      operator === op
+                        ? networkActiveClass(op) + ' shadow-sm'
+                        : 'border-border text-ink-muted hover:border-brand-300'
+                    )}
+                  >
+                    {networkLabel(op)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted text-center py-3">No data networks available.</p>
+            )}
             {errors.operator && <p className="mt-1.5 text-xs text-danger">{errors.operator}</p>}
           </div>
 
-          <Input label="Phone Number" type="tel" inputMode="numeric" value={phone}
-            onChange={(e) => { setPhone(e.target.value); setErrors((err) => ({ ...err, phone: '' })) }}
-            placeholder="08012345678" maxLength={11} error={errors.phone} prefix={<Wifi className="h-4 w-4" />}
-          />
-
-          {/* Plans */}
+          {/* ── Step 2: Category (appears after network is chosen) ── */}
           {operator && (
             <div>
-              <p className="text-sm font-medium text-ink mb-2">Select Plan</p>
-              {plansLoading ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
-                </div>
-              ) : filteredPlans.length ? (
-                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                  {filteredPlans.map((plan) => (
-                    <button key={plan.id} type="button"
-                      onClick={() => { setPlanId(plan.id); setErrors((e) => ({ ...e, plan: '' })) }}
-                      className={cn('p-3 rounded-xl border-2 text-left transition-all',
-                        planId === plan.id ? 'border-brand-600 bg-brand-50' : 'border-border hover:border-brand-300'
+              <p className="text-sm font-medium text-ink mb-2">Plan Type</p>
+              {categories.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => handleCategoryChange(cat)}
+                      className={cn(
+                        'px-4 py-2 rounded-full text-xs font-semibold border-2 transition-all',
+                        category === cat
+                          ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+                          : 'border-border text-ink-muted hover:border-brand-400 hover:text-ink'
                       )}
                     >
-                      <p className="text-xs font-semibold text-ink">{plan.name}</p>
-                      <p className="text-sm font-bold text-brand-600 mt-0.5">{fmtCurrency(plan.selling_price)}</p>
+                      {fmtCategory(cat)}
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-ink-muted text-center py-4">No plans available for this network.</p>
+                <p className="text-sm text-ink-muted py-1">
+                  No plan types available for {networkLabel(operator)}.
+                </p>
+              )}
+              {errors.category && <p className="mt-1.5 text-xs text-danger">{errors.category}</p>}
+            </div>
+          )}
+
+          {/* ── Step 3: Plans (appears after category is chosen) ── */}
+          {operator && category && (
+            <div>
+              <p className="text-sm font-medium text-ink mb-2">Select Plan</p>
+              {filteredPlans.length ? (
+                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-0.5">
+                  {filteredPlans.map(plan => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => { setPlanId(plan.id); setErrors(e => ({ ...e, plan: '' })) }}
+                      className={cn(
+                        'p-3 rounded-xl border-2 text-left transition-all',
+                        planId === plan.id
+                          ? 'border-brand-600 bg-brand-50'
+                          : 'border-border hover:border-brand-300'
+                      )}
+                    >
+                      <p className="text-xs font-semibold text-ink leading-snug">{plan.name}</p>
+                      <p className="text-sm font-bold text-brand-600 mt-1">{fmtCurrency(plan.selling_price)}</p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-ink-muted text-center py-3">
+                  No plans available for {networkLabel(operator)} {fmtCategory(category)}.
+                </p>
               )}
               {errors.plan && <p className="mt-1.5 text-xs text-danger">{errors.plan}</p>}
             </div>
           )}
 
-          <Button type="submit" fullWidth size="lg" disabled={!operator || !phone || !planId}>Continue</Button>
+          {/* ── Phone number ── */}
+          <Input
+            label="Phone Number"
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={e => { setPhone(e.target.value); setErrors(err => ({ ...err, phone: '' })) }}
+            placeholder="08012345678"
+            maxLength={11}
+            error={errors.phone}
+            prefix={<Phone className="h-4 w-4" />}
+          />
+
+          <Button
+            type="submit"
+            fullWidth
+            size="lg"
+            disabled={!operator || !category || !planId || !phone}
+          >
+            Continue
+          </Button>
         </form>
       </Card>
 
       <ConfirmModal
         open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
         rows={[
-          { label: 'Network', value: OPERATORS.find((o) => o.code === operator)?.label ?? operator },
-          { label: 'Phone',   value: phone },
-          { label: 'Plan',    value: selectedPlan?.name ?? '' },
-          { label: 'Amount',  value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
+          { label: 'Network',   value: networkLabel(operator) },
+          { label: 'Plan Type', value: fmtCategory(category) },
+          { label: 'Plan',      value: selectedPlan?.name ?? '' },
+          { label: 'Phone',     value: phone },
+          { label: 'Amount',    value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
         ]}
         onConfirm={purchase.confirm}
         onCancel={purchase.cancel}
         loading={purchase.isLoading}
       />
 
-      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} isPolling={purchase.isPolling} onClose={purchase.reset} onRetry={purchase.reset} />
+      <ResultModal
+        open={purchase.phase === 'done'}
+        transaction={purchase.result}
+        isPolling={purchase.isPolling}
+        onClose={purchase.reset}
+        onRetry={purchase.reset}
+      />
     </div>
   )
 }
