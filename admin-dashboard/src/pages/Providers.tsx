@@ -79,7 +79,7 @@ export function ProvidersPage() {
 
   const openEdit = (p: Provider) => {
     setForm({
-      display_name:       p.display_name,
+      name:               p.name,
       is_active:          p.is_active,
       health_status:      p.health_status,
       priority:           p.priority,
@@ -122,7 +122,7 @@ export function ProvidersPage() {
                 header: 'Provider',
                 render: (p) => (
                   <div>
-                    <p className="font-medium text-ink">{p.display_name}</p>
+                    <p className="font-medium text-ink">{p.name}</p>
                     <p className="text-xs text-ink-faint font-mono">{p.provider_code}</p>
                   </div>
                 ),
@@ -233,7 +233,7 @@ export function ProvidersPage() {
       <Modal
         open={!!editProvider}
         onClose={() => setEditProvider(null)}
-        title={`Edit ${editProvider?.display_name ?? ''}`}
+        title={`Edit ${editProvider?.name ?? ''}`}
         size="md"
         footer={
           <>
@@ -252,8 +252,8 @@ export function ProvidersPage() {
         <div className="space-y-4">
           <Input
             label="Display Name"
-            value={form.display_name ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
+            value={form.name ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
           <Input
             label="Priority"
@@ -314,7 +314,7 @@ export function ProvidersPage() {
         open={!!selected}
         onClose={() => setSelected(null)}
         title="Provider Detail"
-        subtitle={selected?.display_name ?? ''}
+        subtitle={selected?.name ?? ''}
       >
         {selected && (() => {
           const m = metricsByCode[selected.provider_code]
@@ -322,7 +322,7 @@ export function ProvidersPage() {
           return (
             <div className="space-y-4 text-sm">
               <Row label="Code"        value={<span className="font-mono text-xs">{selected.provider_code}</span>} />
-              <Row label="Display Name" value={selected.display_name} />
+              <Row label="Display Name" value={selected.name} />
               <Row label="Status"      value={<BoolBadge value={selected.is_active} trueLabel="Active" falseLabel="Inactive" />} />
               <Row label="Health"      value={<ProviderHealthBadge status={selected.health_status} />} />
               <Row label="Priority"    value={<span className="font-mono font-semibold">{selected.priority}</span>} />

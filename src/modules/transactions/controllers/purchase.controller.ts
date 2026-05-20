@@ -75,10 +75,11 @@ export async function purchaseAirtimeController(
     await airtimeQueue.add(
       "purchase",
       {
-        user_id: req.user!.id,
-        phone: input.phone,
-        amount: input.amount,
-        reference: result.reference,
+        user_id:        req.user!.id,
+        phone:          input.phone,
+        amount:         input.amount,
+        reference:      result.reference,
+        variation_code: input.variation_code,
       },
       { ...defaultJobOptions, jobId: result.reference }
     );

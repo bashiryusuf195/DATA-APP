@@ -109,32 +109,37 @@ export async function seed(knex: Knex): Promise<void> {
     { id: randomUUID(), service_id: id["9mobile-data"], provider_code: PROVIDER, network_operator: "9mobile", name: "9mobile 1GB – 30 Days",  variation_code: "9mobile-1gb-30days",  amount: 500, duration_days: 30 },
 
     // ── MTN Airtime ───────────────────────────────────────────
-    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", name: "MTN ₦50 Airtime",    variation_code: "mtn-airtime-50",    amount: 50   },
-    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", name: "MTN ₦100 Airtime",   variation_code: "mtn-airtime-100",   amount: 100  },
-    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", name: "MTN ₦200 Airtime",   variation_code: "mtn-airtime-200",   amount: 200  },
-    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", name: "MTN ₦500 Airtime",   variation_code: "mtn-airtime-500",   amount: 500  },
-    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", name: "MTN ₦1000 Airtime",  variation_code: "mtn-airtime-1000",  amount: 1000 },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦50 Airtime",    variation_code: "mtn-airtime-50",    amount: 50   },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦100 Airtime",   variation_code: "mtn-airtime-100",   amount: 100  },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦200 Airtime",   variation_code: "mtn-airtime-200",   amount: 200  },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦500 Airtime",   variation_code: "mtn-airtime-500",   amount: 500  },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦1000 Airtime",  variation_code: "mtn-airtime-1000",  amount: 1000 },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦2000 Airtime",  variation_code: "mtn-airtime-2000",  amount: 2000 },
+    { id: randomUUID(), service_id: id["mtn-airtime"], provider_code: PROVIDER, network_operator: "mtn", plan_category: "vtu", name: "MTN ₦5000 Airtime",  variation_code: "mtn-airtime-5000",  amount: 5000 },
 
     // ── Airtel Airtime ────────────────────────────────────────
-    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", name: "Airtel ₦50 Airtime",   variation_code: "airtel-airtime-50",   amount: 50   },
-    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", name: "Airtel ₦100 Airtime",  variation_code: "airtel-airtime-100",  amount: 100  },
-    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", name: "Airtel ₦200 Airtime",  variation_code: "airtel-airtime-200",  amount: 200  },
-    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", name: "Airtel ₦500 Airtime",  variation_code: "airtel-airtime-500",  amount: 500  },
-    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", name: "Airtel ₦1000 Airtime", variation_code: "airtel-airtime-1000", amount: 1000 },
+    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", plan_category: "vtu", name: "Airtel ₦50 Airtime",   variation_code: "airtel-airtime-50",   amount: 50   },
+    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", plan_category: "vtu", name: "Airtel ₦100 Airtime",  variation_code: "airtel-airtime-100",  amount: 100  },
+    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", plan_category: "vtu", name: "Airtel ₦200 Airtime",  variation_code: "airtel-airtime-200",  amount: 200  },
+    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", plan_category: "vtu", name: "Airtel ₦500 Airtime",  variation_code: "airtel-airtime-500",  amount: 500  },
+    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", plan_category: "vtu", name: "Airtel ₦1000 Airtime", variation_code: "airtel-airtime-1000", amount: 1000 },
+    { id: randomUUID(), service_id: id["airtel-airtime"], provider_code: PROVIDER, network_operator: "airtel", plan_category: "vtu", name: "Airtel ₦2000 Airtime", variation_code: "airtel-airtime-2000", amount: 2000 },
 
     // ── Glo Airtime ───────────────────────────────────────────
-    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", name: "Glo ₦50 Airtime",    variation_code: "glo-airtime-50",    amount: 50   },
-    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", name: "Glo ₦100 Airtime",   variation_code: "glo-airtime-100",   amount: 100  },
-    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", name: "Glo ₦200 Airtime",   variation_code: "glo-airtime-200",   amount: 200  },
-    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", name: "Glo ₦500 Airtime",   variation_code: "glo-airtime-500",   amount: 500  },
-    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", name: "Glo ₦1000 Airtime",  variation_code: "glo-airtime-1000",  amount: 1000 },
+    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", plan_category: "vtu", name: "Glo ₦50 Airtime",    variation_code: "glo-airtime-50",    amount: 50   },
+    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", plan_category: "vtu", name: "Glo ₦100 Airtime",   variation_code: "glo-airtime-100",   amount: 100  },
+    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", plan_category: "vtu", name: "Glo ₦200 Airtime",   variation_code: "glo-airtime-200",   amount: 200  },
+    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", plan_category: "vtu", name: "Glo ₦500 Airtime",   variation_code: "glo-airtime-500",   amount: 500  },
+    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", plan_category: "vtu", name: "Glo ₦1000 Airtime",  variation_code: "glo-airtime-1000",  amount: 1000 },
+    { id: randomUUID(), service_id: id["glo-airtime"], provider_code: PROVIDER, network_operator: "glo", plan_category: "vtu", name: "Glo ₦2000 Airtime",  variation_code: "glo-airtime-2000",  amount: 2000 },
 
     // ── 9mobile Airtime ───────────────────────────────────────
-    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", name: "9mobile ₦50 Airtime",   variation_code: "9mobile-airtime-50",   amount: 50   },
-    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", name: "9mobile ₦100 Airtime",  variation_code: "9mobile-airtime-100",  amount: 100  },
-    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", name: "9mobile ₦200 Airtime",  variation_code: "9mobile-airtime-200",  amount: 200  },
-    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", name: "9mobile ₦500 Airtime",  variation_code: "9mobile-airtime-500",  amount: 500  },
-    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", name: "9mobile ₦1000 Airtime", variation_code: "9mobile-airtime-1000", amount: 1000 },
+    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", plan_category: "vtu", name: "9mobile ₦50 Airtime",   variation_code: "9mobile-airtime-50",   amount: 50   },
+    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", plan_category: "vtu", name: "9mobile ₦100 Airtime",  variation_code: "9mobile-airtime-100",  amount: 100  },
+    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", plan_category: "vtu", name: "9mobile ₦200 Airtime",  variation_code: "9mobile-airtime-200",  amount: 200  },
+    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", plan_category: "vtu", name: "9mobile ₦500 Airtime",  variation_code: "9mobile-airtime-500",  amount: 500  },
+    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", plan_category: "vtu", name: "9mobile ₦1000 Airtime", variation_code: "9mobile-airtime-1000", amount: 1000 },
+    { id: randomUUID(), service_id: id["9mobile-airtime"], provider_code: PROVIDER, network_operator: "9mobile", plan_category: "vtu", name: "9mobile ₦2000 Airtime", variation_code: "9mobile-airtime-2000", amount: 2000 },
 
     // ── DStv ──────────────────────────────────────────────────
     { id: randomUUID(), service_id: id["dstv"], provider_code: PROVIDER, network_operator: "dstv", name: "DStv Padi",          variation_code: "dstv-padi",          amount: 1850  },

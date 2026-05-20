@@ -1,9 +1,12 @@
 import { z } from "zod";
 
 // Airtime: amount is user-supplied; no plan lookup needed.
+// variation_code carries the network prefix (e.g. "mtn-airtime") and is
+// forwarded to the queue so providers can resolve the operator.
 export const AirtimePurchaseSchema = z.object({
-  phone: z.string().min(11).max(15),
-  amount: z.number().positive().max(50000),
+  phone:          z.string().min(11).max(15),
+  amount:         z.number().positive().max(50000),
+  variation_code: z.string().optional(),
 });
 
 // Data: amount comes from DB plan; only variation_code is needed.

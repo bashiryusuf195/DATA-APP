@@ -61,7 +61,8 @@ export type ProviderHealthStatus = 'healthy' | 'degraded' | 'unhealthy'
 export interface Provider {
   id: string
   provider_code: string
-  display_name: string
+  /** Display name — matches the `name` column returned by GET /admin/providers */
+  name: string
   is_active: boolean
   health_status: ProviderHealthStatus
   priority: number
@@ -72,7 +73,7 @@ export interface Provider {
 }
 
 export interface UpdateProviderInput {
-  display_name?: string
+  name?: string
   is_active?: boolean
   health_status?: ProviderHealthStatus
   priority?: number
@@ -241,7 +242,7 @@ export interface RoutingRule {
 export interface CreateRoutingRuleInput {
   service_type: string
   primary_provider_code: string
-  fallback_provider_code?: string
+  fallback_provider_code?: string | null
   is_active?: boolean
 }
 

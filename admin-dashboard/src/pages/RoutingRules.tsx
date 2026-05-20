@@ -11,7 +11,7 @@ import { Drawer } from '@/components/shared/Drawer'
 import { Button, Badge, Modal, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtDate } from '@/utils/format'
-import type { RoutingRule, CreateRoutingRuleInput, CategoryProviderRow, BulkAssignProviderInput } from '@/types'
+import type { RoutingRule, CreateRoutingRuleInput, CategoryProviderRow, BulkAssignProviderInput, ProviderRegistryRow } from '@/types'
 import {
   Plus, Edit, ToggleLeft, ToggleRight, RefreshCw, GitBranch, Layers,
   Wifi, Phone, Zap, Tv, BookOpen, Fingerprint, Globe, Loader2, Check,
@@ -62,7 +62,16 @@ function displayCat(category: string | null): string {
 }
 
 function errMsg(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) return err.response?.data?.message ?? err.message ?? fallback
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data
+    if (data?.details && typeof data.details === 'object') {
+      const fields = Object.entries(data.details as Record<string, string[]>)
+        .map(([f, msgs]) => `${f}: ${msgs.join(', ')}`)
+        .join('; ')
+      if (fields) return `${data.message ?? fallback} — ${fields}`
+    }
+    return data?.message ?? err.message ?? fallback
+  }
   return fallback
 }
 
@@ -87,16 +96,31 @@ function ServiceRoutingTab() {
     queryFn: routingApi.list,
   })
 
+  // Shares the ['providers-registry'] cache with ApiIntegrations — same endpoint, same data.
   const { data: providers = [] } = useQuery({
-    queryKey: ['providers'],
-    queryFn: providersApi.list,
+    queryKey: ['providers-registry'],
+    queryFn: providersApi.listRegistry,
   })
 
-  const providerOptions = providers
-    .filter((p) => p.is_active)
-    .map((p) => ({ value: p.provider_code, label: p.display_name }))
+  // Build provider dropdown options filtered by the currently-selected service type
+  // so only relevant providers appear. Falls back to all providers if none support
+  // the service (prevents an empty dropdown when service is selected).
+  // Inactive providers are included but labelled so admins can plan ahead.
+  const makeProviderOptions = (serviceType?: string): Array<{ value: string; label: string }> => {
+    const supporting = serviceType
+      ? providers.filter((p: ProviderRegistryRow) => p.supported_services.includes(serviceType))
+      : providers
+    const list = supporting.length > 0 ? supporting : providers
+    return list.map((p: ProviderRegistryRow) => ({
+      value: p.provider_code,
+      label: `${p.name || p.provider_code}${!p.is_active ? ' [inactive]' : ''}`,
+    }))
+  }
 
-  const providerNameByCode = Object.fromEntries(providers.map((p) => [p.provider_code, p.display_name]))
+  // All providers for table display (name lookup by code)
+  const providerNameByCode = Object.fromEntries(
+    providers.map((p: ProviderRegistryRow) => [p.provider_code, p.name])
+  )
 
   const createMutation = useMutation({
     mutationFn: (body: CreateRoutingRuleInput) => routingApi.create(body),
@@ -274,14 +298,14 @@ function ServiceRoutingTab() {
             label="Primary Provider"
             value={form.primary_provider_code}
             onChange={(e) => setForm((f) => ({ ...f, primary_provider_code: e.target.value }))}
-            options={providerOptions}
+            options={makeProviderOptions(form.service_type)}
             placeholder="Select primary provider"
           />
           <Select
             label="Fallback Provider (optional)"
             value={form.fallback_provider_code ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, fallback_provider_code: e.target.value || undefined }))}
-            options={providerOptions}
+            options={makeProviderOptions(form.service_type)}
             placeholder="None"
           />
         </div>
@@ -436,13 +460,19 @@ function CategoryRoutingTab() {
     queryFn: catalogApi.getCategoryProviders,
   })
 
+  // Shares the ['providers-registry'] cache with ServiceRoutingTab and ApiIntegrations.
   const { data: providers = [] } = useQuery({
-    queryKey: ['providers'],
-    queryFn: providersApi.list,
+    queryKey: ['providers-registry'],
+    queryFn: providersApi.listRegistry,
   })
 
-  const providerOptions = providers.map((p) => ({ value: p.provider_code, label: p.display_name }))
-  const providerNameByCode = Object.fromEntries(providers.map((p) => [p.provider_code, p.display_name]))
+  const providerOptions = providers.map((p: ProviderRegistryRow) => ({
+    value: p.provider_code,
+    label: `${p.name || p.provider_code}${!p.is_active ? ' [inactive]' : ''}`,
+  }))
+  const providerNameByCode = Object.fromEntries(
+    providers.map((p: ProviderRegistryRow) => [p.provider_code, p.name])
+  )
 
   const assignMutation = useMutation({
     mutationFn: (body: BulkAssignProviderInput) => catalogApi.bulkAssignProvider(body),

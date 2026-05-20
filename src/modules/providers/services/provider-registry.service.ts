@@ -2,6 +2,7 @@ import type { VTUProvider } from "./provider.interface";
 
 import { MockVTUProvider } from "./mock-vtu.provider";
 import { VTPassProvider } from "./vtpass.provider";
+import { SmshikaProvider } from "./smshika.provider";
 import { config } from "../../../config";
 
 class ProviderRegistryService {
@@ -29,6 +30,12 @@ class ProviderRegistryService {
         "— mock provider will be used as fallback."
       );
     }
+
+    // SMShika reads credentials from DB (not env vars), so it is always
+    // registered. requireCredentials() throws at call time if not configured,
+    // which the execution engine handles as a provider error and fails over.
+    this.register(new SmshikaProvider());
+    console.log("[PROVIDER REGISTRY] SMShika registered (credentials loaded from DB at call time)");
   }
 
   register(provider: VTUProvider) {

@@ -45,7 +45,7 @@ export const airtimeWorker = createWorker(
         amount:         data.amount,
         phone:          data.phone,
         reference:      data.reference,
-        variation_code: (data as unknown as { variation_code?: string }).variation_code,
+        variation_code: data.variation_code,
       },
       transaction_reference: data.reference,
       transaction: {

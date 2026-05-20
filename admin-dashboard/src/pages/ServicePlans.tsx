@@ -165,7 +165,7 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
 
   const providerOptions = [
     { value: '', label: 'None (use routing rules)' },
-    ...providers.map((p) => ({ value: p.provider_code, label: `${p.display_name} (${p.provider_code})` })),
+    ...providers.map((p) => ({ value: p.provider_code, label: `${p.name} (${p.provider_code})` })),
   ]
 
   const margin = calcMargin(

@@ -253,7 +253,7 @@ export function DashboardPage() {
                     <div key={p.id ?? p.provider_code} className="flex items-center justify-between px-5 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-ink truncate">
-                          {p.display_name ?? formatProvider(p.provider_code)}
+                          {p.name ?? formatProvider(p.provider_code)}
                         </p>
                         {cm?.circuit_open && (
                           <p className="text-xs text-rose-400 mt-0.5 flex items-center gap-1">

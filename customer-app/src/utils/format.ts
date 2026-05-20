@@ -70,3 +70,23 @@ export function maskPhone(phone: string): string {
 export function truncate(str: string, max: number): string {
   return str.length > max ? `${str.slice(0, max)}…` : str
 }
+
+// Maps backend DB status values (and any legacy/provider aliases) to the three
+// UI states used by ResultModal and toast notifications.
+// DB canonical: 'successful' | 'failed' | 'pending' | 'processing' | 'refunded'
+// Legacy/provider aliases: 'success', 'completed', 'fail'
+export function normalizeTransactionStatus(
+  status: string | null | undefined
+): 'success' | 'failed' | 'pending' {
+  switch (status) {
+    case 'successful':
+    case 'success':
+    case 'completed':
+      return 'success'
+    case 'failed':
+    case 'fail':
+      return 'failed'
+    default:
+      return 'pending' // covers: pending, processing, refunded, undefined
+  }
+}
