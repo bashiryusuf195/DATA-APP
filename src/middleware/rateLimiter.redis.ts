@@ -1,6 +1,7 @@
 import rateLimit from "express-rate-limit";
 import type { Request, Response } from "express";
 import { redis } from "../config/redis";
+import { config } from "../config";
 
 // Atomically INCR the key and set a PEXPIRE on the first hit only.
 // Returns an array [hitCount, remainingTtlMs].
@@ -77,33 +78,46 @@ class RedisStore {
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
+// devOverride: applied only when NODE_ENV=development.
+// Allows shorter windows / higher limits so local testing isn't blocked.
+// Production limits are always enforced when NODE_ENV != development.
 function makeRedisLimiter({
   prefix,
   windowMs,
   max,
   keyGenerator,
+  devOverride,
 }: {
   prefix: string;
   windowMs: number;
   max: number;
   keyGenerator: (req: Request) => string;
+  devOverride?: { windowMs?: number; max?: number };
 }) {
+  const effectiveWindowMs = config.isDev && devOverride?.windowMs !== undefined
+    ? devOverride.windowMs
+    : windowMs;
+  const effectiveMax = config.isDev && devOverride?.max !== undefined
+    ? devOverride.max
+    : max;
+
   return rateLimit({
-    windowMs,
-    max,
+    windowMs: effectiveWindowMs,
+    max:      effectiveMax,
     // legacyHeaders → X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
     // standardHeaders → RateLimit-* + Retry-After
     legacyHeaders:   true,
     standardHeaders: true,
-    store: new RedisStore(prefix, windowMs),
+    store: new RedisStore(prefix, effectiveWindowMs),
     keyGenerator,
     handler: (_req: Request, res: Response) => {
-      const retryAfter = res.getHeader("Retry-After");
+      const retryAfterHeader = res.getHeader("Retry-After");
+      const retry_after = retryAfterHeader !== undefined ? Number(retryAfterHeader) : undefined;
       res.status(429).json({
-        success:    false,
-        code:       "RATE_LIMIT_EXCEEDED",
-        message:    "Too many requests. Please try again later.",
-        retryAfter: retryAfter !== undefined ? Number(retryAfter) : undefined,
+        success:     false,
+        code:        "RATE_LIMIT_EXCEEDED",
+        message:     "Too many attempts. Please try again later.",
+        retry_after,
       });
     },
   });
@@ -176,12 +190,16 @@ export const loginRateLimiter = makeRedisLimiter({
   keyGenerator: getClientIp,
 });
 
-/** Auth — register: 3 per hour per IP */
+/** Auth — register: 3 per hour per IP (prod) / 30 per 15 min per IP (dev) */
 export const registerRateLimiter = makeRedisLimiter({
   prefix:       "register",
-  windowMs:     60 * 60 * 1000,
-  max:          3,
+  windowMs:     60 * 60 * 1000,  // 1 hour
+  max:          3,                // production: 3 per hour
   keyGenerator: getClientIp,
+  devOverride: {
+    windowMs: 15 * 60 * 1000,   // dev: 15-min window
+    max:      30,                // dev: 30 attempts per 15 min
+  },
 });
 
 /** Transactions — purchases: 20 per min per authenticated user */

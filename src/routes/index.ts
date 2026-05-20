@@ -13,6 +13,7 @@ import { catalogRouter }      from '../modules/catalog/routes/catalog.routes';
 import { notificationsRouter } from '../modules/notifications/routes/notifications.routes';
 import { webhookRouter }      from '../modules/webhooks/routes/webhook.routes';
 import { userReferralRouter } from '../modules/referral/routes/user-referral.routes';
+import { customerKycRouter }  from '../modules/compliance/routes/customer-kyc.routes';
 
 export const rootRouter = Router();
 
@@ -24,3 +25,4 @@ rootRouter.use('/services',      catalogRouter);
 rootRouter.use('/notifications', notificationsRouter);
 rootRouter.use('/webhooks',      webhookRouter);
 rootRouter.use('/referrals',     userReferralRouter);
+rootRouter.use('/kyc',           customerKycRouter);

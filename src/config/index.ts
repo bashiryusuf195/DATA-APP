@@ -99,4 +99,12 @@ export const config = {
     callbackUrl: optional('PAYSTACK_CALLBACK_URL', ''),
     webhookSecret: optional('PAYSTACK_WEBHOOK_SECRET', ''),
   },
+
+  // ── Workers ───────────────────────────────────────────────────────────────
+  // Set DISABLE_WORKERS=true to prevent BullMQ workers from starting.
+  // Useful when developing the frontend against the API without local Redis.
+  // API routes still respond; background jobs are simply not processed.
+  workers: {
+    disabled: optional('DISABLE_WORKERS', 'false') === 'true',
+  },
 } as const;

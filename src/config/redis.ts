@@ -11,14 +11,45 @@
 import Redis   from 'ioredis';
 import { config } from './index';
 
+// Circuit breaker: stops retries when Upstash free-tier quota is exhausted.
+let _quotaExceeded = false;
+
+function markQuotaExceeded() {
+  if (_quotaExceeded) return;
+  _quotaExceeded = true;
+  // Print visually distinct banner so developers notice immediately
+  process.stderr.write(
+    '\n╔══════════════════════════════════════════════════════════════╗\n' +
+    '║  REDIS QUOTA EXCEEDED — Upstash free-tier limit reached.    ║\n' +
+    '║  Switch to local Redis:  REDIS_URL=redis://localhost:6379   ║\n' +
+    '║  Or stop worker polling: DISABLE_WORKERS=true               ║\n' +
+    '╚══════════════════════════════════════════════════════════════╝\n\n'
+  );
+}
+
+/** Returns true when Upstash quota has been exhausted this process lifetime. */
+export function isRedisQuotaExceeded(): boolean {
+  return _quotaExceeded;
+}
+
 export const redis = new Redis(config.redis.url, {
-  // Reconnect with exponential backoff (max 3 s between retries)
-  retryStrategy: (times: number) => Math.min(times * 500, 3_000),
+  // Stop reconnecting once quota is exceeded — every attempt costs a command.
+  retryStrategy: (times: number) => {
+    if (_quotaExceeded) return null;
+    return Math.min(times * 500, 3_000);
+  },
 
   // Don't open the connection until the first command is issued
   lazyConnect: true,
 
   maxRetriesPerRequest: null,
+});
+
+// Catch connection-level errors, including Upstash quota rejections.
+redis.on('error', (err: Error) => {
+  if (err.message.includes('max requests limit exceeded')) {
+    markQuotaExceeded();
+  }
 });
 
 // ── Health check ──────────────────────────────────────────────────────────────

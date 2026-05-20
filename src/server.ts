@@ -16,7 +16,7 @@
 import { app }    from './app';
 import { config } from './config';
 import { db }     from './config/database';
-import { redis }  from './config/redis';
+import { redis, isRedisQuotaExceeded } from './config/redis';
 import { logger } from './lib/logger';
 
 async function startServer(): Promise<void> {
@@ -35,7 +35,24 @@ async function startServer(): Promise<void> {
     await redis.connect().catch(() => {
       // Ignore "already connected" error on hot reload
     });
-    logger.info('Redis connected ✓');
+
+    // Verify Redis is reachable — catches Upstash quota exceeded at startup.
+    try {
+      await redis.ping();
+      logger.info('Redis connected ✓');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isRedisQuotaExceeded() || msg.includes('max requests limit exceeded')) {
+        logger.warn(
+          'Redis quota exceeded — rate limiting and job queues are unavailable. ' +
+          'Switch to local Redis (REDIS_URL=redis://localhost:6379) ' +
+          'or set DISABLE_WORKERS=true to stop worker polling.'
+        );
+      } else {
+        logger.warn('Redis ping failed — continuing without Redis', { error: msg });
+      }
+      // Continue startup — routes that don't touch Redis still work.
+    }
 
     // ── 3. Start HTTP server ────────────────────────────────────────────────
     const server = app.listen(config.port, () => {

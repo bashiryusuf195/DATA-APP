@@ -14,6 +14,11 @@ import { logger }  from '../lib/logger';
 import { redis }   from '../config/redis';
 import { config }  from '../config';
 
+if (config.workers.disabled) {
+  logger.info('DISABLE_WORKERS=true — standalone worker process skipped.');
+  process.exit(0);
+}
+
 // Importing each worker registers it with BullMQ (side-effect on module load).
 // Exported instances are needed for graceful shutdown.
 import { airtimeWorker }         from '../modules/queue/workers/airtime.worker';

@@ -17,9 +17,10 @@ import { config }              from '../config';
 function makeHandler(retryAfterSec: number) {
   return (_req: Request, res: Response) => {
     res.status(429).json({
-      error:      'Too many requests. Please slow down and try again.',
-      code:       'RATE_LIMIT_EXCEEDED',
-      retryAfter: retryAfterSec,
+      success:     false,
+      code:        'RATE_LIMIT_EXCEEDED',
+      message:     'Too many attempts. Please try again later.',
+      retry_after: retryAfterSec,
     });
   };
 }

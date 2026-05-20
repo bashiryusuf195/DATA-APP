@@ -31,6 +31,18 @@ const InitializeFundingSchema = z.object({
     .max(5_000_000, "amount exceeds maximum single funding limit (₦5,000,000)"),
 });
 
+// Canonical verify response shape — matches FundingVerifyResponse on the frontend.
+// Every code path through verifyFundingController must return this shape.
+type VerifyResponseData = {
+  status:          "success" | "pending" | "failed";
+  reference:       string;
+  amount:          number;
+  credited_amount: number;
+  new_balance:     number;
+  currency:        string;
+  message:         string;
+};
+
 // ── POST /wallet/fund/initialize ──────────────────────────────────────────────
 
 export async function initializeFundingController(
@@ -133,8 +145,13 @@ export async function initializeFundingController(
 }
 
 // ── POST /wallet/fund/verify/:reference ───────────────────────────────────────
-// Development / manual fallback for when webhooks cannot reach localhost.
-// Authenticating user can verify only their own transaction; admins can verify any.
+// Customer-facing verification endpoint.
+// Always returns VerifyResponseData so the frontend can branch on `status`
+// without inspecting nested fields.
+//
+// status=success  → wallet credited (or was already credited by webhook)
+// status=pending  → Paystack confirmed but wallet credit failed; retry or contact support
+// status=failed   → Paystack reported payment was not completed
 
 export async function verifyFundingController(
   req: Request,
@@ -161,12 +178,32 @@ export async function verifyFundingController(
       return;
     }
 
+    // ── Resolve user wallet early — needed in both already_verified and credit paths ──
+    const userWallet = await db("wallets")
+      .where({ user_id: fundingTx.user_id, wallet_type: "user" })
+      .first();
+
     // ── Idempotency gate ──────────────────────────────────────────────────────
+    // Wallet was already credited by the webhook worker or a previous verify call.
+    // Return success with the current live balance so the customer sees the right
+    // state regardless of which path (webhook vs. manual verify) ran first.
     if (fundingTx.verified) {
-      res.status(200).json({
-        success: true,
-        data:    { funding_transaction: fundingTx, credited: false, reason: "already_verified" },
-      });
+      const currentBalance = userWallet
+        ? await walletService.getBalance(userWallet.id).catch(() => 0)
+        : 0;
+
+      const data: VerifyResponseData = {
+        status:          "success",
+        reference,
+        amount:          fundingTx.amount,
+        credited_amount: fundingTx.credited_amount ?? fundingTx.amount,
+        new_balance:     currentBalance,
+        currency:        fundingTx.currency,
+        message:         "Payment already processed successfully",
+      };
+
+      logger.info("wallet_fund_verify_idempotent", { reference, new_balance: currentBalance });
+      res.status(200).json({ success: true, data });
       return;
     }
 
@@ -187,9 +224,9 @@ export async function verifyFundingController(
       channel: verifyResult.channel ?? "unknown",
     });
 
-    // ── Payment not successful ────────────────────────────────────────────────
+    // ── Payment was not completed ─────────────────────────────────────────────
     if (verifyResult.status !== "success") {
-      const updated = await updateFundingTransaction(fundingTx.id, {
+      await updateFundingTransaction(fundingTx.id, {
         status:             verifyResult.status === "abandoned" ? "abandoned" : "failed",
         provider_reference: verifyResult.gateway_reference,
         metadata: {
@@ -199,107 +236,112 @@ export async function verifyFundingController(
         },
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          funding_transaction: updated ?? fundingTx,
-          credited: false,
-          reason:   verifyResult.status,
-        },
-      });
+      const data: VerifyResponseData = {
+        status:          "failed",
+        reference,
+        amount:          fundingTx.amount,
+        credited_amount: 0,
+        new_balance:     0,
+        currency:        fundingTx.currency,
+        message:         `Payment ${verifyResult.status} — no charge was made`,
+      };
+
+      res.status(200).json({ success: true, data });
       return;
     }
 
-    // ── Credit the wallet ─────────────────────────────────────────────────────
+    // ── Paystack confirmed — credit the wallet ────────────────────────────────
     const settlementWalletId = process.env.SYSTEM_SETTLEMENT_WALLET_ID;
     if (!settlementWalletId) {
       throw new Error("SYSTEM_SETTLEMENT_WALLET_ID is not configured");
     }
-
-    const userWallet = await db("wallets")
-      .where({ user_id: fundingTx.user_id, wallet_type: "user" })
-      .first();
 
     if (!userWallet) {
       throw new Error(`Wallet not found for user ${fundingTx.user_id}`);
     }
 
     const paidAmountNgn = verifyResult.amount_kobo / 100;
-    // Use credited_amount from the funding record (accounts for any charge).
+    // Use credited_amount from the funding record (accounts for top-up charge).
     // Fall back to paidAmountNgn for legacy rows created before the charge migration.
     const amountNgn = fundingTx.credited_amount ?? paidAmountNgn;
 
-    // Idempotent: WalletService deduplicates on idempotency_key
-    const walletResult = await walletService.credit({
-      wallet_id:        userWallet.id,
-      contra_wallet_id: settlementWalletId,
-      amount:           amountNgn,
-      currency:         "NGN",
-      description:      `Wallet funding via Paystack (${reference})`,
-      idempotency_key:  `paystack_credit_${reference}`,
-      reference_type:   "paystack_funding",
-      reference_id:     fundingTx.id,
-      metadata:         { reference, gateway: "paystack" },
-    });
-
-    // ── Create transactions record (skip if already exists from worker) ────────
-    const existingTx = await getTransactionByReference(reference).catch(() => null);
-    if (!existingTx) {
-      await createTransaction({
-        user_id:               fundingTx.user_id,
-        reference,
-        type:                  "wallet_funding",
-        status:                "successful",
-        amount:                amountNgn,
-        currency:              "NGN",
-        source_wallet_id:      settlementWalletId,
-        destination_wallet_id: userWallet.id,
-        journal_batch_id:      walletResult.journal_batch_id,
-        provider:              "paystack",
-        provider_reference:    verifyResult.gateway_reference,
-        description:           "Wallet funding via Paystack",
-        metadata: {
-          payment_channel:        verifyResult.channel,
-          paid_at:                verifyResult.paid_at?.toISOString() ?? null,
-          funding_transaction_id: fundingTx.id,
-          verified_manually:      true,
-        },
-        processed_at: verifyResult.paid_at ?? new Date(),
-      });
-    }
-
-    // ── Mark funding transaction verified (idempotency gate — set last) ───────
-    const updated = await updateFundingTransaction(fundingTx.id, {
-      status:             "successful",
-      verified:           true,
-      provider_reference: verifyResult.gateway_reference,
-      payment_channel:    verifyResult.channel,
-      paid_at:            verifyResult.paid_at,
-      metadata: {
-        ...fundingTx.metadata,
-        paystack_raw: {
-          status:        verifyResult.status,
-          channel:       verifyResult.channel,
-          gateway_reference: verifyResult.gateway_reference,
-          paid_at:       verifyResult.paid_at?.toISOString() ?? null,
-          customer_email: verifyResult.customer_email,
-        },
-        verified_manually: true,
-        verified_at:       new Date().toISOString(),
-      },
-    });
-
-    // ── First-funding referral reward (fire-and-forget) ───────────────────────
-    processReferralReward("first_funding", fundingTx.user_id, amountNgn).catch((err) =>
-      logger.warn("referral_first_funding_failed", {
-        user_id: fundingTx.user_id,
-        error:   (err as Error).message,
-      })
-    );
-
-    // ── Notify user ───────────────────────────────────────────────────────────
+    // Wrap the credit + bookkeeping in a try/catch so a transient failure here
+    // returns status=pending instead of a 500.  The funding_transaction stays
+    // unverified and the idempotency_key means a retry is safe.
     try {
-      await createNotification({
+      // Idempotent: WalletService deduplicates on idempotency_key
+      const walletResult = await walletService.credit({
+        wallet_id:        userWallet.id,
+        contra_wallet_id: settlementWalletId,
+        amount:           amountNgn,
+        currency:         "NGN",
+        description:      `Wallet funding via Paystack (${reference})`,
+        idempotency_key:  `paystack_credit_${reference}`,
+        reference_type:   "paystack_funding",
+        reference_id:     fundingTx.id,
+        metadata:         { reference, gateway: "paystack" },
+      });
+
+      // Fetch the new balance immediately after credit
+      const newBalance = await walletService.getBalance(userWallet.id).catch(() => 0);
+
+      // Create transactions record (skip if already exists from webhook worker)
+      const existingTx = await getTransactionByReference(reference).catch(() => null);
+      if (!existingTx) {
+        await createTransaction({
+          user_id:               fundingTx.user_id,
+          reference,
+          type:                  "wallet_funding",
+          status:                "successful",
+          amount:                amountNgn,
+          currency:              "NGN",
+          source_wallet_id:      settlementWalletId,
+          destination_wallet_id: userWallet.id,
+          journal_batch_id:      walletResult.journal_batch_id,
+          provider:              "paystack",
+          provider_reference:    verifyResult.gateway_reference,
+          description:           "Wallet funding via Paystack",
+          metadata: {
+            payment_channel:        verifyResult.channel,
+            paid_at:                verifyResult.paid_at?.toISOString() ?? null,
+            funding_transaction_id: fundingTx.id,
+            verified_manually:      true,
+          },
+          processed_at: verifyResult.paid_at ?? new Date(),
+        });
+      }
+
+      // Mark funding transaction verified — this is the idempotency gate, set last
+      await updateFundingTransaction(fundingTx.id, {
+        status:             "successful",
+        verified:           true,
+        provider_reference: verifyResult.gateway_reference,
+        payment_channel:    verifyResult.channel,
+        paid_at:            verifyResult.paid_at,
+        metadata: {
+          ...fundingTx.metadata,
+          paystack_raw: {
+            status:            verifyResult.status,
+            channel:           verifyResult.channel,
+            gateway_reference: verifyResult.gateway_reference,
+            paid_at:           verifyResult.paid_at?.toISOString() ?? null,
+            customer_email:    verifyResult.customer_email,
+          },
+          verified_manually: true,
+          verified_at:       new Date().toISOString(),
+        },
+      });
+
+      // First-funding referral reward (fire-and-forget)
+      processReferralReward("first_funding", fundingTx.user_id, amountNgn).catch((err) =>
+        logger.warn("referral_first_funding_failed", {
+          user_id: fundingTx.user_id,
+          error:   (err as Error).message,
+        })
+      );
+
+      // Notify user (fire-and-forget — don't let a notification failure break the response)
+      createNotification({
         user_id: fundingTx.user_id,
         channel: "in_app",
         type:    "wallet_funded",
@@ -312,27 +354,73 @@ export async function verifyFundingController(
           charge_amount:    fundingTx.charge_amount ?? 0,
           payment_channel:  verifyResult.channel,
         },
+      }).catch((notifErr) =>
+        logger.warn("wallet_fund_notification_failed", {
+          reference,
+          error: (notifErr as Error).message,
+        })
+      );
+
+      logger.info("wallet_fund_credited", {
+        reference,
+        user_id:     fundingTx.user_id,
+        amount_ngn:  amountNgn,
+        idempotent:  walletResult.idempotent,
+        new_balance: newBalance,
       });
-    } catch (notifErr) {
-      logger.warn("wallet_fund_notification_failed", { reference, error: (notifErr as Error).message });
+
+      const data: VerifyResponseData = {
+        status:          "success",
+        reference,
+        amount:          fundingTx.amount,
+        credited_amount: amountNgn,
+        new_balance:     newBalance,
+        currency:        fundingTx.currency,
+        message:         "Wallet funded successfully",
+      };
+
+      res.status(200).json({ success: true, data });
+
+    } catch (creditErr) {
+      // Paystack confirmed the payment, but the wallet credit failed.
+      // Persist the Paystack confirmation in metadata so the repair script can
+      // find and retry this funding.  Do NOT set verified=true — the next
+      // verify call will re-attempt the credit safely (idempotent key).
+      logger.error("wallet_fund_credit_failed", {
+        reference,
+        user_id: fundingTx.user_id,
+        error:   (creditErr as Error).message,
+      });
+
+      await updateFundingTransaction(fundingTx.id, {
+        provider_reference: verifyResult.gateway_reference,
+        metadata: {
+          ...fundingTx.metadata,
+          paystack_confirmed:  true,
+          paystack_raw: {
+            status:            verifyResult.status,
+            channel:           verifyResult.channel,
+            gateway_reference: verifyResult.gateway_reference,
+            paid_at:           verifyResult.paid_at?.toISOString() ?? null,
+          },
+          credit_failed_at: new Date().toISOString(),
+          credit_error:     (creditErr as Error).message,
+        },
+      }).catch(() => {});
+
+      const data: VerifyResponseData = {
+        status:          "pending",
+        reference,
+        amount:          fundingTx.amount,
+        credited_amount: 0,
+        new_balance:     0,
+        currency:        fundingTx.currency,
+        message:         "Payment confirmed, wallet credit processing",
+      };
+
+      res.status(200).json({ success: true, data });
     }
 
-    logger.info("wallet_fund_credited", {
-      reference,
-      user_id:    fundingTx.user_id,
-      amount_ngn: amountNgn,
-      idempotent: walletResult.idempotent,
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        funding_transaction: updated ?? fundingTx,
-        credited:            !walletResult.idempotent,
-        journal_batch_id:    walletResult.journal_batch_id,
-        amount_ngn:          amountNgn,
-      },
-    });
   } catch (err) {
     next(err);
   }

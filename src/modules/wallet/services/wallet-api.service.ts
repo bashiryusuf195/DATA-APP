@@ -5,6 +5,7 @@ import {
   generateTransferReference,
 } from "../../../lib/reference";
 import { createTransaction } from "../../transactions/services/transaction.service";
+import { AppError } from "../../../lib/errors";
 
 const db = getDbInstance();
 
@@ -12,6 +13,8 @@ export const walletService = new WalletService(db);
 
 /**
  * Get wallet balance for a user.
+ * Returns a flat numeric balance so the API response shape matches
+ * the frontend WalletBalance type exactly.
  */
 export async function getUserWalletBalance(userId: string) {
   const wallet = await db("wallets")
@@ -22,20 +25,27 @@ export async function getUserWalletBalance(userId: string) {
     .first();
 
   if (!wallet) {
-    throw new Error("Wallet not found");
+    throw new AppError("Wallet not found for this account", "WALLET_NOT_FOUND", 404);
   }
 
-  const balance = await walletService.getWalletBalance(wallet.id);
+  // getBalance() returns the authoritative numeric balance from the PostgreSQL
+  // get_wallet_balance() function — NOT the WalletBalance object.
+  const balance = await walletService.getBalance(wallet.id);
 
   return {
-    wallet_id: wallet.id,
-    currency: wallet.currency,
-    balance,
+    wallet_id:   wallet.id as string,
+    balance,                           // plain number — e.g. 5000.00
+    currency:    wallet.currency as string,
+    wallet_type: wallet.wallet_type as string,
+    is_default:  wallet.is_default as boolean,
   };
 }
 
 /**
  * Get wallet ledger entries.
+ * Returns { data, total } using the field names the frontend LedgerEntry type
+ * expects: `type` (not `entry_type`) and `balance_after` (not `running_balance`).
+ * All numeric columns are parsed to numbers — the pg driver returns them as strings.
  */
 export async function getUserWalletLedger(userId: string, limit = 20) {
   const wallet = await db("wallets")
@@ -46,18 +56,27 @@ export async function getUserWalletLedger(userId: string, limit = 20) {
     .first();
 
   if (!wallet) {
-    throw new Error("Wallet not found");
+    throw new AppError("Wallet not found for this account", "WALLET_NOT_FOUND", 404);
   }
 
-  const ledger = await db("wallet_ledger")
+  const rows = await db("wallet_ledger")
     .where({ wallet_id: wallet.id })
     .orderBy("created_at", "desc")
     .limit(limit);
 
-  return {
-    wallet_id: wallet.id,
-    entries: ledger,
-  };
+  const data = rows.map((r: Record<string, unknown>) => ({
+    id:           r.id as string,
+    type:         (r.entry_type as string) as "credit" | "debit",
+    amount:       parseFloat(r.amount as string),
+    balance_after: r.running_balance != null ? parseFloat(r.running_balance as string) : 0,
+    description:  (r.description as string) ?? "",
+    reference:    (r.reference_id as string | null) ?? undefined,
+    created_at:   r.created_at instanceof Date
+      ? (r.created_at as Date).toISOString()
+      : String(r.created_at),
+  }));
+
+  return { data, total: data.length };
 }
 
 /**

@@ -29,6 +29,7 @@ import { createChallenge }             from "./challenge.service";
 import { AppError as AuthAppError }                    from "../../../shared/errors/AppError";
 import { generateReferralCode }        from "../../../lib/reference";
 import { processReferralReward }       from "../../referral/services/referral-reward.service";
+import { WalletService }               from "../../../services/wallet/WalletService";
 import { env }                         from "../../../shared/config/env";
 import type {
   AuthUser,
@@ -137,6 +138,16 @@ export async function register(
     first_name:   input.first_name ?? null,
     last_name:    input.last_name  ?? null,
     display_name: [input.first_name, input.last_name].filter(Boolean).join(" ") || null,
+  });
+
+  // 4b. Provision default NGN wallet
+  const walletSvc = new WalletService(db);
+  await walletSvc.createWallet({
+    user_id:     user.id as string,
+    wallet_type: "user",
+    currency:    "NGN",
+    is_default:  true,
+    label:       "Main Wallet",
   });
 
   // 5. Assign default 'user' role

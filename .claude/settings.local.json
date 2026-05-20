@@ -7,7 +7,8 @@
       "Bash(npx tsc *)",
       "Bash(xargs grep -l \"provider\")",
       "Bash(npx knex *)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(xargs grep -l \"compliance\\\\|kyc\")"
     ]
   }
 }
