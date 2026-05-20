@@ -1,7 +1,7 @@
 # SMShika Provider
 
 Provider code: `smshika`
-Supported services: **Airtime only**
+Supported services: **Airtime**, **Data**
 
 ---
 
@@ -19,22 +19,55 @@ No `secret_key`, `username`, or `password` are required.
 
 ## Airtime Endpoint Mapping
 
-| Internal field     | SMShika field    | Example             |
-|--------------------|------------------|---------------------|
-| `input.amount`     | `amount`         | `"1000"` (string)   |
-| network (from variation_code) | `network` | `"MTN"`, `"Airtel"`, `"Glo"`, `"9mobile"` |
-| `input.phone`      | `mobile_number`  | `"08012345678"`     |
-| (hardcoded)        | `Ported_number`  | `false`             |
-| (hardcoded)        | `airtime_type`   | `"VTU"`             |
+**Endpoint:** `POST {BASE_URL}/api/topup`
 
-**Internal → SMShika network mapping:**
+| Internal field             | SMShika field    | Example              |
+|----------------------------|------------------|----------------------|
+| `input.amount`             | `amount`         | `"1000"` (string)    |
+| network (from variation_code prefix) | `network` | `"MTN"`, `"Airtel"`, `"Glo"`, `"9mobile"` |
+| `input.phone`              | `mobile_number`  | `"08012345678"`      |
+| (hardcoded)                | `Ported_number`  | `false`              |
+| (hardcoded)                | `airtime_type`   | `"VTU"`              |
 
-| Customer selects | variation_code sent | SMShika `network` |
-|-----------------|---------------------|-------------------|
-| MTN             | `mtn-airtime`       | `MTN`             |
-| Airtel          | `airtel-airtime`    | `Airtel`          |
-| Glo             | `glo-airtime`       | `Glo`             |
-| 9mobile         | `9mobile-airtime`   | `9mobile`         |
+**Internal → SMShika network name mapping (airtime):**
+
+| Customer selects | variation_code prefix | SMShika `network` |
+|------------------|-----------------------|-------------------|
+| MTN              | `mtn`                 | `MTN`             |
+| Airtel           | `airtel`              | `Airtel`          |
+| Glo              | `glo`                 | `Glo`             |
+| 9mobile          | `9mobile`             | `9mobile`         |
+
+No `provider_variation_code` is needed for airtime. The variation_code prefix resolves the network name directly.
+
+---
+
+## Data Endpoint Mapping
+
+**Endpoint:** `POST {BASE_URL}/api/data/`
+
+| Internal field                        | SMShika field    | Example         |
+|---------------------------------------|------------------|-----------------|
+| network ID (from variation_code prefix) | `network`      | `1` (integer)   |
+| `input.phone`                         | `mobile_number`  | `"08012345678"` |
+| `service_plans.provider_variation_code` | `plan`         | `7` (integer)   |
+| (hardcoded)                           | `Ported_number`  | `false`         |
+
+**Internal → SMShika network ID mapping (data):**
+
+| Customer selects | variation_code prefix | SMShika `network` ID |
+|------------------|-----------------------|----------------------|
+| MTN              | `mtn`                 | `1`                  |
+| Glo              | `glo`                 | `2`                  |
+| 9mobile          | `9mobile`             | `3`                  |
+| Airtel           | `airtel`              | `4`                  |
+
+**Plan ID mapping:**
+
+The SMShika `plan` integer comes from `service_plans.provider_variation_code`. This field is set per-plan in Admin → Service Plans → Edit → "Provider Plan ID / Variation Code". Get the correct integer from your SMShika account's data plan list.
+
+**If the `provider_variation_code` field is blank**, the purchase will fail with a clear error before reaching SMShika:
+> "SMShika data: Provider plan ID is missing for this plan."
 
 **Auth header:**
 ```
@@ -42,17 +75,23 @@ Authorization: Token {api_key}
 Content-Type: application/json
 ```
 
-**Success condition:** `status === "success"` OR `Status === "successful"` in response body.
+**Success condition:** `status` or `Status` field in the response body equals `"success"`, `"successful"`, or `"delivered"` (case-insensitive).
 
 ---
 
 ## Admin Dashboard Setup Steps
 
-1. **Register provider config** (dev: run seed `04_smshika_provider_config.ts`; production: use Admin SQL or run seed on staging):
+### First-time setup
+
+1. **Register provider config** (dev: run seed `04_smshika_provider_config.ts` then migration `20260522000002`; production: use Admin SQL):
    ```sql
    INSERT INTO provider_configs (id, provider_code, name, is_active, priority, supported_services, health_status)
-   VALUES (gen_random_uuid(), 'smshika', 'SMShika', false, 3, '["airtime"]', 'unknown')
+   VALUES (gen_random_uuid(), 'smshika', 'SMShika', false, 3, '["airtime","data"]', 'unknown')
    ON CONFLICT (provider_code) DO NOTHING;
+   ```
+   Then run the migration to update `supported_services` if the row already exists:
+   ```
+   npx knex migrate:latest
    ```
 
 2. **Add credentials** — Admin → API Integrations → find SMShika row → Edit:
@@ -63,56 +102,97 @@ Content-Type: application/json
 
 3. **Enable the provider** — Admin → Provider Management → SMShika → set `is_active = true`.
 
-4. **Set airtime routing** — Admin → Provider Routing:
-   - Service type: `airtime`
-   - Primary provider: `smshika`
-   - Fallback provider: `mock_vtu_provider` (or leave blank in production)
-   - Set to active
+4. **Set routing rules** — Admin → Provider Routing:
+   - **Airtime**: Service type `airtime`, Primary provider `smshika`
+   - **Data**: Service type `data`, Primary provider `smshika`
+   - Set each rule to active
 
 5. **Health check** — Admin → Provider Health → SMShika.
-   - Will report `healthy: true` if credentials are present (no live ping — see Known Limitations).
+   Reports `healthy: true` if credentials are present (no live ping — see Known Limitations).
 
 ---
 
-## Test Steps
+### Creating a data plan for SMShika
 
-### Verify provider is registered
-Check server startup logs:
+1. Go to **Admin → Service Plans → New Plan**
+2. Fill in:
+   - **Service**: select the data service (e.g. `MTN Data`)
+   - **Legacy Provider Code**: `smshika`
+   - **Plan Name**: descriptive (e.g. `MTN 1GB SME 30 Days`)
+   - **Variation Code**: internal identifier (e.g. `mtn-sme-1gb-30`)
+   - **Network**: `mtn` (or `airtel`, `glo`, `9mobile`)
+   - **Category**: `sme` (or `corporate`, `gifting`, `direct`, etc.)
+   - **Provider Plan ID / Variation Code**: ⚠️ **REQUIRED** — the numeric plan ID from your SMShika data plan list (e.g. `7`). Without this, all purchases of this plan will fail.
+   - **Primary Provider**: `smshika`
+   - **Cost Price / Selling Price**: your margin
+   - **Active**: enabled
+
+3. The plan will appear in the customer Data page under the correct network and category.
+
+---
+
+## Test Steps (Data)
+
+### Verify provider is registered with data support
+```sql
+SELECT provider_code, supported_services FROM provider_configs WHERE provider_code = 'smshika';
+-- Should show: ["airtime","data"]
 ```
-[PROVIDER REGISTRY] SMShika registered (credentials loaded from DB at call time)
-```
 
-### Test airtime purchase (customer app)
-1. Log in as a customer with wallet balance > 0.
-2. Navigate to Services → Buy Airtime.
-3. Select any network (MTN, Airtel, Glo, 9mobile).
-4. Enter a valid 11-digit phone number and an amount (e.g. ₦100).
-5. Confirm the purchase.
-6. **Expected (success):** transaction shows `successful`; wallet is debited.
-7. **Expected (failure from provider):** transaction shows `failed`; wallet is refunded (net balance unchanged).
+### End-to-end test (use low-value plan, e.g. 50MB or smallest available)
 
-### Force a failed provider response (mock phone)
-Send phone `08000000000` if using the mock provider as fallback.
-For SMShika itself, use a phone number that SMShika rejects in sandbox mode.
+1. **Create the test plan** via Admin → Service Plans:
+   - Variation Code: `mtn-sme-50mb-test` (or any unique slug)
+   - Network: `mtn`, Category: `sme`
+   - Provider Plan ID: `[SMShika plan ID for MTN 50MB]`
+   - Primary Provider: `smshika`, Active: yes
 
-### Verify wallet debit/refund behavior
+2. **Log in as a customer** with wallet balance ≥ plan selling price.
+3. Go to **Services → Buy Data**
+4. Select **MTN → SME → [your test plan]**
+5. Enter a valid MTN phone number, confirm.
+6. **Expected (success):** transaction shows `successful`; wallet debited by selling price.
+7. **Expected (failure):** transaction shows `failed`; wallet refunded to pre-purchase balance.
+
+### Verify missing plan ID error
+1. Create a plan with **blank** Provider Plan ID.
+2. Purchase it.
+3. **Expected:** transaction fails immediately with:
+   > "SMShika data: Provider plan ID is missing for this plan."
+4. Wallet should be refunded; transaction status `failed`.
+
+### Verify wallet debit/refund
 1. Note wallet balance before purchase.
-2. Submit a purchase.
-3. If provider returns failure:
-   - Check `provider_attempts` table: `success = false`, `response_payload` has `status: "fail"`.
-   - Check `transactions` table: `status = 'failed'`, `failed_at` is set.
-   - Check wallet balance: should equal pre-purchase balance (refund applied).
-4. If provider returns success:
-   - Check `provider_attempts` table: `success = true`.
-   - Check `transactions` table: `status = 'successful'`, `processed_at` is set.
-   - Check wallet balance: should equal pre-purchase balance minus purchase amount.
+2. After a **failed** data purchase:
+   - `provider_attempts`: `success = false`
+   - `transactions`: `status = 'failed'`, `failed_at` set
+   - Wallet balance = pre-purchase balance (full refund)
+3. After a **successful** data purchase:
+   - `provider_attempts`: `success = true`
+   - `transactions`: `status = 'successful'`, `processed_at` set
+   - Wallet balance = pre-purchase balance minus selling_price
 
 ### Confirm raw response is stored
 ```sql
-SELECT response_payload FROM provider_attempts
+SELECT provider_code, success, response_payload->>'Status', response_payload->>'message'
+FROM provider_attempts
 WHERE provider_code = 'smshika'
-ORDER BY created_at DESC LIMIT 1;
+ORDER BY created_at DESC
+LIMIT 3;
 ```
+
+---
+
+## Refund Behavior on Failed Data Purchase
+
+The execution engine handles refunds automatically — no provider-specific code is needed:
+
+1. Customer submits purchase → wallet is debited via double-entry journal.
+2. If SMShika returns `status: "fail"` → engine calls `handleAllFailed()` → calls `walletService.refundFromDestination()`.
+3. Refund is recorded as a journal entry reversing the original debit.
+4. Transaction status set to `failed`, `failed_at` timestamp set.
+5. Customer receives an in-app notification: "Transaction Failed".
+6. No double-debit/refund: `provider_attempts` idempotency check prevents re-execution on BullMQ retry.
 
 ---
 
@@ -121,8 +201,7 @@ ORDER BY created_at DESC LIMIT 1;
 | Limitation | Detail |
 |-----------|--------|
 | No balance endpoint | `getBalance()` throws. Admin health check reports credentials present but cannot do a live ping. |
-| No verify/requery endpoint | `verifyTransaction()` returns `pending` with a warning. Use SMShika dashboard to look up transactions. |
-| No webhook support | Transaction status is set synchronously from the topup response. No async webhook processing. |
-| Base URL not confirmed | The SMShika documentation shows `http://localhost` as example. Confirm production base URL with SMShika before go-live. |
-| No sandbox environment documented | Cannot confirm test mode is available without contacting SMShika support. |
-| Data, Cable, Electricity | Not implemented. `purchase()` throws for any service_type other than `airtime`. |
+| No verify/requery endpoint | `verifyTransaction()` returns `pending`. Use SMShika dashboard to look up transactions. |
+| No webhook support | Transaction status is set synchronously from the API response. No async webhook processing. |
+| Data plan IDs must be set manually | Admin must look up numeric plan IDs from SMShika's plan list and enter them per-plan. |
+| Cable, Electricity | Not yet implemented. `purchase()` throws for service_types other than `airtime`/`data`. |

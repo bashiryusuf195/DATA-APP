@@ -20,6 +20,11 @@ export interface ProviderPurchaseInput {
 
   variation_code?: string;
 
+  // Provider-specific plan identifier resolved from service_plans.provider_variation_code.
+  // Required by providers (e.g. SMShika data) that use a numeric plan ID rather than
+  // the internal variation_code.
+  provider_variation_code?: string | null;
+
   customer_name?: string;
 
   reference: string;

@@ -14,15 +14,25 @@ const SMSHIKA_TIMEOUT_MS = 30_000;
 
 // ── Operator mapping ──────────────────────────────────────────────────────────
 //
-// Internal variation_code values (e.g. "mtn-airtime", "mtn") → SMShika network names.
-// Ported_number is sent as false; SMShika routes based on the supplied network name.
+// Airtime uses string network names; data uses integer network IDs.
+// variation_code prefix (e.g. "mtn-airtime", "mtn-1gb-30") is the source.
 
-const NETWORK_MAP: Record<string, string> = {
-  mtn:      "MTN",
-  airtel:   "Airtel",
-  glo:      "Glo",
+const AIRTIME_NETWORK_MAP: Record<string, string> = {
+  mtn:       "MTN",
+  airtel:    "Airtel",
+  glo:       "Glo",
   "9mobile": "9mobile",
-  etisalat: "9mobile",    // legacy alias
+  etisalat:  "9mobile",   // legacy alias
+};
+
+// SMShika data API network IDs (documented at /api/data/ endpoint):
+//   1 = MTN  |  2 = Glo  |  3 = 9mobile  |  4 = Airtel
+const DATA_NETWORK_ID_MAP: Record<string, number> = {
+  mtn:       1,
+  glo:       2,
+  "9mobile": 3,
+  etisalat:  3,           // legacy alias
+  airtel:    4,
 };
 
 // ── SMShika response shapes ───────────────────────────────────────────────────
@@ -38,13 +48,20 @@ interface SmshikaTopupResponse {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Extracts the network prefix from a variation_code.
- * Accepts "mtn-airtime", "mtn", "airtel-airtime", "9mobile-airtime", etc.
- */
-function resolveNetwork(variationCode: string): string | null {
-  const prefix = variationCode.split("-")[0].toLowerCase();
-  return NETWORK_MAP[prefix] ?? null;
+/** Extracts the network prefix from a variation_code (e.g. "mtn-airtime" → "mtn"). */
+function extractPrefix(variationCode: string): string {
+  return variationCode.split("-")[0].toLowerCase();
+}
+
+/** Resolves SMShika string network name for airtime. */
+function resolveAirtimeNetwork(variationCode: string): string | null {
+  return AIRTIME_NETWORK_MAP[extractPrefix(variationCode)] ?? null;
+}
+
+/** Resolves SMShika integer network ID for data. */
+function resolveDataNetworkId(variationCode: string): number | null {
+  const id = DATA_NETWORK_ID_MAP[extractPrefix(variationCode)];
+  return id !== undefined ? id : null;
 }
 
 function maskPhone(phone?: string): string {
@@ -110,13 +127,6 @@ export class SmshikaProvider extends HttpVTUProvider {
   // ── VTUProvider interface ─────────────────────────────────────────────────
 
   async purchase(input: ProviderPurchaseInput): Promise<ProviderPurchaseResult> {
-    if (input.service_type !== "airtime") {
-      // TODO: implement data/cable/electricity when SMShika endpoints are documented
-      throw new Error(
-        `SMShika: service_type '${input.service_type}' not implemented. Only 'airtime' is supported.`
-      );
-    }
-
     const creds = await this.requireCredentials();
 
     const apiKey  = creds.api_key_encrypted;
@@ -129,12 +139,33 @@ export class SmshikaProvider extends HttpVTUProvider {
       throw new Error("SMShika: base_url not set — add it in Admin > API Integrations > SMShika");
     }
 
+    if (input.service_type === "airtime") {
+      return this.purchaseAirtime(input, apiKey, baseUrl);
+    }
+    if (input.service_type === "data") {
+      return this.purchaseData(input, apiKey, baseUrl);
+    }
+
+    // TODO: implement cable/electricity when SMShika endpoints are documented
+    throw new Error(
+      `SMShika: service_type '${input.service_type}' not implemented. ` +
+      `Supported: airtime, data.`
+    );
+  }
+
+  // ── Airtime ───────────────────────────────────────────────────────────────
+
+  private async purchaseAirtime(
+    input: ProviderPurchaseInput,
+    apiKey: string,
+    baseUrl: string,
+  ): Promise<ProviderPurchaseResult> {
     const variationCode = input.variation_code ?? "";
-    const network = resolveNetwork(variationCode);
+    const network = resolveAirtimeNetwork(variationCode);
 
     if (!network) {
       throw new Error(
-        `SMShika: cannot resolve network for variation_code '${variationCode}'. ` +
+        `SMShika airtime: cannot resolve network for variation_code '${variationCode}'. ` +
         `Expected prefix: mtn | airtel | glo | 9mobile`
       );
     }
@@ -147,15 +178,14 @@ export class SmshikaProvider extends HttpVTUProvider {
       airtime_type:  "VTU",
     };
 
-    console.log("[SMSHIKA] purchase →", {
+    console.log("[SMSHIKA] airtime purchase →", {
       network,
       amount:    input.amount,
       phone:     maskPhone(input.phone),
       reference: input.reference,
     });
 
-    const url      = `${baseUrl}/api/topup`;
-    const response = await this.fetchWithTimeout(url, {
+    const response = await this.fetchWithTimeout(`${baseUrl}/api/topup`, {
       method:  "POST",
       headers: {
         "Authorization": `Token ${apiKey}`,
@@ -166,19 +196,17 @@ export class SmshikaProvider extends HttpVTUProvider {
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        `SMShika: HTTP ${response.status} authentication failure — verify api_key in Admin > API Integrations > SMShika`
+        `SMShika airtime: HTTP ${response.status} authentication failure — verify api_key`
       );
     }
 
-    // Parse response body regardless of HTTP status — SMShika returns failure
-    // details in the JSON body even on non-2xx codes.
-    const raw = await this.parseJson<SmshikaTopupResponse>(response, "topup");
+    const raw = await this.parseJson<SmshikaTopupResponse>(response, "airtime topup");
 
     const SUCCESS_VALUES = new Set(["success", "successful", "delivered"]);
     const rawStatusLower = (raw.status ?? raw.Status ?? "").toLowerCase();
     const isSuccess = SUCCESS_VALUES.has(rawStatusLower);
 
-    console.log("[SMSHIKA] purchase ←", {
+    console.log("[SMSHIKA] airtime purchase ←", {
       status:    raw.status,
       Status:    raw.Status,
       message:   raw.message,
@@ -190,6 +218,99 @@ export class SmshikaProvider extends HttpVTUProvider {
       provider_reference: input.reference,
       provider:           this.name,
       message:            raw.message ?? (isSuccess ? "Airtime purchase successful" : "Airtime purchase failed"),
+      status:             isSuccess ? "successful" : "failed",
+      raw_response:       {
+        status:         raw.status,
+        Status:         raw.Status,
+        message:        raw.message,
+        api_response:   raw.api_response,
+        balance_before: raw.balance_before,
+        balance_after:  raw.balance_after,
+      },
+    };
+  }
+
+  // ── Data ─────────────────────────────────────────────────────────────────
+
+  private async purchaseData(
+    input: ProviderPurchaseInput,
+    apiKey: string,
+    baseUrl: string,
+  ): Promise<ProviderPurchaseResult> {
+    // provider_variation_code MUST be a numeric plan ID from SMShika's plan list.
+    const rawPlanId = input.provider_variation_code ?? null;
+    if (!rawPlanId) {
+      throw new Error(
+        "SMShika data: Provider plan ID is missing for this plan. " +
+        "Go to Admin → Service Plans, find this data plan, and set " +
+        "'Provider Variation Code' to the numeric plan ID from your SMShika plan list."
+      );
+    }
+    const planId = parseInt(rawPlanId, 10);
+    if (isNaN(planId) || planId <= 0) {
+      throw new Error(
+        `SMShika data: Provider plan ID '${rawPlanId}' is not a valid positive integer. ` +
+        "Update the plan in Admin → Service Plans with the correct numeric SMShika plan ID."
+      );
+    }
+
+    const variationCode = input.variation_code ?? "";
+    const networkId = resolveDataNetworkId(variationCode);
+    if (networkId === null) {
+      throw new Error(
+        `SMShika data: cannot resolve network ID for variation_code '${variationCode}'. ` +
+        `Expected prefix: mtn | glo | 9mobile | airtel`
+      );
+    }
+
+    const payload = {
+      network:       networkId,
+      mobile_number: input.phone ?? "",
+      plan:          planId,
+      Ported_number: false,
+    };
+
+    console.log("[SMSHIKA] data purchase →", {
+      network:   networkId,
+      plan:      planId,
+      amount:    input.amount,
+      phone:     maskPhone(input.phone),
+      reference: input.reference,
+    });
+
+    const response = await this.fetchWithTimeout(`${baseUrl}/api/data/`, {
+      method:  "POST",
+      headers: {
+        "Authorization": `Token ${apiKey}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        `SMShika data: HTTP ${response.status} authentication failure — verify api_key`
+      );
+    }
+
+    const raw = await this.parseJson<SmshikaTopupResponse>(response, "data purchase");
+
+    const SUCCESS_VALUES = new Set(["success", "successful", "delivered"]);
+    const rawStatusLower = (raw.status ?? raw.Status ?? "").toLowerCase();
+    const isSuccess = SUCCESS_VALUES.has(rawStatusLower);
+
+    console.log("[SMSHIKA] data purchase ←", {
+      status:    raw.status,
+      Status:    raw.Status,
+      message:   raw.message,
+      reference: input.reference,
+    });
+
+    return {
+      success:            isSuccess,
+      provider_reference: input.reference,
+      provider:           this.name,
+      message:            raw.message ?? (isSuccess ? "Data purchase successful" : "Data purchase failed"),
       status:             isSuccess ? "successful" : "failed",
       raw_response:       {
         status:         raw.status,

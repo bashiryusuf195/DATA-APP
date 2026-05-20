@@ -394,11 +394,15 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
             options={providerOptions}
           />
           <Input
-            label="Provider Variation Code"
+            label="Provider Plan ID / Variation Code"
             value={form.provider_variation_code ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, provider_variation_code: e.target.value || null }))}
-            placeholder="Provider-specific variation identifier"
-            hint="Leave blank to use the plan's variation_code"
+            placeholder="e.g. 7 (SMShika data) or leave blank"
+            hint={
+              selectedServiceType === 'data'
+                ? 'SMShika data: enter the numeric plan ID from your SMShika plan list (e.g. 1, 7, 42). Required — purchase will fail without it.'
+                : "Provider-specific plan identifier. Leave blank to use the plan's variation_code."
+            }
           />
 
           <div>

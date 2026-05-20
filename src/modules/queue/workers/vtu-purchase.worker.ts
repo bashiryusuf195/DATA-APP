@@ -37,7 +37,11 @@ export const vtuPurchaseWorker = createWorker(
     }
 
     // Resolve plan-level provider overrides — takes precedence over routing rules.
+    // Also read provider_variation_code (needed by providers like SMShika data
+    // that use a numeric plan ID instead of our internal variation_code).
     let planOverrides: PlanProviderOverrides | undefined;
+    let planProviderVariationCode: string | null = null;
+
     if (data.variation_code) {
       const plan = await getPlanByVariationCode(data.service_type, data.variation_code).catch(() => null);
       if (plan?.primary_provider_code) {
@@ -46,20 +50,22 @@ export const vtuPurchaseWorker = createWorker(
           fallback_provider_code: (plan.fallback_provider_code as string | null) ?? null,
         };
       }
+      planProviderVariationCode = (plan?.provider_variation_code as string | null) ?? null;
     }
 
     const result = await providerExecutionEngine.executeWithFailover({
       service_type:   data.service_type,
       plan_overrides: planOverrides,
       purchase_input: {
-        service_type:     data.service_type,
-        amount:           data.amount,
-        phone:            data.phone,
-        smartcard_number: data.smartcard_number,
-        meter_number:     data.meter_number,
-        variation_code:   data.variation_code,
-        customer_name:    data.customer_name,
-        reference:        data.reference,
+        service_type:            data.service_type,
+        amount:                  data.amount,
+        phone:                   data.phone,
+        smartcard_number:        data.smartcard_number,
+        meter_number:            data.meter_number,
+        variation_code:          data.variation_code,
+        provider_variation_code: planProviderVariationCode,
+        customer_name:           data.customer_name,
+        reference:               data.reference,
       },
       transaction_reference: data.reference,
       transaction: {
