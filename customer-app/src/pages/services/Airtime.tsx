@@ -114,7 +114,7 @@ export function AirtimePage() {
       </Card>
 
       <ConfirmModal
-        open={purchase.phase === 'confirm'}
+        open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
         rows={[
           { label: 'Network',  value: OPERATORS.find((o) => o.code === operator)?.label ?? operator },
           { label: 'Phone',    value: phone },
@@ -122,12 +122,13 @@ export function AirtimePage() {
         ]}
         onConfirm={purchase.confirm}
         onCancel={purchase.cancel}
-        loading={purchase.phase === 'submitting'}
+        loading={purchase.isLoading}
       />
 
       <ResultModal
         open={purchase.phase === 'done'}
         transaction={purchase.result}
+        isPolling={purchase.isPolling}
         onClose={purchase.reset}
         onRetry={purchase.reset}
       />

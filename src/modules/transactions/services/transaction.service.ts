@@ -48,7 +48,9 @@ export async function updateTransactionStatus(
       provider_reference: data.provider_reference ?? undefined,
       journal_batch_id: data.journal_batch_id ?? undefined,
       failure_reason: data.failure_reason ?? undefined,
-      metadata: data.metadata ?? undefined,
+      ...(data.metadata !== undefined
+        ? { metadata: db.raw("COALESCE(metadata, '{}'::jsonb) || ?::jsonb", [JSON.stringify(data.metadata)]) }
+        : {}),
       processed_at: data.status === "successful" ? new Date() : undefined,
       failed_at: data.status === "failed" ? new Date() : undefined,
       updated_at: new Date(),

@@ -1,5 +1,5 @@
 import { Modal, Button } from '@/components/ui'
-import { CheckCircle2, XCircle, Clock, RefreshCw, Home } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
 import type { Transaction } from '@/types'
@@ -7,18 +7,19 @@ import type { Transaction } from '@/types'
 interface ResultModalProps {
   open: boolean
   transaction: Transaction | null
+  isPolling?: boolean
   onClose: () => void
   onRetry?: () => void
 }
 
-export function ResultModal({ open, transaction, onClose, onRetry }: ResultModalProps) {
+export function ResultModal({ open, transaction, isPolling = false, onClose, onRetry }: ResultModalProps) {
   const navigate = useNavigate()
 
-  // Normalize so 'successful'/'success'/'completed' all → 'success',
-  // 'failed'/'fail' → 'failed', everything else → 'pending'.
   const uiStatus = normalizeTransactionStatus(transaction?.status)
   const isSuccess = uiStatus === 'success'
   const isPending = uiStatus === 'pending'
+  // Polling timed out without a final status — user needs to check history
+  const isTimedOut = isPending && !isPolling
 
   return (
     <Modal open={open} locked size="sm">
@@ -29,7 +30,11 @@ export function ResultModal({ open, transaction, onClose, onRetry }: ResultModal
           </div>
         ) : isPending ? (
           <div className="h-16 w-16 rounded-full bg-amber-50 flex items-center justify-center mb-4">
-            <Clock className="h-8 w-8 text-amber-500" />
+            {isPolling ? (
+              <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
+            ) : (
+              <Clock className="h-8 w-8 text-amber-500" />
+            )}
           </div>
         ) : (
           <div className="h-16 w-16 rounded-full bg-danger-light flex items-center justify-center mb-4">
@@ -38,7 +43,13 @@ export function ResultModal({ open, transaction, onClose, onRetry }: ResultModal
         )}
 
         <p className="text-lg font-bold text-ink mb-1">
-          {isSuccess ? 'Transaction Successful' : isPending ? 'Transaction Processing' : 'Transaction Failed'}
+          {isSuccess
+            ? 'Transaction Successful'
+            : isPolling
+              ? 'Processing Transaction…'
+              : isPending
+                ? 'Still Processing'
+                : 'Transaction Failed'}
         </p>
 
         {transaction && (
@@ -59,9 +70,15 @@ export function ResultModal({ open, transaction, onClose, onRetry }: ResultModal
           </p>
         )}
 
-        {isPending && (
+        {isPolling && (
           <p className="text-xs text-ink-muted mb-4">
-            Your transaction is being processed. Check Transaction History for the final status.
+            Waiting for confirmation. This usually takes a few seconds…
+          </p>
+        )}
+
+        {isTimedOut && (
+          <p className="text-xs text-ink-muted mb-4">
+            Your transaction is still being processed. Check Transaction History for the final status.
           </p>
         )}
 
@@ -71,9 +88,20 @@ export function ResultModal({ open, transaction, onClose, onRetry }: ResultModal
               Try Again
             </Button>
           )}
+          {isTimedOut && (
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={() => { onClose(); navigate('/transactions') }}
+              icon={<History className="h-4 w-4" />}
+            >
+              View History
+            </Button>
+          )}
           <Button
             variant={isSuccess ? 'primary' : 'secondary'}
             fullWidth
+            disabled={isPolling}
             onClick={() => { onClose(); navigate('/dashboard') }}
             icon={<Home className="h-4 w-4" />}
           >

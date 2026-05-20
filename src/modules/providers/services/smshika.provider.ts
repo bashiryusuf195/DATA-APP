@@ -174,7 +174,9 @@ export class SmshikaProvider extends HttpVTUProvider {
     // details in the JSON body even on non-2xx codes.
     const raw = await this.parseJson<SmshikaTopupResponse>(response, "topup");
 
-    const isSuccess = raw.status === "success" || raw.Status === "successful";
+    const SUCCESS_VALUES = new Set(["success", "successful", "delivered"]);
+    const rawStatusLower = (raw.status ?? raw.Status ?? "").toLowerCase();
+    const isSuccess = SUCCESS_VALUES.has(rawStatusLower);
 
     console.log("[SMSHIKA] purchase ←", {
       status:    raw.status,

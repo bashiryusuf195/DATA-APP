@@ -106,16 +106,16 @@ export function ElectricityPage() {
       </Card>
 
       <ConfirmModal
-        open={purchase.phase === 'confirm'}
+        open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
         rows={[
           { label: 'Disco',  value: selectedDisco?.name ?? discoCode },
           { label: 'Meter',  value: meter },
           { label: 'Amount', value: fmtCurrency(parseFloat(amount) || 0) },
         ]}
-        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.phase === 'submitting'}
+        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.isLoading}
       />
 
-      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} onClose={purchase.reset} onRetry={purchase.reset} />
+      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} isPolling={purchase.isPolling} onClose={purchase.reset} onRetry={purchase.reset} />
     </div>
   )
 }

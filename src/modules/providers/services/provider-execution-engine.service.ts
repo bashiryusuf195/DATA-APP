@@ -7,7 +7,10 @@ import {
   getSuccessfulAttempt,
   getFailedAttemptProviderCodes,
 } from "./provider-attempts.service";
-import { updateTransactionStatus } from "../../transactions/services/transaction.service";
+import {
+  updateTransactionStatus,
+  getTransactionByReference,
+} from "../../transactions/services/transaction.service";
 import { createNotification } from "../../notifications/services/notification.service";
 import {
   recordSuccess as metricsRecordSuccess,
@@ -16,6 +19,7 @@ import {
 } from "./provider-health-metrics.service";
 import { classifyError } from "./error-classifier.service";
 import { processReferralReward } from "../../referral/services/referral-reward.service";
+import { logger } from "../../../lib/logger";
 import type { VTUProvider } from "./provider.interface";
 import type { ProviderPurchaseInput, ProviderPurchaseResult, ProviderServiceType } from "../types/provider.types";
 
@@ -82,27 +86,88 @@ class ProviderExecutionEngine {
     const tag = `[ENGINE][${transaction_reference}]`;
     const executionStartedAt = new Date();
 
+    logger.info("engine_start", {
+      reference:    transaction_reference,
+      service_type,
+      tx_status:    transaction.status,
+    });
+
     // ── Guard: terminal state ─────────────────────────────────────────────────
     if (transaction.status === "successful" || transaction.status === "failed") {
-      console.log(`${tag} Already in terminal state (${transaction.status}) — skipping`);
+      logger.info("engine_skip_terminal", {
+        reference: transaction_reference,
+        status:    transaction.status,
+      });
       return this.idempotentResult(transaction.status === "successful");
     }
 
     // ── Idempotency: successful attempt already recorded ─────────────────────
+    //
+    // CRITICAL: If a previous BullMQ attempt recorded a successful provider
+    // attempt (in provider_attempts) but handleSuccess failed (e.g. DB error),
+    // the transaction is stuck at "processing". On this retry, the successful
+    // attempt is found and the engine must finalize the transaction NOW rather
+    // than returning without updating transaction status.
     const existingSuccess = await getSuccessfulAttempt(transaction_reference);
     if (existingSuccess) {
-      console.log(
-        `${tag} Idempotent replay — successful attempt already recorded`,
-        `| provider=${existingSuccess.provider_code}`
-      );
+      logger.info("engine_idempotent_replay", {
+        reference: transaction_reference,
+        provider:  existingSuccess.provider_code,
+      });
+
+      // Re-check live status: if still processing (not finalized), do it now.
+      const liveTx = await getTransactionByReference(transaction_reference).catch(() => null);
+      if (liveTx && liveTx.status !== "successful" && liveTx.status !== "failed") {
+        logger.warn("engine_refinalizing_stuck_processing", {
+          reference:    transaction_reference,
+          live_status:  liveTx.status,
+          provider:     existingSuccess.provider_code,
+          reason:       "handleSuccess failed on a previous attempt — re-finalizing",
+        });
+        await updateTransactionStatus(transaction_reference, {
+          status:   "successful",
+          provider: existingSuccess.provider_code,
+          metadata: { finalized_on_replay: true, replayed_at: new Date().toISOString() },
+        });
+        // Best-effort notification
+        createNotification({
+          user_id: transaction.user_id,
+          channel: "in_app",
+          type:    "purchase_successful",
+          title:   "Transaction Successful",
+          message: `Your ${service_type} purchase was successful.`,
+          metadata: {
+            reference: transaction_reference,
+            type:      service_type,
+            amount:    Number(transaction.amount),
+            provider:  existingSuccess.provider_code,
+          },
+        }).catch((err: Error) =>
+          logger.warn("engine_replay_notification_failed", { error: err.message })
+        );
+      }
+
       return this.idempotentResult(true, existingSuccess.provider_code);
     }
 
     // ── Providers already tried in a previous BullMQ attempt ─────────────────
     const alreadyFailedCodes = await getFailedAttemptProviderCodes(transaction_reference);
     if (alreadyFailedCodes.length > 0) {
-      console.log(`${tag} Skipping previously failed providers:`, alreadyFailedCodes.join(", "));
+      logger.info("engine_skip_previously_failed", {
+        reference: transaction_reference,
+        skipping:  alreadyFailedCodes,
+      });
     }
+
+    // Determine the next attempt number from ALL existing attempts (success or
+    // fail) so that a unique constraint on (transaction_reference, attempt_number)
+    // is never violated on retries.
+    const existingAttemptCount: number = await db("provider_attempts")
+      .where({ transaction_reference })
+      .count("id as count")
+      .first()
+      .then((r: Record<string, unknown> | undefined) => Number(r?.count ?? 0))
+      .catch(() => 0);
 
     // ── Resolve ordered provider candidates ───────────────────────────────────
     const { candidates, rejectedProviders } = await this.resolveProviderCandidates(
@@ -113,7 +178,11 @@ class ProviderExecutionEngine {
 
     if (candidates.length === 0) {
       const reason = "No eligible providers configured or available";
-      console.warn(`${tag} ${reason} for ${service_type}`, `| rejected=${rejectedProviders.length}`);
+      logger.warn("engine_no_candidates", {
+        reference:   transaction_reference,
+        service_type,
+        rejected:    rejectedProviders.length,
+      });
       await this.handleAllFailed(params, [], rejectedProviders, reason, executionStartedAt);
       return {
         success: false, provider_result: null, final_provider: null,
@@ -126,7 +195,7 @@ class ProviderExecutionEngine {
     // ── Execute with provider-level failover ──────────────────────────────────
     const attemptedProviders: string[] = [];
     let failoverTriggered              = false;
-    let attemptNumber                  = alreadyFailedCodes.length + 1;
+    let attemptNumber                  = existingAttemptCount + 1;
     let lastError                      = "All providers exhausted";
 
     for (const candidate of candidates) {
@@ -135,12 +204,13 @@ class ProviderExecutionEngine {
       if (attemptedProviders.length > 0 || isFailover) failoverTriggered = true;
       attemptedProviders.push(providerCode);
 
-      console.log(
-        `${tag} Attempting provider '${providerCode}'`,
-        `| attempt=${attemptNumber}`,
-        `| failover=${failoverTriggered}`,
-        `| service=${service_type}`
-      );
+      logger.info("engine_provider_attempt", {
+        reference:    transaction_reference,
+        provider:     providerCode,
+        attempt:      attemptNumber,
+        failover:     failoverTriggered,
+        service_type,
+      });
 
       const start = Date.now();
       let result: ProviderPurchaseResult | null = null;
@@ -150,16 +220,28 @@ class ProviderExecutionEngine {
         result = await provider.purchase(purchase_input);
       } catch (err) {
         errorMsg = (err as Error).message;
-        console.error(`${tag} Provider '${providerCode}' threw exception:`, errorMsg);
+        logger.error("engine_provider_threw", {
+          reference: transaction_reference,
+          provider:  providerCode,
+          error:     errorMsg,
+        });
       }
 
       const latencyMs = Date.now() - start;
       const success   = result?.success === true;
 
-      const rawError  = errorMsg ?? (result?.success ? null : (result?.message ?? null));
+      logger.info("engine_provider_result", {
+        reference:   transaction_reference,
+        provider:    providerCode,
+        success,
+        status:      result?.status ?? null,
+        message:     result?.message ?? errorMsg ?? null,
+        latency_ms:  latencyMs,
+      });
+
+      const rawError   = errorMsg ?? (result?.success ? null : (result?.message ?? null));
       const errorClass = rawError ? classifyError(rawError) : null;
 
-      // Sanitise request — strip phone/account numbers for audit
       const safeRequest: Record<string, unknown> = {
         service_type:   purchase_input.service_type,
         amount:         purchase_input.amount,
@@ -167,26 +249,37 @@ class ProviderExecutionEngine {
         reference:      purchase_input.reference,
       };
 
-      await recordProviderAttempt({
-        transaction_reference: transaction_reference,
-        provider_code:         providerCode,
-        attempt_number:        attemptNumber,
-        request_payload:       safeRequest,
-        response_payload:      (result?.raw_response as Record<string, unknown>) ?? {},
-        success,
-        error_message:         rawError,
-        error_classification:  errorClass,
-        latency_ms:            latencyMs,
-      });
+      // recordProviderAttempt is non-critical: a DB error here must NOT kill
+      // the engine and leave the transaction stuck at "processing".
+      try {
+        await recordProviderAttempt({
+          transaction_reference: transaction_reference,
+          provider_code:         providerCode,
+          attempt_number:        attemptNumber,
+          request_payload:       safeRequest,
+          response_payload:      (result?.raw_response as Record<string, unknown>) ?? {},
+          success,
+          error_message:         rawError,
+          error_classification:  errorClass,
+          latency_ms:            latencyMs,
+        });
+      } catch (recordErr) {
+        logger.error("engine_record_attempt_failed_nonfatal", {
+          reference: transaction_reference,
+          provider:  providerCode,
+          error:     (recordErr as Error).message,
+        });
+        // Continue — the purchase result is what matters, not the audit record.
+      }
 
-      // Update circuit breaker metrics
+      // Update circuit breaker metrics (non-critical)
       if (success) {
-        await metricsRecordSuccess(providerCode).catch((e: Error) =>
-          console.error(`${tag} metricsRecordSuccess failed (non-fatal):`, e.message)
+        metricsRecordSuccess(providerCode).catch((e: Error) =>
+          logger.warn("engine_metrics_success_failed", { error: e.message })
         );
       } else {
-        await metricsRecordFailure(providerCode).catch((e: Error) =>
-          console.error(`${tag} metricsRecordFailure failed (non-fatal):`, e.message)
+        metricsRecordFailure(providerCode).catch((e: Error) =>
+          logger.warn("engine_metrics_failure_failed", { error: e.message })
         );
       }
 
@@ -194,12 +287,13 @@ class ProviderExecutionEngine {
 
       if (success && result) {
         const totalLatencyMs = Date.now() - executionStartedAt.getTime();
-        console.log(
-          `${tag} Provider '${providerCode}' succeeded`,
-          `| latency=${latencyMs}ms`,
-          `| totalLatency=${totalLatencyMs}ms`,
-          `| failover_triggered=${failoverTriggered}`
-        );
+        logger.info("engine_provider_succeeded", {
+          reference:       transaction_reference,
+          provider:        providerCode,
+          latency_ms:      latencyMs,
+          total_ms:        totalLatencyMs,
+          failover:        failoverTriggered,
+        });
         await this.handleSuccess(params, result, attemptedProviders, rejectedProviders, failoverTriggered, executionStartedAt);
         return {
           success:             true,
@@ -215,21 +309,22 @@ class ProviderExecutionEngine {
       }
 
       lastError = rawError ?? `Provider '${providerCode}' returned failure`;
-      console.warn(
-        `${tag} Provider '${providerCode}' failed — trying next`,
-        `| reason=${lastError}`,
-        `| classification=${errorClass ?? "unknown"}`,
-        `| latency=${latencyMs}ms`
-      );
+      logger.warn("engine_provider_failed_trying_next", {
+        reference:       transaction_reference,
+        provider:        providerCode,
+        reason:          lastError,
+        classification:  errorClass ?? "unknown",
+        latency_ms:      latencyMs,
+      });
     }
 
     // ── All providers exhausted ───────────────────────────────────────────────
-    console.error(
-      `${tag} All providers exhausted`,
-      `| tried=${attemptedProviders.join(", ")}`,
-      `| rejected=${rejectedProviders.map((r) => r.provider_code).join(", ")}`,
-      `| service=${service_type}`
-    );
+    logger.error("engine_all_providers_exhausted", {
+      reference:   transaction_reference,
+      tried:       attemptedProviders,
+      rejected:    rejectedProviders.map((r) => r.provider_code),
+      service_type,
+    });
     await this.handleAllFailed(params, attemptedProviders, rejectedProviders, lastError, executionStartedAt);
 
     return {
@@ -256,24 +351,19 @@ class ProviderExecutionEngine {
     const rejectedProviders: RejectedProvider[]  = [];
     const seen = new Set<string>(skipCodes);
 
-    // Track skipped-from-previous-attempts as rejected
     for (const code of skipCodes) {
       rejectedProviders.push({ provider_code: code, reason: "ALREADY_ATTEMPTED" });
     }
 
-    // 1. Plan-level overrides (highest priority — set per service plan)
+    // 1. Plan-level overrides (highest priority)
     if (planOverrides?.primary_provider_code) {
       const primary = planOverrides.primary_provider_code;
-      console.log(`[ROUTING] plan override → primary '${primary}' for ${serviceType}`);
+      logger.debug("engine_routing_plan_override", { primary, service_type: serviceType });
       await this.tryAddCandidate(primary, serviceType, false, seen, candidates, rejectedProviders);
       if (planOverrides.fallback_provider_code) {
         await this.tryAddCandidate(
           planOverrides.fallback_provider_code, serviceType, true, seen, candidates, rejectedProviders
         );
-      }
-      // Skip service-level routing rules when plan overrides are present
-      if (candidates.length > 0) {
-        // Still fall through to priority-based for additional fallback capacity
       }
     }
 
@@ -296,7 +386,7 @@ class ProviderExecutionEngine {
       }
     }
 
-    // 2. Priority-based path (active + supports service_type + not already included)
+    // 3. Priority-based path (active + supports service_type + not already included)
     const configs = await db("provider_configs")
       .where({ is_active: true })
       .whereRaw("supported_services @> ?::jsonb", [JSON.stringify([serviceType])])
@@ -324,10 +414,9 @@ class ProviderExecutionEngine {
   ): Promise<void> {
     if (seen.has(providerCode)) return;
 
-    // Circuit breaker check
     const circuitOpen = await isCircuitOpen(providerCode).catch(() => false);
     if (circuitOpen) {
-      console.warn(`[ENGINE] Provider '${providerCode}' skipped — circuit open`);
+      logger.warn("engine_circuit_open", { provider: providerCode });
       rejectedProviders.push({ provider_code: providerCode, reason: "CIRCUIT_OPEN" });
       seen.add(providerCode);
       return;
@@ -394,9 +483,15 @@ class ProviderExecutionEngine {
       provider:           result.provider,
       provider_reference: result.provider_reference,
       metadata: {
-        provider_response: result.raw_response,
+        provider_response: result.raw_response ?? null,
         execution:         executionMeta,
       },
+    });
+
+    logger.info("engine_transaction_finalized_successful", {
+      reference: params.transaction_reference,
+      provider:  result.provider,
+      latency_ms: executionMeta.total_latency_ms,
     });
 
     // First-purchase referral reward (fire-and-forget)
@@ -405,10 +500,10 @@ class ProviderExecutionEngine {
       params.transaction.user_id,
       Number(params.transaction.amount)
     ).catch((err) =>
-      console.error("[ENGINE] Referral reward failed (non-fatal):", (err as Error).message)
+      logger.warn("engine_referral_reward_failed", { error: (err as Error).message })
     );
 
-    await createNotification({
+    createNotification({
       user_id: params.transaction.user_id,
       channel: "in_app",
       type:    "purchase_successful",
@@ -421,7 +516,7 @@ class ProviderExecutionEngine {
         provider:  result.provider,
       },
     }).catch((err) =>
-      console.error("[ENGINE] Success notification failed (non-fatal):", (err as Error).message)
+      logger.warn("engine_success_notification_failed", { error: (err as Error).message })
     );
   }
 
@@ -454,12 +549,15 @@ class ProviderExecutionEngine {
           metadata:        { reference: transaction_reference },
         });
         refundBatchId = refundResult.journal_batch_id;
-        console.log(`[ENGINE] Refund issued | ref=${transaction_reference} | batch=${refundBatchId}`);
+        logger.info("engine_refund_issued", {
+          reference: transaction_reference,
+          batch_id:  refundBatchId,
+        });
       } catch (refundErr) {
-        console.error(
-          `[ENGINE] Refund failed (manual intervention required) | ref=${transaction_reference}:`,
-          (refundErr as Error).message
-        );
+        logger.error("engine_refund_failed_manual_intervention", {
+          reference: transaction_reference,
+          error:     (refundErr as Error).message,
+        });
       }
     }
 
@@ -484,7 +582,13 @@ class ProviderExecutionEngine {
       },
     });
 
-    await createNotification({
+    logger.info("engine_transaction_finalized_failed", {
+      reference:  transaction_reference,
+      reason,
+      refund_id:  refundBatchId,
+    });
+
+    createNotification({
       user_id: transaction.user_id,
       channel: "in_app",
       type:    "purchase_failed",
@@ -496,7 +600,7 @@ class ProviderExecutionEngine {
         amount:    Number(transaction.amount),
       },
     }).catch((err) =>
-      console.error("[ENGINE] Failure notification failed (non-fatal):", (err as Error).message)
+      logger.warn("engine_failure_notification_failed", { error: (err as Error).message })
     );
   }
 

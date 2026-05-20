@@ -116,16 +116,16 @@ export function CableTvPage() {
         </form>
       </Card>
 
-      <ConfirmModal open={purchase.phase === 'confirm'}
+      <ConfirmModal open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
         rows={[
           { label: 'Provider',   value: PROVIDERS.find((p) => p.code === provider)?.label ?? provider },
           { label: 'Smartcard',  value: smartcard },
           { label: 'Package',    value: selectedPlan?.name ?? '' },
           { label: 'Amount',     value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
         ]}
-        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.phase === 'submitting'}
+        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.isLoading}
       />
-      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} onClose={purchase.reset} onRetry={purchase.reset} />
+      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} isPolling={purchase.isPolling} onClose={purchase.reset} onRetry={purchase.reset} />
     </div>
   )
 }

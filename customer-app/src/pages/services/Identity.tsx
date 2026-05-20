@@ -88,15 +88,15 @@ export function IdentityPage() {
         </form>
       </Card>
 
-      <ConfirmModal open={purchase.phase === 'confirm'}
+      <ConfirmModal open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
         rows={[
           { label: 'Service', value: selectedPlan?.name ?? '' },
           { label: 'Amount',  value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
           ...(phone ? [{ label: 'Phone', value: phone }] : []),
         ]}
-        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.phase === 'submitting'}
+        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.isLoading}
       />
-      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} onClose={purchase.reset} onRetry={purchase.reset} />
+      <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} isPolling={purchase.isPolling} onClose={purchase.reset} onRetry={purchase.reset} />
     </div>
   )
 }

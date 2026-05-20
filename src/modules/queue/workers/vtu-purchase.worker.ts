@@ -131,10 +131,15 @@ vtuPurchaseWorker.on("failed", async (job, err) => {
     });
 
     if (data?.reference) {
-      await updateTransactionStatus(data.reference, {
-        status:         "failed",
-        failure_reason: err.message,
-      });
+      // Guard: never overwrite a finalized status — engine may have succeeded
+      // on a prior attempt even though the job itself later threw.
+      const liveTx = await getTransactionByReference(data.reference).catch(() => null);
+      if (liveTx && liveTx.status !== "successful" && liveTx.status !== "failed") {
+        await updateTransactionStatus(data.reference, {
+          status:         "failed",
+          failure_reason: err.message,
+        });
+      }
     }
 
     await createNotification({
