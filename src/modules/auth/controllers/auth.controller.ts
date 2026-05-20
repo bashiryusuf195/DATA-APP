@@ -131,8 +131,17 @@ export async function loginController(
       throw loginErr;
     }
 
-    // Successful login — clear failed-login counter for this email+IP.
+    // Successful password verification — clear failed-login counter.
     await failedLoginLimiter.reset(email, ip);
+
+    // 2FA required for admin users with TOTP enabled.
+    if (loginResult.requires_2fa) {
+      res.status(200).json({
+        success: true,
+        data: { requires_2fa: true, challenge_id: loginResult.challenge_id },
+      });
+      return;
+    }
 
     const { user, tokens, sessionId, rbac } = loginResult;
     setAuthCookies(res, tokens.access_token, tokens.refresh_token);

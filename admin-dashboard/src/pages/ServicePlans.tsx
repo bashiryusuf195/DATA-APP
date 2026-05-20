@@ -8,12 +8,15 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { FilterBar } from '@/components/shared/FilterBar'
 import { DataTable } from '@/components/shared/DataTable'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { Pagination } from '@/components/shared/Pagination'
 import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtCurrency } from '@/utils/format'
 import { ENDPOINTS } from '@/config/endpoints'
 import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput } from '@/types'
-import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp } from 'lucide-react'
+import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon } from 'lucide-react'
+
+const PAGE_SIZE = 50
 
 function errMsg(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) return err.response?.data?.error ?? err.message ?? fallback
@@ -49,7 +52,48 @@ interface PlanFormProps {
 
 interface PlanFormState extends CreateServicePlanInput {
   provider_metadata_raw: string
+  duration_days_str: string
 }
+
+const OPERATOR_OPTIONS = [
+  { value: '', label: 'None' },
+  // Telecom
+  { value: 'mtn', label: 'MTN' },
+  { value: 'airtel', label: 'Airtel' },
+  { value: 'glo', label: 'Glo' },
+  { value: '9mobile', label: '9mobile' },
+  // Cable TV
+  { value: 'dstv', label: 'DStv' },
+  { value: 'gotv', label: 'GOtv' },
+  { value: 'startimes', label: 'StarTimes' },
+  // Electricity DISCOs
+  { value: 'ekedc', label: 'EKEDC' },
+  { value: 'ikedc', label: 'IKEDC' },
+  { value: 'aedc', label: 'AEDC' },
+  { value: 'phed', label: 'PHED' },
+  { value: 'kedco', label: 'KEDCO' },
+  // Exams
+  { value: 'waec', label: 'WAEC' },
+  { value: 'neco', label: 'NECO' },
+  { value: 'jamb', label: 'JAMB' },
+  // Identity
+  { value: 'nin', label: 'NIN' },
+  { value: 'bvn', label: 'BVN' },
+]
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'sme', label: 'SME' },
+  { value: 'corporate', label: 'Corporate' },
+  { value: 'gifting', label: 'Gifting' },
+  { value: 'direct', label: 'Direct' },
+  { value: 'dnd', label: 'DND' },
+  { value: 'social', label: 'Social' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'annual', label: 'Annual' },
+]
 
 function buildFormState(initial?: ServicePlan | null): PlanFormState {
   if (initial) {
@@ -64,6 +108,10 @@ function buildFormState(initial?: ServicePlan | null): PlanFormState {
       is_variable_amount: initial.is_variable_amount,
       metadata: initial.metadata,
       is_active: initial.is_active,
+      network_operator: initial.network_operator ?? null,
+      plan_category: initial.plan_category ?? null,
+      duration_days: initial.duration_days ?? null,
+      duration_days_str: initial.duration_days != null ? String(initial.duration_days) : '',
       primary_provider_code: initial.primary_provider_code ?? null,
       fallback_provider_code: initial.fallback_provider_code ?? null,
       provider_variation_code: initial.provider_variation_code ?? null,
@@ -81,6 +129,10 @@ function buildFormState(initial?: ServicePlan | null): PlanFormState {
     is_variable_amount: false,
     metadata: {},
     is_active: true,
+    network_operator: null,
+    plan_category: null,
+    duration_days: null,
+    duration_days_str: '',
     primary_provider_code: null,
     fallback_provider_code: null,
     provider_variation_code: null,
@@ -104,6 +156,12 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
     { value: '', label: 'Select service…' },
     ...services.map((s) => ({ value: s.id, label: `${s.name} (${s.service_type})` })),
   ]
+
+  const selectedService = services.find((s) => s.id === form.service_id)
+  const selectedServiceType = selectedService?.service_type ?? ''
+  const operatorFieldLabel = ['data', 'airtime'].includes(selectedServiceType)
+    ? 'Network'
+    : 'Operator / Biller'
 
   const providerOptions = [
     { value: '', label: 'None (use routing rules)' },
@@ -134,6 +192,8 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
     if (!form.name.trim()) e.name = 'Plan name is required'
     if (!form.variation_code.trim()) e.variation_code = 'Variation code is required'
     if (form.amount < 0) e.amount = 'Amount must be ≥ 0'
+    if (form.duration_days_str && isNaN(parseInt(form.duration_days_str, 10)))
+      e.duration_days_str = 'Must be a positive integer'
     try { JSON.parse(form.provider_metadata_raw) } catch {
       e.provider_metadata_raw = 'Must be valid JSON'
     }
@@ -144,6 +204,9 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
   function buildPayload(): CreateServicePlanInput {
     let provider_metadata: Record<string, unknown> = {}
     try { provider_metadata = JSON.parse(form.provider_metadata_raw) } catch { /* validated above */ }
+    const duration_days = form.duration_days_str
+      ? parseInt(form.duration_days_str, 10)
+      : null
     return {
       service_id: form.service_id,
       provider_code: form.provider_code,
@@ -155,6 +218,9 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
       is_variable_amount: form.is_variable_amount,
       metadata: form.metadata,
       is_active: form.is_active,
+      network_operator: form.network_operator || null,
+      plan_category: form.plan_category || null,
+      duration_days,
       primary_provider_code: form.primary_provider_code || null,
       fallback_provider_code: form.fallback_provider_code || null,
       provider_variation_code: form.provider_variation_code || null,
@@ -265,6 +331,33 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
             error={errors.variation_code}
           />
 
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label={operatorFieldLabel}
+              value={form.network_operator ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, network_operator: e.target.value || null }))}
+              options={OPERATOR_OPTIONS}
+            />
+            <Select
+              label="Category"
+              value={form.plan_category ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, plan_category: e.target.value || null }))}
+              options={CATEGORY_OPTIONS}
+            />
+          </div>
+
+          <Input
+            label="Duration (days)"
+            type="number"
+            min={1}
+            step={1}
+            value={form.duration_days_str}
+            onChange={(e) => setForm((f) => ({ ...f, duration_days_str: e.target.value }))}
+            placeholder="Leave blank for unlimited"
+            hint="Optional — leave blank for variable/unlimited"
+            error={errors.duration_days_str}
+          />
+
           {numField('amount', 'Base Amount (₦)', 'Provider face value')}
           {numField('cost_price', 'Cost Price (₦)', 'What you pay the provider')}
           {numField('selling_price', 'Selling Price (₦)', 'What users pay')}
@@ -335,16 +428,63 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
   )
 }
 
+// ── Bulk toggle confirmation modal ────────────────────────────────────────────
+
+interface BulkToggleModalProps {
+  open: boolean
+  onClose: () => void
+  selectedIds: string[]
+  targetActive: boolean
+  onConfirm: () => void
+  isPending: boolean
+}
+
+function BulkToggleModal({ open, onClose, selectedIds, targetActive, onConfirm, isPending }: BulkToggleModalProps) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Bulk ${targetActive ? 'Enable' : 'Disable'} Plans`}
+      subtitle={`${selectedIds.length} plan${selectedIds.length !== 1 ? 's' : ''} selected`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button
+            variant={targetActive ? 'primary' : 'danger'}
+            size="sm"
+            onClick={onConfirm}
+            disabled={isPending}
+          >
+            {isPending ? 'Applying…' : `${targetActive ? 'Enable' : 'Disable'} ${selectedIds.length} Plan${selectedIds.length !== 1 ? 's' : ''}`}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-ink-muted">
+        This will {targetActive ? 'activate' : 'deactivate'} {selectedIds.length} selected plan{selectedIds.length !== 1 ? 's' : ''}.
+        The change takes effect immediately.
+      </p>
+    </Modal>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function ServicePlansPage() {
   const qc = useQueryClient()
   const [filterServiceId, setFilterServiceId] = useState('')
+  const [filterServiceType, setFilterServiceType] = useState('')
+  const [filterOperator, setFilterOperator] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
   const [filterProvider, setFilterProvider] = useState('')
   const [filterActive, setFilterActive] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
   const [editItem, setEditItem] = useState<ServicePlan | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkTarget, setBulkTarget] = useState<boolean | null>(null)
 
   const { data: services = [] } = useQuery({
     queryKey: ['admin-services'],
@@ -358,15 +498,25 @@ export function ServicePlansPage() {
 
   const queryParams = {
     service_id: filterServiceId || undefined,
+    service_type: filterServiceType || undefined,
+    network_operator: filterOperator || undefined,
+    plan_category: filterCategory || undefined,
     provider_code: filterProvider || undefined,
     search: search.trim() || undefined,
     is_active: filterActive === '' ? undefined : filterActive === 'true',
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
   }
 
-  const { data = [], isLoading, error, refetch } = useQuery({
+  const { data: result, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-service-plans', queryParams],
     queryFn: () => catalogApi.listServicePlans(queryParams),
   })
+
+  const plans = result?.plans ?? []
+  const total = result?.meta.total ?? 0
+
+  function resetPage() { setPage(1); setSelectedIds(new Set()) }
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
@@ -378,8 +528,21 @@ export function ServicePlansPage() {
     onError: (err) => toast.error(errMsg(err, 'Failed to update status')),
   })
 
+  const bulkMutation = useMutation({
+    mutationFn: ({ ids, is_active }: { ids: string[]; is_active: boolean }) =>
+      Promise.all(ids.map((id) => catalogApi.updateServicePlan(id, { is_active }))),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
+      setSelectedIds(new Set())
+      setBulkTarget(null)
+      toast.success(`${vars.ids.length} plan${vars.ids.length !== 1 ? 's' : ''} ${vars.is_active ? 'enabled' : 'disabled'}`)
+    },
+    onError: (err) => toast.error(errMsg(err, 'Bulk update failed')),
+  })
+
   const handleSaved = () => {
     qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
+    setSelectedIds(new Set())
   }
 
   const serviceOptions = [
@@ -387,21 +550,82 @@ export function ServicePlansPage() {
     ...services.map((s) => ({ value: s.id, label: s.name })),
   ]
 
+  const serviceTypeOptions = [
+    { value: '', label: 'All types' },
+    { value: 'airtime', label: 'Airtime' },
+    { value: 'data', label: 'Data' },
+    { value: 'electricity', label: 'Electricity' },
+    { value: 'cable_tv', label: 'Cable TV' },
+    { value: 'exam_pin', label: 'Exam PIN' },
+    { value: 'identity_verification', label: 'Identity' },
+  ]
+
+  const operatorOptions = [
+    { value: '', label: 'All operators' },
+    ...OPERATOR_OPTIONS.filter((o) => o.value),
+  ]
+
+  const categoryOptions = [
+    { value: '', label: 'All categories' },
+    ...CATEGORY_OPTIONS.filter((o) => o.value),
+  ]
+
   const providerCodes = useMemo(() => {
-    const codes = new Set(data.map((p) => p.provider_code))
+    const codes = new Set(plans.map((p) => p.provider_code))
     return [
       { value: '', label: 'All providers' },
       ...Array.from(codes).sort().map((c) => ({ value: c, label: c })),
     ]
-  }, [data])
+  }, [plans])
+
+  const allPageSelected = plans.length > 0 && plans.every((p) => selectedIds.has(p.id))
+
+  function toggleSelectAll() {
+    if (allPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        plans.forEach((p) => next.delete(p.id))
+        return next
+      })
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        plans.forEach((p) => next.add(p.id))
+        return next
+      })
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   if (error) {
     return <ErrorMessage error={error} onRetry={() => void refetch()} endpoint={ENDPOINTS.adminServicePlans.path} />
   }
 
-  const hasFilters = !!(filterServiceId || filterProvider || filterActive || search)
+  const hasFilters = !!(filterServiceId || filterServiceType || filterOperator || filterCategory || filterProvider || filterActive || search)
 
   const columns = [
+    {
+      key: 'select',
+      header: '',
+      render: (p: ServicePlan) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(p.id)}
+          onChange={() => toggleSelectOne(p.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="h-3.5 w-3.5 accent-accent cursor-pointer"
+          aria-label={`Select ${p.name}`}
+        />
+      ),
+    },
     {
       key: 'name',
       header: 'Plan',
@@ -419,6 +643,20 @@ export function ServicePlansPage() {
         <div>
           <div className="text-sm text-ink">{p.service_name}</div>
           <div className="text-xs text-ink-faint">{p.service_type.replace('_', ' ')}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'operator',
+      header: 'Operator / Cat',
+      render: (p: ServicePlan) => (
+        <div className="space-y-0.5">
+          {p.network_operator
+            ? <Badge variant="neutral" className="uppercase text-[10px]">{p.network_operator}</Badge>
+            : <span className="text-xs text-ink-faint">—</span>}
+          {p.plan_category && (
+            <div className="text-[10px] text-ink-faint capitalize">{p.plan_category}</div>
+          )}
         </div>
       ),
     },
@@ -500,6 +738,8 @@ export function ServicePlansPage() {
     },
   ]
 
+  const selCount = selectedIds.size
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -516,50 +756,115 @@ export function ServicePlansPage() {
       />
 
       <FilterBar>
-        <div className="flex-1 min-w-[200px] max-w-sm">
+        <div className="flex-1 min-w-[180px] max-w-xs">
           <Input
             placeholder="Search name or variation code…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); resetPage() }}
           />
         </div>
         <Select
+          value={filterServiceType}
+          onChange={(e) => { setFilterServiceType(e.target.value); resetPage() }}
+          options={serviceTypeOptions}
+          className="w-36"
+        />
+        <Select
           value={filterServiceId}
-          onChange={(e) => setFilterServiceId(e.target.value)}
+          onChange={(e) => { setFilterServiceId(e.target.value); resetPage() }}
           options={serviceOptions}
-          className="w-48"
+          className="w-44"
+        />
+        <Select
+          value={filterOperator}
+          onChange={(e) => { setFilterOperator(e.target.value); resetPage() }}
+          options={operatorOptions}
+          className="w-36"
+        />
+        <Select
+          value={filterCategory}
+          onChange={(e) => { setFilterCategory(e.target.value); resetPage() }}
+          options={categoryOptions}
+          className="w-36"
         />
         <Select
           value={filterProvider}
-          onChange={(e) => setFilterProvider(e.target.value)}
+          onChange={(e) => { setFilterProvider(e.target.value); resetPage() }}
           options={providerCodes}
-          className="w-40"
+          className="w-36"
         />
         <Select
           value={filterActive}
-          onChange={(e) => setFilterActive(e.target.value)}
+          onChange={(e) => { setFilterActive(e.target.value); resetPage() }}
           options={[
             { value: '', label: 'All statuses' },
             { value: 'true', label: 'Active only' },
             { value: 'false', label: 'Inactive only' },
           ]}
-          className="w-36"
+          className="w-32"
         />
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={() => {
-            setSearch(''); setFilterServiceId(''); setFilterProvider(''); setFilterActive('')
+            setSearch(''); setFilterServiceId(''); setFilterServiceType('')
+            setFilterOperator(''); setFilterCategory(''); setFilterProvider('')
+            setFilterActive(''); resetPage()
           }}>
             Clear
           </Button>
         )}
       </FilterBar>
 
+      {/* Bulk actions bar */}
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-2 px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={allPageSelected}
+            onChange={toggleSelectAll}
+            className="h-3.5 w-3.5 accent-accent cursor-pointer"
+            aria-label="Select all on this page"
+          />
+          <span className="text-xs text-ink-muted">
+            {selCount > 0 ? `${selCount} selected` : 'Select page'}
+          </span>
+        </div>
+        {selCount > 0 && (
+          <div className="flex gap-2 ml-auto">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<BulkIcon className="h-3.5 w-3.5 text-emerald-400" />}
+              onClick={() => setBulkTarget(true)}
+              disabled={bulkMutation.isPending}
+            >
+              Enable
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ToggleLeft className="h-3.5 w-3.5 text-ink-faint" />}
+              onClick={() => setBulkTarget(false)}
+              disabled={bulkMutation.isPending}
+            >
+              Disable
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Plans', value: data.length },
-          { label: 'Active', value: data.filter((p) => p.is_active).length },
-          { label: 'With Pricing', value: data.filter((p) => p.cost_price && p.selling_price).length },
-          { label: 'Plan Routing', value: data.filter((p) => p.primary_provider_code).length },
+          { label: 'Total Plans', value: total },
+          { label: 'This Page', value: plans.length },
+          { label: 'With Pricing', value: plans.filter((p) => p.cost_price && p.selling_price).length },
+          { label: 'Plan Routing', value: plans.filter((p) => p.primary_provider_code).length },
         ].map(({ label, value }) => (
           <Card key={label} className="p-3 flex flex-col gap-0.5">
             <span className="text-[11px] text-ink-faint uppercase tracking-wide">{label}</span>
@@ -574,12 +879,21 @@ export function ServicePlansPage() {
         ) : (
           <DataTable
             columns={columns}
-            data={data}
+            data={plans}
             rowKey={(p) => p.id}
             emptyMessage={hasFilters ? 'No plans match the current filters.' : 'No plans found.'}
           />
         )}
       </Card>
+
+      {total > PAGE_SIZE && (
+        <Pagination
+          page={page}
+          limit={PAGE_SIZE}
+          total={total}
+          onPage={(p) => { setPage(p); setSelectedIds(new Set()) }}
+        />
+      )}
 
       <PlanFormModal
         open={createOpen}
@@ -595,6 +909,14 @@ export function ServicePlansPage() {
         providers={providers}
         initial={editItem}
         onSaved={handleSaved}
+      />
+      <BulkToggleModal
+        open={bulkTarget !== null}
+        onClose={() => setBulkTarget(null)}
+        selectedIds={Array.from(selectedIds)}
+        targetActive={bulkTarget ?? true}
+        onConfirm={() => bulkMutation.mutate({ ids: Array.from(selectedIds), is_active: bulkTarget ?? true })}
+        isPending={bulkMutation.isPending}
       />
     </div>
   )

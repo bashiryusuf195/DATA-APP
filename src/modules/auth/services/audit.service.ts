@@ -11,7 +11,9 @@ export type AuditAction =
   | "token_refresh" | "session_revoked"
   | "role_assign" | "role_revoke"   | "create"
   | "read"        | "update"        | "delete"
-  | "approve"     | "reject"        | "export";
+  | "approve"     | "reject"        | "export"
+  | "2fa_enabled" | "2fa_disabled"
+  | "2fa_challenge" | "2fa_login_success" | "2fa_login_failure";
 
 export interface WriteAuditOpts {
   actorId?:      string | null;

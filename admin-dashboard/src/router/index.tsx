@@ -29,6 +29,7 @@ import { JournalBatchesPage }   from '@/pages/JournalBatches'
 import { AuditLogsPage }        from '@/pages/AuditLogs'
 import { RolesPage }            from '@/pages/Roles'
 import { SettingsPage }         from '@/pages/Settings'
+import { ProviderWalletsPage }  from '@/pages/ProviderWallets'
 import { ServicesPage }         from '@/pages/Services'
 import { ServicePlansPage }     from '@/pages/ServicePlans'
 import { PricingPage }          from '@/pages/Pricing'
@@ -46,10 +47,14 @@ import { RiskFlagsPage }            from '@/pages/RiskFlags'
 import { ComplianceReportsPage }    from '@/pages/ComplianceReports'
 import { BlacklistPage }            from '@/pages/Blacklist'
 import { FrozenAccountsPage }       from '@/pages/FrozenAccounts'
-import { ManualWalletOpsPage }      from '@/pages/ManualWalletOps'
+import { ManualWalletOpsPage }        from '@/pages/ManualWalletOps'
+import { ServiceAvailabilityPage }    from '@/pages/ServiceAvailability'
+import { PaymentGatewaysPage }        from '@/pages/PaymentGateways'
+import { ApiIntegrationsPage }        from '@/pages/ApiIntegrations'
+import { ReferralProgramPage }        from '@/pages/ReferralProgram'
 
 import {
-  Globe, Landmark,
+  Landmark,
   UserCheck, Lock, Gauge, Cpu,
 } from 'lucide-react'
 
@@ -91,24 +96,10 @@ export const router = createBrowserRouter([
       { path: '/services',       element: <ServicesPage /> },
       { path: '/service-plans',  element: <ServicePlansPage /> },
       { path: '/pricing',        element: <PricingPage /> },
-      {
-        path: '/service-availability',
-        element: (
-          <PlaceholderPage
-            title="Service Availability"
-            subtitle="Monitor and control service uptime per region"
-            icon={<Globe className="h-10 w-10" />}
-            features={[
-              'Real-time availability dashboard',
-              'Maintenance window scheduling',
-              'Regional availability toggles',
-              'Availability history and SLA reports',
-            ]}
-          />
-        ),
-      },
+      { path: '/service-availability', element: <ServiceAvailabilityPage /> },
 
       // ── Payments ───────────────────────────────────────────────────────────
+      { path: '/payment-gateways', element: <PaymentGatewaysPage /> },
       { path: '/paystack', element: <PaystackTransactionsPage /> },
       { path: '/webhooks', element: <WebhookEventsPage /> },
       {
@@ -129,9 +120,11 @@ export const router = createBrowserRouter([
       },
 
       // ── Providers ──────────────────────────────────────────────────────────
-      { path: '/providers',      element: <ProvidersPage /> },
-      { path: '/routing-rules',  element: <RoutingRulesPage /> },
-      { path: '/health-metrics', element: <HealthMetricsPage /> },
+      { path: '/api-integrations', element: <ApiIntegrationsPage /> },
+      { path: '/providers',        element: <ProvidersPage /> },
+      { path: '/routing-rules',    element: <RoutingRulesPage /> },
+      { path: '/health-metrics',   element: <HealthMetricsPage /> },
+      { path: '/provider-wallets', element: <ProviderWalletsPage /> },
 
       // ── Transactions ───────────────────────────────────────────────────────
       { path: '/transactions', element: <TransactionsPage /> },
@@ -236,6 +229,9 @@ export const router = createBrowserRouter([
       { path: '/notification-templates', element: <Navigate to="/communication/templates"     replace /> },
       { path: '/notification-queue',     element: <Navigate to="/communication/queue"         replace /> },
       { path: '/broadcast',              element: <Navigate to="/communication/broadcasts"    replace /> },
+
+      // ── Growth ─────────────────────────────────────────────────────────────
+      { path: '/referral-program', element: <ReferralProgramPage /> },
 
       // ── System ─────────────────────────────────────────────────────────────
       { path: '/wallets',              element: <WalletPage /> },

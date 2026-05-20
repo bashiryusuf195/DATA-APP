@@ -12,19 +12,21 @@ export interface ProviderConfigRow {
   priority:           number;
   supported_services: ProviderServiceType[];
   health_status:      string;
+  notes:              string | null;
   metadata:           Record<string, unknown>;
   created_at:         Date;
   updated_at:         Date;
 }
 
 export interface CreateProviderConfigInput {
-  provider_code:      string;
-  name:               string;
-  is_active?:         boolean;
-  priority?:          number;
+  provider_code:       string;
+  name:                string;
+  is_active?:          boolean;
+  priority?:           number;
   supported_services?: ProviderServiceType[];
-  health_status?:     string;
-  metadata?:          Record<string, unknown>;
+  health_status?:      string;
+  notes?:              string | null;
+  metadata?:           Record<string, unknown>;
 }
 
 export type UpdateProviderConfigInput = Partial<Omit<CreateProviderConfigInput, "provider_code">>;
@@ -44,6 +46,7 @@ export async function createProviderConfig(
       priority:           input.priority           ?? 100,
       supported_services: JSON.stringify(input.supported_services ?? []),
       health_status:      input.health_status      ?? "unknown",
+      notes:              input.notes              ?? null,
       metadata:           JSON.stringify(input.metadata ?? {}),
       created_at:         now,
       updated_at:         now,
@@ -65,6 +68,7 @@ export async function updateProviderConfig(
   if (input.priority           !== undefined) patch.priority           = input.priority;
   if (input.supported_services !== undefined) patch.supported_services = JSON.stringify(input.supported_services);
   if (input.health_status      !== undefined) patch.health_status      = input.health_status;
+  if (input.notes              !== undefined) patch.notes              = input.notes;
   if (input.metadata           !== undefined) patch.metadata           = JSON.stringify(input.metadata);
 
   const [row] = await db("provider_configs")

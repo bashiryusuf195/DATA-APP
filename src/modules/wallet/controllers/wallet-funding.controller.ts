@@ -15,6 +15,11 @@ import {
 import { createNotification } from "../../notifications/services/notification.service";
 import { generateFundingReference } from "../../../lib/reference";
 import { WalletService } from "../../../services/wallet/WalletService";
+import {
+  getDefaultActiveGateway,
+  calculateCharge,
+} from "../../payment-gateways/services/payment-gateway.service";
+import { processReferralReward } from "../../referral/services/referral-reward.service";
 
 const db            = getDbInstance();
 const walletService = new WalletService(db);
@@ -34,16 +39,36 @@ export async function initializeFundingController(
   next: NextFunction
 ): Promise<void> {
   try {
-    if (!paystackGateway.isConfigured()) {
+    const userId = req.user!.id;
+    const input  = InitializeFundingSchema.parse(req.body);
+
+    // ── Resolve default active payment gateway ────────────────────────────────
+    const activeGateway = await getDefaultActiveGateway();
+    if (!activeGateway) {
       res.status(503).json({
         success: false,
-        error:   "Payment gateway is not configured. Contact support.",
+        error:   "No active payment gateway configured. Contact support.",
       });
       return;
     }
 
-    const userId = req.user!.id;
-    const input  = InitializeFundingSchema.parse(req.body);
+    // Only Paystack is currently supported — unsupported gateways return 501
+    if (activeGateway.code !== "paystack") {
+      res.status(501).json({
+        success: false,
+        error:   `Payment gateway '${activeGateway.name}' is configured but not yet implemented.`,
+        gateway: { code: activeGateway.code, name: activeGateway.name },
+      });
+      return;
+    }
+
+    if (!paystackGateway.isConfigured()) {
+      res.status(503).json({
+        success: false,
+        error:   "Paystack is not configured. Contact support.",
+      });
+      return;
+    }
 
     // Load user email for Paystack initialization
     const user = await db("users").where({ id: userId }).select("id", "email").first();
@@ -52,16 +77,24 @@ export async function initializeFundingController(
       return;
     }
 
-    const reference = generateFundingReference();
+    // ── Calculate top-up charge ───────────────────────────────────────────────
+    const charge = calculateCharge(input.amount, activeGateway.charge_type, activeGateway.charge_value);
+
+    const reference  = generateFundingReference();
     const amountKobo = Math.round(input.amount * 100);
 
     // Create pending funding transaction first — this is our source of truth
     const fundingTx = await createFundingTransaction({
-      user_id:   userId,
+      user_id:         userId,
       reference,
-      amount:    input.amount,
-      currency:  "NGN",
-      metadata:  { initiated_by: userId },
+      payment_gateway: activeGateway.code,
+      amount:          input.amount,
+      currency:        "NGN",
+      charge_type:     charge.charge_type,
+      charge_value:    charge.charge_value,
+      charge_amount:   charge.charge_amount,
+      credited_amount: charge.credited_amount,
+      metadata:        { initiated_by: userId, gateway_id: activeGateway.id },
     });
 
     // Initialize with Paystack — passes our reference so we can match on webhook
@@ -72,16 +105,26 @@ export async function initializeFundingController(
       metadata:    { funding_transaction_id: fundingTx.id, user_id: userId },
     });
 
-    logger.info("wallet_fund_initialized", { reference, user_id: userId });
+    logger.info("wallet_fund_initialized", {
+      reference,
+      user_id:         userId,
+      gateway:         activeGateway.code,
+      amount:          input.amount,
+      charge_amount:   charge.charge_amount,
+      credited_amount: charge.credited_amount,
+    });
 
     res.status(200).json({
       success: true,
       data: {
         reference,
-        authorization_url: paymentResult.authorization_url,
-        access_code:       paymentResult.access_code,
-        amount:            input.amount,
-        currency:          "NGN",
+        authorization_url:  paymentResult.authorization_url,
+        access_code:        paymentResult.access_code,
+        amount:             input.amount,
+        charge_amount:      charge.charge_amount,
+        credited_amount:    charge.credited_amount,
+        currency:           "NGN",
+        gateway:            activeGateway.code,
       },
     });
   } catch (err) {
@@ -181,7 +224,10 @@ export async function verifyFundingController(
       throw new Error(`Wallet not found for user ${fundingTx.user_id}`);
     }
 
-    const amountNgn = verifyResult.amount_kobo / 100;
+    const paidAmountNgn = verifyResult.amount_kobo / 100;
+    // Use credited_amount from the funding record (accounts for any charge).
+    // Fall back to paidAmountNgn for legacy rows created before the charge migration.
+    const amountNgn = fundingTx.credited_amount ?? paidAmountNgn;
 
     // Idempotent: WalletService deduplicates on idempotency_key
     const walletResult = await walletService.credit({
@@ -243,6 +289,14 @@ export async function verifyFundingController(
       },
     });
 
+    // ── First-funding referral reward (fire-and-forget) ───────────────────────
+    processReferralReward("first_funding", fundingTx.user_id, amountNgn).catch((err) =>
+      logger.warn("referral_first_funding_failed", {
+        user_id: fundingTx.user_id,
+        error:   (err as Error).message,
+      })
+    );
+
     // ── Notify user ───────────────────────────────────────────────────────────
     try {
       await createNotification({
@@ -253,8 +307,10 @@ export async function verifyFundingController(
         message: `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? "Paystack"}.`,
         metadata: {
           reference,
-          amount_ngn:      amountNgn,
-          payment_channel: verifyResult.channel,
+          paid_amount_ngn:  paidAmountNgn,
+          amount_ngn:       amountNgn,
+          charge_amount:    fundingTx.charge_amount ?? 0,
+          payment_channel:  verifyResult.channel,
         },
       });
     } catch (notifErr) {

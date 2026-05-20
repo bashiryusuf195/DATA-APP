@@ -29,3 +29,7 @@ export function generateTransferReference(): string {
 export function generateFundingReference(): string {
   return generateTransactionReference("FND");
 }
+
+export function generateReferralCode(): string {
+  return randomCode(8);
+}

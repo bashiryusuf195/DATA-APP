@@ -15,6 +15,7 @@ import {
   isCircuitOpen,
 } from "./provider-health-metrics.service";
 import { classifyError } from "./error-classifier.service";
+import { processReferralReward } from "../../referral/services/referral-reward.service";
 import type { VTUProvider } from "./provider.interface";
 import type { ProviderPurchaseInput, ProviderPurchaseResult, ProviderServiceType } from "../types/provider.types";
 
@@ -397,6 +398,15 @@ class ProviderExecutionEngine {
         execution:         executionMeta,
       },
     });
+
+    // First-purchase referral reward (fire-and-forget)
+    processReferralReward(
+      "first_purchase",
+      params.transaction.user_id,
+      Number(params.transaction.amount)
+    ).catch((err) =>
+      console.error("[ENGINE] Referral reward failed (non-fatal):", (err as Error).message)
+    );
 
     await createNotification({
       user_id: params.transaction.user_id,

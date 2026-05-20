@@ -97,7 +97,7 @@ const columns: Column<AdminUser>[] = [
     align: 'right',
     render: (u) => (
       <span className="font-mono text-sm text-ink">
-        {u.wallet ? fmtCurrency(u.wallet.balance, u.wallet.currency) : '—'}
+        {fmtCurrency(u.wallet?.balance, u.wallet?.currency ?? 'NGN')}
       </span>
     ),
   },

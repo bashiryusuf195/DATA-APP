@@ -6,7 +6,8 @@
       "Bash(node -e ' *)",
       "Bash(npx tsc *)",
       "Bash(xargs grep -l \"provider\")",
-      "Bash(npx knex *)"
+      "Bash(npx knex *)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

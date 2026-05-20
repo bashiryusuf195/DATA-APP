@@ -216,6 +216,14 @@ export const webhookRateLimiter = makeRedisLimiter({
   keyGenerator: (req) => req.params.providerCode || getClientIp(req),
 });
 
+/** 2FA login verify: 10 attempts per 5 min per IP */
+export const twoFactorVerifyLimiter = makeRedisLimiter({
+  prefix:       "2fa_verify",
+  windowMs:     5 * 60 * 1000,
+  max:          10,
+  keyGenerator: getClientIp,
+});
+
 /** Wallet funding — initialize: 10 per 15 min per authenticated user */
 export const fundingRateLimiter = makeRedisLimiter({
   prefix:       "funding",

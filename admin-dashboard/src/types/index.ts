@@ -79,6 +79,153 @@ export interface UpdateProviderInput {
   supported_services?: string[]
 }
 
+// ── API Integrations (provider registry) ─────────────────────────────────────
+
+/** Shape returned by GET /admin/providers (list) — joined config + credential status */
+export interface ProviderRegistryRow {
+  id: string
+  provider_code: string
+  name: string
+  is_active: boolean
+  priority: number
+  supported_services: string[]
+  health_status: string
+  notes: string | null
+  config_metadata: Record<string, unknown>
+  has_credentials: boolean
+  // Credential presence flags (false when no credentials row exists)
+  has_api_key: boolean
+  has_secret_key: boolean
+  has_username: boolean
+  has_password: boolean
+  has_bearer_token: boolean
+  has_webhook_secret: boolean
+  has_custom_headers: boolean
+  // Credential meta (null when no credentials row)
+  base_url: string | null
+  is_live: boolean | null
+  auth_type: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Shape returned by GET /admin/providers/:code — includes safe credentials */
+export interface ProviderRegistryDetail extends ProviderRegistryRow {
+  credentials: SafeProviderCredentials | null
+}
+
+export interface SafeProviderCredentials {
+  id: string
+  provider_code: string
+  base_url: string | null
+  auth_type: string
+  is_live: boolean
+  has_api_key: boolean
+  has_secret_key: boolean
+  has_username: boolean
+  has_password: boolean
+  has_bearer_token: boolean
+  has_webhook_secret: boolean
+  has_custom_headers: boolean
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProviderInput {
+  provider_code: string
+  name: string
+  is_active?: boolean
+  priority?: number
+  supported_services?: string[]
+  notes?: string | null
+  metadata?: Record<string, unknown>
+}
+
+export interface UpdateProviderRegistryInput {
+  name?: string
+  is_active?: boolean
+  priority?: number
+  supported_services?: string[]
+  notes?: string | null
+  metadata?: Record<string, unknown>
+}
+
+export type ProviderAuthType =
+  | 'api_key'
+  | 'api_key_secret'
+  | 'bearer_token'
+  | 'username_password'
+  | 'custom_headers'
+  | 'none'
+  | 'advanced'
+
+export interface UpsertProviderCredentialsInput {
+  auth_type?: ProviderAuthType
+  base_url?: string | null
+  api_key?: string | null
+  secret_key?: string | null
+  username?: string | null
+  password?: string | null
+  bearer_token?: string | null
+  webhook_secret?: string | null
+  custom_headers?: string | null
+  is_live?: boolean
+  metadata?: Record<string, unknown>
+}
+
+// ── Provider Wallets ──────────────────────────────────────────────────────────
+
+export type BalanceCheckStatus = 'ok' | 'low' | 'unknown' | 'error'
+
+export interface ProviderWallet {
+  id: string | null
+  provider_code: string
+  name: string
+  is_active: boolean
+  supported_services: string[]
+  health_status: string
+  priority: number
+  base_url: string | null
+  is_live: boolean | null
+  funding_bank_name: string | null
+  funding_account_number: string | null
+  funding_account_name: string | null
+  wallet_balance: string | null
+  balance_currency: string
+  low_balance_threshold: string | null
+  last_balance_check_at: string | null
+  balance_check_status: BalanceCheckStatus
+  balance_check_message: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UpdateProviderWalletInput {
+  funding_bank_name?: string | null
+  funding_account_number?: string | null
+  funding_account_name?: string | null
+  low_balance_threshold?: number | null
+  notes?: string | null
+}
+
+export interface ManualBalanceUpdateInput {
+  balance: number
+  currency?: string
+  notes?: string | null
+}
+
+export interface BalanceCheckResult {
+  provider_code: string
+  supported: boolean
+  balance: number | null
+  currency: string
+  message: string
+  status: BalanceCheckStatus
+  checked_at: string
+}
+
 // ── Routing Rules ─────────────────────────────────────────────────────────────
 
 export interface RoutingRule {
@@ -426,6 +573,9 @@ export interface ServicePlan {
   is_variable_amount: boolean
   metadata: Record<string, unknown>
   is_active: boolean
+  network_operator: string | null
+  plan_category: string | null
+  duration_days: number | null
   created_at: string
   updated_at: string
   // provider routing overrides
@@ -464,6 +614,9 @@ export interface CreateServicePlanInput {
   is_variable_amount?: boolean
   metadata?: Record<string, unknown>
   is_active?: boolean
+  network_operator?: string | null
+  plan_category?: string | null
+  duration_days?: number | null
   primary_provider_code?: string | null
   fallback_provider_code?: string | null
   provider_variation_code?: string | null
@@ -481,10 +634,21 @@ export interface UpdateServicePlanInput {
   is_variable_amount?: boolean
   metadata?: Record<string, unknown>
   is_active?: boolean
+  network_operator?: string | null
+  plan_category?: string | null
+  duration_days?: number | null
   primary_provider_code?: string | null
   fallback_provider_code?: string | null
   provider_variation_code?: string | null
   provider_metadata?: Record<string, unknown>
+}
+
+export interface BulkTogglePlansInput {
+  service_id?: string
+  service_type?: ServiceType
+  network_operator?: string
+  plan_category?: string
+  is_active: boolean
 }
 
 // ── Support Tickets ───────────────────────────────────────────────────────────
@@ -1000,6 +1164,27 @@ export interface DashboardMetrics {
   generated_at: string
 }
 
+// ── Service Availability Group Controls ───────────────────────────────────────
+
+export interface GroupSummaryRow {
+  service_type: ServiceType
+  network_operator: string
+  plan_category: string | null   // null = network-level control
+  plan_count: number
+  active_plan_count: number
+  is_active: boolean             // state from control record; defaults to true if no record
+  reason: string | null
+  control_id: string | null
+}
+
+export interface SetGroupControlInput {
+  service_type: ServiceType
+  network_operator: string
+  plan_category?: string | null
+  is_active: boolean
+  reason?: string | null
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface PaginationParams {
@@ -1012,4 +1197,126 @@ export interface PaginatedResponse<T> {
   total: number
   page: number
   limit: number
+}
+
+// ── Payment Gateways ──────────────────────────────────────────────────────────
+
+export type ChargeType = 'flat' | 'percentage' | 'none'
+
+export interface PaymentGateway {
+  id: string
+  code: string
+  name: string
+  is_active: boolean
+  is_default: boolean
+  is_live: boolean
+  is_supported: boolean
+  base_url: string | null
+  public_key: string | null
+  // Secrets never returned; replaced by boolean flags
+  has_secret_key: boolean
+  has_webhook_secret: boolean
+  charge_type: ChargeType
+  charge_value: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreatePaymentGatewayInput {
+  code: string
+  name: string
+  is_active?: boolean
+  is_live?: boolean
+  base_url?: string | null
+  public_key?: string | null
+  secret_key?: string | null
+  webhook_secret?: string | null
+  charge_type?: ChargeType
+  charge_value?: number
+  notes?: string | null
+}
+
+export interface UpdatePaymentGatewayInput {
+  name?: string
+  is_active?: boolean
+  is_live?: boolean
+  base_url?: string | null
+  public_key?: string | null
+  secret_key?: string | null
+  webhook_secret?: string | null
+  charge_type?: ChargeType
+  charge_value?: number
+  notes?: string | null
+}
+
+// ── Category Provider Mapping ─────────────────────────────────────────────────
+
+export interface CategoryProviderRow {
+  service_type: string
+  network_operator: string | null
+  plan_category: string | null
+  plan_count: number
+  primary_provider_code: string | null
+  fallback_provider_code: string | null
+}
+
+export interface BulkAssignProviderInput {
+  service_type: string
+  network_operator?: string | null
+  plan_category?: string | null
+  primary_provider_code: string
+  fallback_provider_code?: string | null
+}
+
+// ── Referral Program ──────────────────────────────────────────────────────────
+
+export interface ReferralSettings {
+  id: string
+  is_enabled: boolean
+  reward_trigger: 'signup' | 'first_funding' | 'first_purchase'
+  reward_type: 'fixed' | 'percentage'
+  reward_value: number
+  min_amount: number | null
+  max_reward_cap: number | null
+  reward_recipient: 'referrer' | 'both'
+  referred_reward_value: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ReferralReward {
+  id: string
+  referrer_id: string
+  referred_id: string
+  trigger_type: string
+  reward_type: string
+  referrer_amount: number
+  referred_amount: number
+  status: string
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  referrer_email?: string
+  referred_email?: string
+}
+
+export interface ReferralSummary {
+  total_referrals: number
+  total_rewards_paid: number
+  pending_rewards: number
+  active_referrers: number
+}
+
+export interface UserReferralInfo {
+  referral_code: string | null
+  referral_link: string | null
+  total_referrals: number
+  rewards_earned: number
+  referred_users: Array<{
+    id: string
+    email: string
+    created_at: string
+    reward_status: string | null
+  }>
 }

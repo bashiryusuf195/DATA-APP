@@ -4,7 +4,8 @@ export type ProviderServiceType =
   | "electricity"
   | "cable_tv"
   | "exam_pin"
-  | "identity_verification";
+  | "identity_verification"
+  | "wallet_funding";
 
 export interface ProviderPurchaseInput {
   service_type: ProviderServiceType;

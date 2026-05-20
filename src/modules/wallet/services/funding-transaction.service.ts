@@ -11,13 +11,18 @@ export interface FundingTransaction {
   reference:          string;
   provider_reference: string | null;
   payment_gateway:    string;
-  amount:             number;   // NGN
+  amount:             number;   // NGN — what the customer paid
   currency:           string;
   status:             FundingStatus;
   payment_channel:    string | null;
   verified:           boolean;
   metadata:           Record<string, unknown>;
   paid_at:            Date | null;
+  // Charge fields (null on legacy rows pre-migration)
+  charge_type:        string | null;   // 'flat' | 'percentage' | 'none'
+  charge_value:       number | null;   // rate at time of transaction
+  charge_amount:      number | null;   // computed fee in NGN
+  credited_amount:    number | null;   // amount - charge_amount; what lands in wallet
   created_at:         Date;
   updated_at:         Date;
 }
@@ -28,6 +33,10 @@ export interface CreateFundingTransactionInput {
   payment_gateway?: string;
   amount:           number;
   currency?:        string;
+  charge_type?:     string;
+  charge_value?:    number;
+  charge_amount?:   number;
+  credited_amount?: number;
   metadata?:        Record<string, unknown>;
 }
 
@@ -57,6 +66,10 @@ export async function createFundingTransaction(
       status:          "pending",
       verified:        false,
       metadata:        JSON.stringify(input.metadata ?? {}),
+      charge_type:     input.charge_type   ?? "none",
+      charge_value:    input.charge_value  ?? 0,
+      charge_amount:   input.charge_amount ?? 0,
+      credited_amount: input.credited_amount ?? input.amount,
       created_at:      now,
       updated_at:      now,
     })
@@ -120,19 +133,24 @@ export async function listFundingTransactions(options: {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function coerce(row: Record<string, unknown>): FundingTransaction {
+  const amount = parseFloat(row.amount as string);
   return {
     id:                 row.id as string,
     user_id:            row.user_id as string,
     reference:          row.reference as string,
     provider_reference: (row.provider_reference as string | null) ?? null,
     payment_gateway:    row.payment_gateway as string,
-    amount:             parseFloat(row.amount as string),
+    amount,
     currency:           row.currency as string,
     status:             row.status as FundingStatus,
     payment_channel:    (row.payment_channel as string | null) ?? null,
     verified:           row.verified as boolean,
     metadata:           (row.metadata as Record<string, unknown>) ?? {},
     paid_at:            row.paid_at ? new Date(row.paid_at as string) : null,
+    charge_type:        (row.charge_type as string | null) ?? null,
+    charge_value:       row.charge_value != null ? parseFloat(row.charge_value as string) : null,
+    charge_amount:      row.charge_amount != null ? parseFloat(row.charge_amount as string) : null,
+    credited_amount:    row.credited_amount != null ? parseFloat(row.credited_amount as string) : null,
     created_at:         new Date(row.created_at as string),
     updated_at:         new Date(row.updated_at as string),
   };

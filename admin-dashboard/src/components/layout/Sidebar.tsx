@@ -8,56 +8,30 @@ import {
   GitBranch,
   ArrowLeftRight,
   CreditCard,
-  Activity,
   HeartPulse,
   Wallet,
   Bell,
-  AlertTriangle,
+  WalletCards,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  // Users
   Users,
-  Shield,
-  // Finance
-  BookOpen,
-  FileText,
   RotateCcw,
-  TrendingUp,
-  // Services
-  Package,
+  Scale,
   List,
-  Tag,
   Globe,
-  // Payments
   Plug,
   Landmark,
-  // Security
   ClipboardList,
-  UserCheck,
-  Lock,
-  Gauge,
-  // Operations
-  Scale,
-  BarChart2,
-  Webhook,
-  PackageX,
-  // Support
-  MessageSquare,
-  Flag,
-  Megaphone,
-  // System
   SlidersHorizontal,
   ArrowUpDown,
-  // Communication
-  FileText as FileTemplate,
-  Clock as ClockIcon,
   Radio,
-  // Compliance
   ShieldCheck,
-  FileBarChart2,
-  Ban,
-  Snowflake,
+  Gift,
+  MessageSquare,
+  Flag,
+  PackageX,
+  Webhook,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -83,134 +57,68 @@ const nav: NavSection[] = [
   },
   {
     key: 'users',
-    title: 'Users',
+    title: 'Users & Wallets',
     items: [
-      { to: '/users',  label: 'Users',             icon: <Users className="h-4 w-4" /> },
-      { to: '/roles',  label: 'Roles & Permissions', icon: <Shield className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'finance',
-    title: 'Finance',
-    items: [
-      { to: '/finance/reconciliation-reports', label: 'Reconciliation Reports', icon: <Scale className="h-4 w-4" /> },
-      { to: '/finance/reconciliation-issues',  label: 'Reconciliation Issues',  icon: <AlertTriangle className="h-4 w-4" /> },
-      { to: '/finance/revenue',                label: 'Revenue Analytics',      icon: <TrendingUp className="h-4 w-4" /> },
-      { to: '/finance/provider-balances',      label: 'Provider Balances',      icon: <BarChart2 className="h-4 w-4" /> },
-      { to: '/finance/profit-analysis',        label: 'Profit Analysis',        icon: <TrendingUp className="h-4 w-4" /> },
-      { to: '/finance/refunds-reversals',      label: 'Refunds & Reversals',    icon: <RotateCcw className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'ledger',
-    title: 'Ledger',
-    items: [
-      { to: '/ledger',          label: 'Ledger Explorer', icon: <BookOpen className="h-4 w-4" /> },
-      { to: '/journal-batches', label: 'Journal Batches', icon: <FileText className="h-4 w-4" /> },
-      { to: '/funding',         label: 'Funding',         icon: <CreditCard className="h-4 w-4" /> },
+      { to: '/users',              label: 'Users',            icon: <Users         className="h-4 w-4" /> },
+      { to: '/system/wallet-adjust', label: 'Manual Wallet Ops', icon: <ArrowUpDown className="h-4 w-4" /> },
+      { to: '/wallets',            label: 'Wallets',          icon: <Wallet        className="h-4 w-4" /> },
+      { to: '/transactions',       label: 'Transactions',     icon: <ArrowLeftRight className="h-4 w-4" /> },
+      { to: '/finance/refunds-reversals', label: 'Refunds',  icon: <RotateCcw     className="h-4 w-4" /> },
     ],
   },
   {
     key: 'services',
-    title: 'Services',
+    title: 'Services & Operations',
     items: [
-      { to: '/services',             label: 'Services',          icon: <Package className="h-4 w-4" /> },
-      { to: '/service-plans',        label: 'Service Plans',     icon: <List className="h-4 w-4" /> },
-      { to: '/pricing',              label: 'Pricing',           icon: <Tag className="h-4 w-4" /> },
-      { to: '/service-availability', label: 'Availability',      icon: <Globe className="h-4 w-4" /> },
+      { to: '/service-plans',        label: 'Service & Plans',  icon: <List       className="h-4 w-4" /> },
+      { to: '/service-availability', label: 'Availability',     icon: <Globe      className="h-4 w-4" /> },
+      { to: '/routing-rules',        label: 'API Routing',      icon: <GitBranch  className="h-4 w-4" /> },
+      { to: '/api-integrations',     label: 'API Integrations', icon: <Plug       className="h-4 w-4" /> },
+      { to: '/provider-wallets',     label: 'Provider Wallets', icon: <WalletCards className="h-4 w-4" /> },
+      { to: '/operations/provider-health', label: 'Provider Health', icon: <HeartPulse className="h-4 w-4" /> },
     ],
   },
   {
     key: 'payments',
     title: 'Payments',
     items: [
-      { to: '/paystack',         label: 'Paystack Txns',   icon: <CreditCard className="h-4 w-4" /> },
-      { to: '/webhooks',         label: 'Webhook Events',  icon: <Plug className="h-4 w-4" /> },
-      { to: '/virtual-accounts', label: 'Virtual Accounts', icon: <Landmark className="h-4 w-4" /> },
+      { to: '/payment-gateways',               label: 'Payment Gateways',     icon: <CreditCard className="h-4 w-4" /> },
+      { to: '/funding',                         label: 'Funding Transactions', icon: <Landmark   className="h-4 w-4" /> },
+      { to: '/finance/reconciliation-reports',  label: 'Reconciliation',       icon: <Scale      className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'providers',
-    title: 'Providers',
+    key: 'growth',
+    title: 'Growth & Communication',
     items: [
-      { to: '/providers',      label: 'Providers',       icon: <Zap className="h-4 w-4" /> },
-      { to: '/routing-rules',  label: 'Routing Rules',   icon: <GitBranch className="h-4 w-4" /> },
-      { to: '/health-metrics', label: 'Health Metrics',  icon: <HeartPulse className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'transactions',
-    title: 'Transactions',
-    items: [
-      { to: '/transactions', label: 'Transactions',     icon: <ArrowLeftRight className="h-4 w-4" /> },
-      { to: '/attempts',     label: 'Provider Attempts', icon: <Activity className="h-4 w-4" /> },
+      { to: '/referral-program',              label: 'Referral Program', icon: <Gift          className="h-4 w-4" /> },
+      { to: '/communication/notifications',   label: 'Notifications',    icon: <Bell          className="h-4 w-4" /> },
+      { to: '/communication/broadcasts',      label: 'Broadcast',        icon: <Radio         className="h-4 w-4" /> },
+      { to: '/support/tickets',               label: 'Support',          icon: <MessageSquare className="h-4 w-4" /> },
+      { to: '/support/disputes',              label: 'Disputes',         icon: <Flag          className="h-4 w-4" /> },
     ],
   },
   {
     key: 'security',
-    title: 'Security',
+    title: 'Security & Compliance',
     items: [
-      { to: '/audit-logs',     label: 'Audit Logs',      icon: <ClipboardList className="h-4 w-4" /> },
-      { to: '/admin-activity', label: 'Admin Activity',  icon: <UserCheck className="h-4 w-4" /> },
-      { to: '/sessions',       label: 'Sessions',        icon: <Lock className="h-4 w-4" /> },
-      { to: '/rate-limits',    label: 'Rate Limits',     icon: <Gauge className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'operations',
-    title: 'Operations',
-    items: [
-      { to: '/operations/paystack-transactions', label: 'Paystack Txns',      icon: <CreditCard  className="h-4 w-4" /> },
-      { to: '/operations/funding',               label: 'Funding Ops',        icon: <Landmark    className="h-4 w-4" /> },
-      { to: '/operations/webhooks',              label: 'Webhook Logs',       icon: <Webhook     className="h-4 w-4" /> },
-      { to: '/operations/webhook-diagnostics',   label: 'Webhook Diagnostics', icon: <Activity   className="h-4 w-4" /> },
-      { to: '/operations/provider-health',       label: 'Provider Health',    icon: <HeartPulse  className="h-4 w-4" /> },
-      { to: '/operations/failed-deliveries',     label: 'Failed Deliveries',  icon: <PackageX    className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'support',
-    title: 'Customer Support',
-    items: [
-      { to: '/support/tickets',    label: 'Support Tickets', icon: <MessageSquare className="h-4 w-4" /> },
-      { to: '/support/disputes',   label: 'Disputes',        icon: <Flag className="h-4 w-4" /> },
-      { to: '/support/complaints', label: 'Complaints',      icon: <Megaphone className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'communication',
-    title: 'Communication',
-    items: [
-      { to: '/communication/notifications', label: 'Notifications',    icon: <Bell         className="h-4 w-4" /> },
-      { to: '/communication/templates',     label: 'Templates',       icon: <FileTemplate className="h-4 w-4" /> },
-      { to: '/communication/queue',         label: 'Queue',           icon: <ClockIcon    className="h-4 w-4" /> },
-      { to: '/communication/broadcasts',    label: 'Broadcast Center', icon: <Radio       className="h-4 w-4" /> },
-    ],
-  },
-  {
-    key: 'compliance',
-    title: 'Compliance',
-    items: [
-      { to: '/compliance/kyc',             label: 'KYC Monitoring',     icon: <ShieldCheck    className="h-4 w-4" /> },
-      { to: '/compliance/risk-flags',      label: 'Risk Flags',         icon: <Flag           className="h-4 w-4" /> },
-      { to: '/compliance/reports',         label: 'Compliance Reports', icon: <FileBarChart2  className="h-4 w-4" /> },
-      { to: '/compliance/blacklist',       label: 'Blacklist',          icon: <Ban            className="h-4 w-4" /> },
-      { to: '/compliance/frozen-accounts', label: 'Frozen Accounts',    icon: <Snowflake      className="h-4 w-4" /> },
+      { to: '/compliance/kyc', label: 'KYC / Compliance', icon: <ShieldCheck   className="h-4 w-4" /> },
+      { to: '/audit-logs',     label: 'Audit Logs',       icon: <ClipboardList className="h-4 w-4" /> },
+      { to: '/settings',       label: 'Settings',         icon: <SlidersHorizontal className="h-4 w-4" /> },
     ],
   },
   {
     key: 'system',
     title: 'System',
     items: [
-      { to: '/wallets',              label: 'Wallet Monitor',   icon: <Wallet            className="h-4 w-4" /> },
-      { to: '/system/wallet-adjust', label: 'Credit / Debit',   icon: <ArrowUpDown       className="h-4 w-4" /> },
-      { to: '/settings',             label: 'Settings',         icon: <SlidersHorizontal className="h-4 w-4" /> },
+      { to: '/failed-jobs',          label: 'Failed Jobs',   icon: <PackageX className="h-4 w-4" /> },
+      { to: '/operations/webhooks',  label: 'Webhook Logs',  icon: <Webhook  className="h-4 w-4" /> },
     ],
   },
 ]
 
-// Sections closed by default to keep sidebar manageable on first load
-const DEFAULT_CLOSED = new Set(['services', 'payments', 'ledger'])
+// Keep infra group tucked away on first load
+const DEFAULT_CLOSED = new Set(['system'])
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUiStore()

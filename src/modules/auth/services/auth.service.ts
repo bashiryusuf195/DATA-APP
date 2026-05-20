@@ -25,7 +25,10 @@ import {
 } from "./session.service";
 import { resolveUserRbac, assignRole } from "./rbac.service";
 import { writeAuditLog }               from "./audit.service";
+import { createChallenge }             from "./challenge.service";
 import { AppError as AuthAppError }                    from "../../../shared/errors/AppError";
+import { generateReferralCode }        from "../../../lib/reference";
+import { processReferralReward }       from "../../referral/services/referral-reward.service";
 import { env }                         from "../../../shared/config/env";
 import type {
   AuthUser,
@@ -102,12 +105,24 @@ export async function register(
   const authId = await supabaseSignUp(input.email, input.password, input.phone);
 
   // 3. Create local users row
+  // Resolve referrer from provided referral_code (if any)
+  let referredById: string | null = null;
+  if (input.referral_code) {
+    const referrer = await db("users")
+      .where({ referral_code: input.referral_code })
+      .whereNull("deleted_at")
+      .first("id");
+    referredById = referrer?.id ?? null;
+  }
+
   const [user] = await db("users")
     .insert({
       auth_id:           authId,
       email:             input.email,
       phone:             input.phone ?? null,
       password_hash:     await bcrypt.hash(input.password, env.BCRYPT_ROUNDS),
+      referral_code:     generateReferralCode(),
+      referred_by_id:    referredById,
       status:            "active",
       kyc_level:         "none",
       is_email_verified: true,
@@ -167,6 +182,16 @@ export async function register(
     resourceId:   user.id as string,
   });
 
+  // 11. Signup referral reward (fire-and-forget — never blocks registration)
+  if (referredById) {
+    processReferralReward("signup", user.id as string).catch((err) =>
+      logger.warn("referral_signup_failed", {
+        user_id: user.id,
+        error:   (err as Error).message,
+      })
+    );
+  }
+
   return { user: coerceUser(user), tokens, sessionId, rbac };
 }
 
@@ -176,7 +201,10 @@ export async function login(
   db:    Knex,
   req:   Request,
   input: LoginInput
-): Promise<{ user: AuthUser; tokens: TokenPair; sessionId: string; rbac: RbacContext }> {
+): Promise<
+  | { requires_2fa: true;  challenge_id: string }
+  | { requires_2fa: false; user: AuthUser; tokens: TokenPair; sessionId: string; rbac: RbacContext }
+> {
   // 1. Load user
   const user = await db("users")
     .where({ email: input.email })
@@ -241,16 +269,44 @@ export async function login(
 
   const tokens = supabaseSessionToTokenPair(supabaseSession);
 
-  // 5. Clear brute-force counter
+  // 5. Clear brute-force on successful password verification
   await db("users").where({ id: user.id }).update({
     failed_login_attempts: 0,
     locked_until:          null,
-    last_login_at:         new Date(),
-    login_count:           db.raw("login_count + 1"),
   });
 
-  // 6. RBAC
+  // 5a. Resolve RBAC (needed both for 2FA check and for the normal login return)
   const rbac = await resolveUserRbac(db, user.id as string);
+
+  // 5b. 2FA enforcement — admin/super_admin users with TOTP enabled must complete
+  //     a second factor before a session is created.
+  const isAdminUser = rbac.roles.some((r) => r === "admin" || r === "super_admin");
+  if (isAdminUser && user.totp_enabled) {
+    const challengeId = await createChallenge(
+      user.id         as string,
+      user.email      as string,
+      supabaseSession.access_token,
+      supabaseSession.refresh_token,
+      // expires_at is a Unix timestamp (seconds); fall back to expires_in if absent.
+      supabaseSession.expires_at ??
+        Math.floor(Date.now() / 1000) + (supabaseSession.expires_in ?? 3600),
+    );
+
+    writeAuditLog(db, req, {
+      actorId:      user.id as string,
+      action:       "2fa_challenge",
+      outcome:      "success",
+      resourceType: "session",
+    });
+
+    return { requires_2fa: true as const, challenge_id: challengeId };
+  }
+
+  // Normal login — complete the session now (no 2FA required or non-admin user).
+  await db("users").where({ id: user.id }).update({
+    last_login_at: new Date(),
+    login_count:   db.raw("login_count + 1"),
+  });
 
   // 7. Device
   let deviceId: string | null = null;
@@ -284,7 +340,7 @@ export async function login(
     resourceId:   sessionId,
   });
 
-  return { user: coerceUser(user), tokens, sessionId, rbac };
+  return { requires_2fa: false as const, user: coerceUser(user), tokens, sessionId, rbac };
 }
 
 // ── Logout ─────────────────────────────────────────────────────

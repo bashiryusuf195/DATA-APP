@@ -1,5 +1,10 @@
 import { apiClient } from './client'
-import type { Provider, UpdateProviderInput } from '@/types'
+import type {
+  Provider, UpdateProviderInput,
+  ProviderRegistryRow, ProviderRegistryDetail,
+  CreateProviderInput, UpdateProviderRegistryInput,
+  UpsertProviderCredentialsInput, SafeProviderCredentials,
+} from '@/types'
 
 export const providersApi = {
   list: () =>
@@ -22,4 +27,36 @@ export const providersApi = {
 
   resetCircuit: (code: string) =>
     apiClient.post(`/admin/providers/${code}/reset-circuit`).then((r) => r.data),
+
+  // ── Registry methods (used by ApiIntegrations page) ────────────────────────
+
+  listRegistry: (): Promise<ProviderRegistryRow[]> =>
+    apiClient
+      .get<{ success: boolean; data: ProviderRegistryRow[] }>('/admin/providers')
+      .then((r) => (Array.isArray(r.data.data) ? r.data.data : [])),
+
+  getRegistry: (code: string): Promise<ProviderRegistryDetail> =>
+    apiClient
+      .get<{ success: boolean; data: ProviderRegistryDetail }>(`/admin/providers/${code}`)
+      .then((r) => r.data.data),
+
+  createRegistry: (body: CreateProviderInput): Promise<ProviderRegistryRow> =>
+    apiClient
+      .post<{ success: boolean; data: ProviderRegistryRow }>('/admin/providers', body)
+      .then((r) => r.data.data),
+
+  updateRegistry: (code: string, body: UpdateProviderRegistryInput): Promise<ProviderRegistryRow> =>
+    apiClient
+      .patch<{ success: boolean; data: ProviderRegistryRow }>(`/admin/providers/${code}`, body)
+      .then((r) => r.data.data),
+
+  upsertCredentials: (code: string, body: UpsertProviderCredentialsInput): Promise<SafeProviderCredentials> =>
+    apiClient
+      .patch<{ success: boolean; data: SafeProviderCredentials }>(`/admin/providers/${code}/credentials`, body)
+      .then((r) => r.data.data),
+
+  triggerHealthCheck: (code: string): Promise<{ provider_code: string; healthy: boolean; latency_ms: number; message: string }> =>
+    apiClient
+      .post<{ success: boolean; data: { provider_code: string; healthy: boolean; latency_ms: number; message: string } }>(`/admin/providers/${code}/health-check`)
+      .then((r) => r.data.data),
 }

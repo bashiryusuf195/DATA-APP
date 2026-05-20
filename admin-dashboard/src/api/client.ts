@@ -54,7 +54,10 @@ apiClient.interceptors.response.use(
       // If the 401 came from the login endpoint itself, it means wrong credentials —
       // do NOT redirect; let the error propagate to the form's error handler so the
       // user sees the message instead of silently reloading the login page.
-      const isLoginRequest = !!error.config?.url?.includes('/auth/login')
+      const isLoginRequest = (
+        !!error.config?.url?.includes('/auth/login') ||
+        !!error.config?.url?.includes('/auth/2fa/verify-login')
+      )
       useAuthStore.getState().clearAuth()
       delete apiClient.defaults.headers.common['Authorization']
       if (!isLoginRequest) {

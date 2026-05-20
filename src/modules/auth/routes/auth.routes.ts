@@ -20,6 +20,14 @@ import {
   getMeController,
   changePasswordController,
 } from "../controllers/auth.controller";
+import {
+  getSecurityStatusController,
+  setupTotpController,
+  verifyTotpSetupController,
+  disableTotpController,
+} from "../controllers/security.controller";
+import { verifyLoginTotpController } from "../controllers/login-2fa.controller";
+import { twoFactorVerifyLimiter } from "../../../middleware/rateLimiter.redis";
 
 const router = Router();
 
@@ -32,5 +40,14 @@ router.post("/refresh",         refreshLimiter,     refreshController);
 router.post("/logout",          authenticate, logoutController);
 router.get( "/me",              authenticate, getMeController);
 router.post("/change-password", authenticate, changePasswordLimiter, changePasswordController);
+
+// ── 2FA login verification (public — uses challenge token, no session) ────────
+router.post("/2fa/verify-login", twoFactorVerifyLimiter, verifyLoginTotpController);
+
+// ── Account security (2FA) ─────────────────────────────────────
+router.get(   "/security/status",       authenticate, getSecurityStatusController);
+router.post(  "/security/totp/setup",   authenticate, setupTotpController);
+router.post(  "/security/totp/verify",  authenticate, verifyTotpSetupController);
+router.delete("/security/totp",         authenticate, disableTotpController);
 
 export { router as authRouter };

@@ -174,10 +174,11 @@ export function PricingPage() {
     is_active: true,
   }
 
-  const { data: allPlans = [], isLoading, error, refetch } = useQuery({
+  const { data: result, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-service-plans-pricing', queryParams],
     queryFn: () => catalogApi.listServicePlans(queryParams),
   })
+  const allPlans = result?.plans ?? []
 
   const data = useMemo(() => {
     if (pricingFilter === 'priced') return allPlans.filter((p) => p.cost_price && p.selling_price)

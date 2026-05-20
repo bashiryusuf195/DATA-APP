@@ -18,6 +18,7 @@ const SERVICE_PREFIX: Record<ProviderServiceType, string> = {
   cable_tv: "CAB",
   exam_pin: "EXM",
   identity_verification: "IDV",
+  wallet_funding: "WLT",
 };
 
 const SERVICE_TRANSACTION_TYPE: Record<ProviderServiceType, TransactionType> = {
@@ -27,6 +28,7 @@ const SERVICE_TRANSACTION_TYPE: Record<ProviderServiceType, TransactionType> = {
   cable_tv: "cable_tv",
   exam_pin: "exam_pin",
   identity_verification: "identity_verification",
+  wallet_funding: "airtime", // wallet_funding is not a purchasable type; fallback to airtime as sentinel
 };
 
 export interface VtuPlanMeta {

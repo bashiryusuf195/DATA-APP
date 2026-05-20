@@ -5,6 +5,9 @@ import { AppError } from "../../../shared/errors/AppError";
 import {
   adminListServices,
   adminListServicePlans,
+  bulkToggleServicePlans,
+  getCategoryProviderSummary,
+  bulkAssignProvider,
   createCatalogService,
   updateCatalogService,
   createServicePlan,
@@ -59,6 +62,9 @@ const CreateServicePlanSchema = z.object({
   is_variable_amount: z.boolean().default(false),
   metadata: z.record(z.unknown()).default({}),
   is_active: z.boolean().default(true),
+  network_operator: z.string().max(100).nullable().optional(),
+  plan_category: z.string().max(100).nullable().optional(),
+  duration_days: z.number().int().positive().nullable().optional(),
   primary_provider_code: z.string().max(100).nullable().optional(),
   fallback_provider_code: z.string().max(100).nullable().optional(),
   provider_variation_code: z.string().max(100).nullable().optional(),
@@ -77,14 +83,25 @@ const UpdateServicePlanSchema = z
     is_variable_amount: z.boolean().optional(),
     metadata: z.record(z.unknown()).optional(),
     is_active: z.boolean().optional(),
+    network_operator: z.string().max(100).nullable().optional(),
+    plan_category: z.string().max(100).nullable().optional(),
+    duration_days: z.number().int().positive().nullable().optional(),
     primary_provider_code: z.string().max(100).nullable().optional(),
     fallback_provider_code: z.string().max(100).nullable().optional(),
     provider_variation_code: z.string().max(100).nullable().optional(),
-    provider_metadata: z.record(z.unknown()).optional(),  // keep optional on update — only set when explicitly sent
+    provider_metadata: z.record(z.unknown()).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "At least one field must be provided",
   });
+
+const BulkTogglePlansSchema = z.object({
+  service_id: z.string().uuid().optional(),
+  service_type: z.enum(SERVICE_TYPES).optional(),
+  network_operator: z.string().max(100).optional(),
+  plan_category: z.string().max(100).optional(),
+  is_active: z.boolean(),
+});
 
 // ── List controllers ──────────────────────────────────────────────────────────
 
@@ -112,15 +129,29 @@ export async function listServicePlansAdminController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const service_id = typeof req.query.service_id === "string" ? req.query.service_id : undefined;
-    const provider_code = typeof req.query.provider_code === "string" ? req.query.provider_code : undefined;
-    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const str = (key: string) => typeof req.query[key] === "string" ? req.query[key] as string : undefined;
+    const service_id       = str("service_id");
+    const service_type     = str("service_type");
+    const provider_code    = str("provider_code");
+    const network_operator = str("network_operator");
+    const plan_category    = str("plan_category");
+    const search           = str("search");
     const is_active =
       req.query.is_active === "true" ? true
       : req.query.is_active === "false" ? false
       : undefined;
-    const plans = await adminListServicePlans({ service_id, provider_code, search, is_active });
-    res.json({ success: true, data: plans });
+    const limit  = req.query.limit  ? parseInt(req.query.limit  as string, 10) : 50;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+    const { plans, total } = await adminListServicePlans({
+      service_id, service_type, provider_code, network_operator,
+      plan_category, search, is_active, limit, offset,
+    });
+    res.json({
+      success: true,
+      data: plans,
+      meta: { total, limit, offset },
+    });
   } catch (err) {
     next(err);
   }
@@ -185,6 +216,63 @@ export async function updateServicePlanController(
       throw new AppError(404, "PLAN_NOT_FOUND", "Service plan not found");
     }
     res.status(200).json({ success: true, data: plan });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getCategoryProvidersController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const rows = await getCategoryProviderSummary();
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+const BulkAssignProviderSchema = z.object({
+  service_type: z.enum(SERVICE_TYPES),
+  network_operator: z.string().max(100).nullable().optional(),
+  plan_category: z.string().max(100).nullable().optional(),
+  primary_provider_code: z.string().min(1).max(100),
+  fallback_provider_code: z.string().max(100).nullable().optional(),
+});
+
+export async function bulkAssignProviderController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const body = BulkAssignProviderSchema.parse(req.body);
+    const count = await bulkAssignProvider(
+      {
+        service_type: body.service_type,
+        network_operator: body.network_operator,
+        plan_category: body.plan_category,
+      },
+      body.primary_provider_code,
+      body.fallback_provider_code,
+    );
+    res.json({ success: true, data: { updated: count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkToggleServicePlansController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { is_active, ...filters } = BulkTogglePlansSchema.parse(req.body);
+    const count = await bulkToggleServicePlans(filters, is_active);
+    res.json({ success: true, data: { updated: count } });
   } catch (err) {
     next(err);
   }

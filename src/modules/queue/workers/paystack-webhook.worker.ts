@@ -86,7 +86,10 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
     throw new Error(`Wallet not found for user ${fundingTx.user_id}`);
   }
 
-  const amountNgn = verifyResult.amount_kobo / 100;
+  const paidAmountNgn = verifyResult.amount_kobo / 100;
+  // Use credited_amount from the funding record (accounts for any top-up charge).
+  // Fall back to paidAmountNgn for legacy rows created before the charge migration.
+  const amountNgn = fundingTx.credited_amount ?? paidAmountNgn;
 
   const walletResult = await walletService.credit({
     wallet_id:        userWallet.id,
@@ -102,7 +105,9 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
 
   logger.info("paystack_webhook_wallet_credited", {
     reference,
+    paid_amount_ngn:  paidAmountNgn,
     amount_ngn:       amountNgn,
+    charge_amount:    fundingTx.charge_amount ?? 0,
     journal_batch_id: walletResult.journal_batch_id,
     idempotent:       walletResult.idempotent,
   });
@@ -151,8 +156,10 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
       message: `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? "Paystack"}.`,
       metadata: {
         reference,
-        amount_ngn:      amountNgn,
-        payment_channel: verifyResult.channel,
+        paid_amount_ngn:  paidAmountNgn,
+        amount_ngn:       amountNgn,
+        charge_amount:    fundingTx.charge_amount ?? 0,
+        payment_channel:  verifyResult.channel,
       },
     });
   } catch (notifErr) {
