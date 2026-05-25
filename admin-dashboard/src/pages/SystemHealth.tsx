@@ -240,7 +240,7 @@ export function SystemHealthPage() {
               label="Queue Backlog"
               value={data.queues.total_waiting.toLocaleString()}
               icon={<List className="h-4 w-4" />}
-              variant={data.queues.total_waiting > 500 ? 'warning' : 'neutral'}
+              variant={data.queues.total_waiting > 500 ? 'warning' : 'default'}
             />
             <MetricCard
               label="Failed Jobs"

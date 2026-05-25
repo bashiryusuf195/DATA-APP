@@ -290,7 +290,7 @@ function IntegritySection() {
       </div>
 
       {runMutation.isError && (
-        <ErrorMessage message={(runMutation.error as Error).message} />
+        <ErrorMessage error={runMutation.error} />
       )}
 
       {latest && (
@@ -309,10 +309,10 @@ function IntegritySection() {
         </div>
       )}
 
-      {error && <ErrorMessage message={(error as Error).message} />}
+      {error && <ErrorMessage error={error} />}
 
       {isLoading ? (
-        <SkeletonTable rows={4} cols={7} />
+        <SkeletonTable rows={4} />
       ) : !reports?.length ? (
         <p className="text-sm text-gray-500 text-center py-6">No reports yet. Run your first check.</p>
       ) : (
@@ -346,7 +346,7 @@ export function BackupRestorePage() {
     <div className="space-y-6">
       <PageHeader
         title="Backup & Integrity"
-        description="Export platform data as CSV and run integrity checks on the ledger."
+        subtitle="Export platform data as CSV and run integrity checks on the ledger."
       />
       <ExportSection />
       <IntegritySection />

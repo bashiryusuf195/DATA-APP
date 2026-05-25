@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 
 // Bypass function: let browser-navigation requests (Accept: text/html) be
 // served by Vite as the SPA index page.  XHR/fetch API calls do not send
@@ -15,7 +14,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      // import.meta.url is ESM-standard; URL is ES2022 — no @types/node needed.
+      '@': new URL('./src', import.meta.url).pathname,
     },
   },
   server: {

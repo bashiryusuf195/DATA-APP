@@ -11,8 +11,8 @@ import { cn } from '@/utils/cn'
 import type { QueueStats, QueueJobItem, JobState } from '@/types'
 import {
   RefreshCw, RotateCcw, Trash2, Activity, AlertTriangle,
-  CheckCircle2, Clock, Layers, XCircle, ChevronDown,
-  ChevronUp, Eye, Pause, Play,
+  CheckCircle2, Clock, Layers, XCircle,
+  Eye, Pause, Play,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
