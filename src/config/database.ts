@@ -14,9 +14,14 @@
 
 import { createClient }    from '@supabase/supabase-js';
 import knex, { type Knex } from 'knex';
+import ws                   from 'ws';
 import { config }           from './index';
 
 // ── Supabase client ───────────────────────────────────────────────────────────
+// Node.js < 22 has no native WebSocket. Supabase Realtime requires one even
+// though this backend never subscribes to realtime channels. Providing the
+// "ws" package as the transport silences the startup warning and prevents the
+// crash on Railway (Node 20).
 export const supabase = createClient(
   config.supabase.url,
   config.supabase.serviceRoleKey,
@@ -24,6 +29,11 @@ export const supabase = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession:   false,
+    },
+    realtime: {
+      // ws constructor signature is incompatible with supabase's WebSocketLikeConstructor type.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transport: ws as any,
     },
   }
 );
