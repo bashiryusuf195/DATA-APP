@@ -1,48 +1,178 @@
 // src/routes/health.routes.ts
 //
-// Two endpoints used by load balancers and container orchestrators:
+// Health-check endpoints used by load balancers, container orchestrators,
+// and the admin monitoring dashboard.
 //
-//   GET /api/v1/health  — liveness check: "is the process alive?"
-//                         Returns 200 immediately. No DB or Redis calls.
-//                         Load balancers call this every few seconds.
-//
-//   GET /api/v1/ready   — readiness check: "is the app ready for traffic?"
-//                         Checks DB + Redis before returning 200.
-//                         Container orchestrators use this before sending traffic.
+//  GET /api/v1/health            — liveness:  "is the process alive?"
+//  GET /api/v1/health/ready      — readiness: "is the app ready for traffic?" (DB + Redis)
+//  GET /api/v1/health/database   — DB latency measurement (public, minimal details)
+//  GET /api/v1/health/queues     — BullMQ queue backlog summary  (admin-only)
+//  GET /api/v1/health/providers  — Provider circuit-breaker summary (admin-only)
 
 import { Router, Request, Response } from 'express';
-import { checkDatabaseHealth }        from '../config/database';
+import { checkDatabaseHealth, db }    from '../config/database';
 import { checkRedisHealth }           from '../config/redis';
 import { config }                     from '../config';
+import { authenticate }               from '../modules/auth/middleware/authenticate';
+import { requireRole }                from '../modules/auth/middleware/authorize';
+import { logger }                     from '../lib/logger';
+import { errorReporter }              from '../lib/error-reporter';
 
 export const healthRouter = Router();
 
+const adminGuard = [authenticate, requireRole('admin', 'super_admin')] as const;
+
+// Track server start time for uptime calculation
+const SERVER_START = Date.now();
+
 // ── Liveness ──────────────────────────────────────────────────────────────────
+// Fast — no external calls. Load balancers hit this every few seconds.
 healthRouter.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
-    status:    'ok',
-    service:   config.appName,
-    version:   config.appVersion,
-    env:       config.env,
-    timestamp: new Date().toISOString(),
+    status:          'ok',
+    service:         config.appName,
+    version:         config.appVersion,
+    env:             config.env,
+    uptime_seconds:  Math.floor((Date.now() - SERVER_START) / 1000),
+    timestamp:       new Date().toISOString(),
   });
 });
 
 // ── Readiness ─────────────────────────────────────────────────────────────────
+// Used by Kubernetes / Docker before routing traffic to this instance.
 healthRouter.get('/ready', async (_req: Request, res: Response) => {
   const [dbOk, redisOk] = await Promise.all([
     checkDatabaseHealth(),
     checkRedisHealth(),
   ]);
 
-  const allOk = dbOk && redisOk;
+  if (!dbOk)    errorReporter.alert.dbConnectionFailed('SELECT 1 failed during readiness check');
+  if (!redisOk) errorReporter.alert.redisConnectionFailed('PING failed during readiness check');
 
+  const allOk = dbOk && redisOk;
   res.status(allOk ? 200 : 503).json({
-    status: allOk ? 'ok' : 'degraded',
+    status:    allOk ? 'ok' : 'degraded',
     checks: {
       database: dbOk    ? 'ok' : 'unreachable',
       redis:    redisOk ? 'ok' : 'unreachable',
     },
     timestamp: new Date().toISOString(),
   });
+});
+
+// ── Database latency ──────────────────────────────────────────────────────────
+// Public endpoint — infrastructure tooling (Prometheus exporters, etc.)
+// Only returns status + latency, never internal details.
+healthRouter.get('/database', async (_req: Request, res: Response) => {
+  const start = Date.now();
+  let status: 'ok' | 'degraded' = 'ok';
+  let latency_ms: number | null = null;
+  let error: string | undefined;
+
+  try {
+    await db.raw('SELECT 1');
+    latency_ms = Date.now() - start;
+  } catch (err) {
+    status     = 'degraded';
+    latency_ms = Date.now() - start;
+    error      = (err as Error).message;
+    logger.error('health_check_db_failed', { error, latency_ms });
+    errorReporter.alert.dbConnectionFailed(error);
+  }
+
+  res.status(status === 'ok' ? 200 : 503).json({
+    status,
+    latency_ms,
+    ...(error && config.isDev ? { error } : {}),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Queue health ──────────────────────────────────────────────────────────────
+// Admin-only — reveals internal queue depths and failure counts.
+healthRouter.get('/queues', ...adminGuard, async (_req: Request, res: Response) => {
+  try {
+    const { getAllQueueStats } = await import('../modules/queue/services/queue-monitor.service');
+    const queues = await getAllQueueStats();
+
+    const totalWaiting = queues.reduce((s, q) => s + q.waiting, 0);
+    const totalFailed  = queues.reduce((s, q) => s + q.failed,  0);
+    const totalActive  = queues.reduce((s, q) => s + q.active,  0);
+
+    // Alert if any queue has a large backlog or failure spike
+    for (const q of queues) {
+      if (q.waiting > 500) {
+        errorReporter.alert.queueBacklogHigh(q.name, q.waiting);
+      }
+      if (q.failed > 50) {
+        errorReporter.alert.queueFailureSpiked(q.name, q.failed);
+      }
+    }
+
+    const hasIssue = totalFailed > 0 || queues.some((q) => q.waiting > 500);
+    res.status(200).json({
+      status: hasIssue ? 'degraded' : 'ok',
+      summary: {
+        total_waiting: totalWaiting,
+        total_active:  totalActive,
+        total_failed:  totalFailed,
+        queue_count:   queues.length,
+      },
+      queues: queues.map((q) => ({
+        name:    q.name,
+        waiting: q.waiting,
+        active:  q.active,
+        failed:  q.failed,
+        delayed: q.delayed,
+        paused:  q.paused,
+        oldest_waiting_age_ms: q.oldest_waiting_age_ms,
+      })),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error('health_check_queues_failed', { error: (err as Error).message });
+    res.status(503).json({ status: 'error', message: 'Queue stats unavailable', timestamp: new Date().toISOString() });
+  }
+});
+
+// ── Provider health ───────────────────────────────────────────────────────────
+// Admin-only — reveals provider circuit-breaker state.
+healthRouter.get('/providers', ...adminGuard, async (_req: Request, res: Response) => {
+  try {
+    const { getProviderHealthDashboard } = await import('../modules/providers/services/provider-health-dashboard.service');
+    const providers = await getProviderHealthDashboard({ window: '1h' });
+
+    const summary = {
+      healthy:  providers.filter((p) => p.computed_health === 'healthy').length,
+      degraded: providers.filter((p) => p.computed_health === 'degraded').length,
+      down:     providers.filter((p) => p.computed_health === 'down').length,
+    };
+
+    // Alert on auth failures (providers with repeated auth errors)
+    for (const p of providers) {
+      if (p.circuit_open && p.consecutive_failures >= 5) {
+        errorReporter.alert.providerTimeoutRepeated(p.provider_code, p.consecutive_failures);
+      }
+    }
+
+    const overallStatus = summary.down > 0 ? 'degraded' : summary.degraded > 0 ? 'degraded' : 'ok';
+    res.status(200).json({
+      status: overallStatus,
+      summary,
+      providers: providers.map((p) => ({
+        code:                 p.provider_code,
+        name:                 p.name,
+        computed_health:      p.computed_health,
+        circuit_open:         p.circuit_open,
+        consecutive_failures: p.consecutive_failures,
+        success_rate:         p.success_rate,
+        last_failure_at:      p.last_failure_at,
+        recent_failure_reason: p.recent_failure_reason,
+      })),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error('health_check_providers_failed', { error: (err as Error).message });
+    res.status(503).json({ status: 'error', message: 'Provider health unavailable', timestamp: new Date().toISOString() });
+  }
 });

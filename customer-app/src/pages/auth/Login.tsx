@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, Navigate } from 'react-router-dom'
 import { Mail, Lock, Smartphone, ArrowLeft } from 'lucide-react'
+import { ONBOARDING_KEY } from '@/pages/onboarding/Onboarding'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
 import { apiClient } from '@/api/client'
@@ -21,6 +22,19 @@ export function LoginPage() {
 
   const { setAuth, access_token, _hasHydrated } = useAuthStore()
   const navigate = useNavigate()
+
+  // Show a toast if the user was redirected here because their session expired.
+  useEffect(() => {
+    if (sessionStorage.getItem('session_expired') === '1') {
+      sessionStorage.removeItem('session_expired')
+      toast.error('Session expired. Please log in again.')
+    }
+    // First-time mobile visitors see onboarding before login
+    const isMobile = window.innerWidth < 768
+    if (isMobile && !localStorage.getItem(ONBOARDING_KEY)) {
+      navigate('/onboarding', { replace: true })
+    }
+  }, [navigate])
 
   if (!_hasHydrated) return null
   if (access_token) return <Navigate to="/dashboard" replace />

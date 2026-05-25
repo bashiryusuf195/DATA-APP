@@ -10,11 +10,29 @@ export const apiClient = axios.create({
 })
 
 // ── Request: attach JWT ───────────────────────────────────────────────────────
+// Always reads from the store at request time — correct even before
+// syncAuthHeader() has been called (Zustand persist hydrates asynchronously).
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().access_token
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  } else {
+    delete config.headers.Authorization
+  }
   return config
 })
+
+// ── 401 redirect guard ────────────────────────────────────────────────────────
+let _isRedirectingToLogin = false
+
+function redirectToLogin() {
+  if (_isRedirectingToLogin) return
+  _isRedirectingToLogin = true
+  useAuthStore.getState().clearAuth()
+  delete apiClient.defaults.headers.common['Authorization']
+  sessionStorage.setItem('session_expired', '1')
+  window.location.replace('/login')
+}
 
 // ── Response: 401 handling + error normalisation ──────────────────────────────
 apiClient.interceptors.response.use(
@@ -24,14 +42,25 @@ apiClient.interceptors.response.use(
 
     if (status === 401) {
       const url: string = error.config?.url ?? ''
-      const isAuthEndpoint = url.includes('/auth/login') ||
+      const isAuthEndpoint =
+        url.includes('/auth/login') ||
         url.includes('/auth/register') ||
         url.includes('/auth/refresh') ||
         url.includes('/auth/2fa/')
+
       if (!isAuthEndpoint) {
-        useAuthStore.getState().clearAuth()
-        window.location.href = '/login'
+        // Friendly message first — if any component briefly renders before
+        // navigation completes, it sees clean text instead of raw JSON.
+        error.message = 'Session expired. Please log in again.'
+        redirectToLogin()
+        // Never-resolving promise: page is navigating away, no component
+        // should ever render this error response.
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        return new Promise(() => {})
       }
+
+      // Auth endpoints: let the form handle the error normally.
+      error.message = error.response?.data?.message ?? 'Invalid credentials.'
       return Promise.reject(error)
     }
 
@@ -49,6 +78,9 @@ apiClient.interceptors.response.use(
       ;(error as { retryAfterSeconds?: number | null }).retryAfterSeconds = secs
     } else if (status != null && status >= 500) {
       error.message = `Server error (${status}). Please try again shortly.`
+    } else if (status != null && status >= 400) {
+      // Use the server's message when available — it's more specific than Axios's default.
+      error.message = error.response?.data?.message ?? error.message
     }
 
     return Promise.reject(error)
@@ -59,6 +91,7 @@ export function syncAuthHeader() {
   const token = useAuthStore.getState().access_token
   if (token) {
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    _isRedirectingToLogin = false
   } else {
     delete apiClient.defaults.headers.common['Authorization']
   }

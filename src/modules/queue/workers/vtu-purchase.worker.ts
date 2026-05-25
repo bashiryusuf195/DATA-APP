@@ -29,6 +29,15 @@ export const vtuPurchaseWorker = createWorker(
       throw new Error("Transaction not found");
     }
 
+    // Guard: never re-process a finalized transaction on a BullMQ retry.
+    if (transaction.status === "successful" || transaction.status === "failed") {
+      logger.info("vtu_job_skip_terminal", {
+        reference: data.reference,
+        status:    transaction.status,
+      });
+      return;
+    }
+
     await updateTransactionStatus(data.reference, { status: "processing" });
 
     // TEST-ONLY: simulate an unrecoverable infrastructure crash
@@ -41,6 +50,8 @@ export const vtuPurchaseWorker = createWorker(
     // that use a numeric plan ID instead of our internal variation_code).
     let planOverrides: PlanProviderOverrides | undefined;
     let planProviderVariationCode: string | null = null;
+    let planCategory: string | null = null;
+    let planNetworkOperator: string | null = null;
 
     if (data.variation_code) {
       const plan = await getPlanByVariationCode(data.service_type, data.variation_code).catch(() => null);
@@ -51,6 +62,27 @@ export const vtuPurchaseWorker = createWorker(
         };
       }
       planProviderVariationCode = (plan?.provider_variation_code as string | null) ?? null;
+      planCategory = (plan?.plan_category as string | null) ?? null;
+      planNetworkOperator = (plan?.network_operator as string | null) ?? null;
+
+      logger.info("vtu_worker_plan_resolved", {
+        reference:              data.reference,
+        service_type:           data.service_type,
+        variation_code:         data.variation_code,
+        plan_found:             !!plan,
+        plan_primary_override:  planOverrides?.primary_provider_code ?? null,
+        plan_fallback_override: planOverrides?.fallback_provider_code ?? null,
+        plan_variation_code:    planProviderVariationCode,
+        routing_mode:           planOverrides?.primary_provider_code
+          ? "plan_override"
+          : "routing_rule_or_priority",
+      });
+    } else {
+      logger.info("vtu_worker_no_variation_code", {
+        reference:    data.reference,
+        service_type: data.service_type,
+        routing_mode: "routing_rule_or_priority",
+      });
     }
 
     const result = await providerExecutionEngine.executeWithFailover({
@@ -64,6 +96,8 @@ export const vtuPurchaseWorker = createWorker(
         meter_number:            data.meter_number,
         variation_code:          data.variation_code,
         provider_variation_code: planProviderVariationCode,
+        plan_category:           planCategory,
+        network_operator:        planNetworkOperator,
         customer_name:           data.customer_name,
         reference:               data.reference,
       },

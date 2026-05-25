@@ -294,9 +294,21 @@ export async function checkProviderBalance(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
 
+    // Upsert — creates the row if it doesn't exist yet so the error status is
+    // always visible in the UI rather than silently dropped.
     await db("provider_wallet_info")
-      .where({ provider_code: providerCode })
-      .update({
+      .insert({
+        id:                     randomUUID(),
+        provider_code:          providerCode,
+        balance_check_status:   "error",
+        balance_check_message:  errorMessage,
+        last_balance_check_at:  checked_at,
+        balance_currency:       "NGN",
+        created_at:             checked_at,
+        updated_at:             checked_at,
+      })
+      .onConflict("provider_code")
+      .merge({
         balance_check_status:  "error",
         balance_check_message: errorMessage,
         last_balance_check_at: checked_at,

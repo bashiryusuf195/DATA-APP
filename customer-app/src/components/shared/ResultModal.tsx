@@ -1,8 +1,33 @@
 import { Modal, Button } from '@/components/ui'
-import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search, Copy, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
 import type { Transaction } from '@/types'
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard API unavailable
+    }
+  }, [text])
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-2 p-1 rounded hover:bg-black/10 transition-colors"
+      title="Copy"
+    >
+      {copied
+        ? <Check className="h-3.5 w-3.5 text-green-600" />
+        : <Copy className="h-3.5 w-3.5 text-ink-faint" />}
+    </button>
+  )
+}
 
 interface ResultModalProps {
   open: boolean
@@ -15,9 +40,10 @@ interface ResultModalProps {
 export function ResultModal({ open, transaction, isPolling = false, onClose, onRetry }: ResultModalProps) {
   const navigate = useNavigate()
 
-  const uiStatus = normalizeTransactionStatus(transaction?.status)
+  const uiStatus  = normalizeTransactionStatus(transaction?.status)
   const isSuccess = uiStatus === 'success'
   const isPending = uiStatus === 'pending'
+  const isReview  = uiStatus === 'review'
   // Polling timed out without a final status — user needs to check history
   const isTimedOut = isPending && !isPolling
 
@@ -27,6 +53,10 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
         {isSuccess ? (
           <div className="h-16 w-16 rounded-full bg-success-light flex items-center justify-center mb-4">
             <CheckCircle2 className="h-8 w-8 text-success" />
+          </div>
+        ) : isReview ? (
+          <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+            <Search className="h-8 w-8 text-blue-500" />
           </div>
         ) : isPending ? (
           <div className="h-16 w-16 rounded-full bg-amber-50 flex items-center justify-center mb-4">
@@ -45,11 +75,13 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
         <p className="text-lg font-bold text-ink mb-1">
           {isSuccess
             ? 'Transaction Successful'
-            : isPolling
-              ? 'Processing Transaction…'
-              : isPending
-                ? 'Still Processing'
-                : 'Transaction Failed'}
+            : isReview
+              ? 'Transaction Under Review'
+              : isPolling
+                ? 'Processing Transaction…'
+                : isPending
+                  ? 'Still Processing'
+                  : 'Transaction Failed'}
         </p>
 
         {transaction && (
@@ -64,11 +96,125 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
           </p>
         )}
 
-        {!isSuccess && !isPending && !!transaction?.metadata?.message && (
+        {!isSuccess && !isPending && !isReview && !!transaction?.metadata?.message && (
           <p className="text-xs text-danger-400 mb-4">
             {String(transaction.metadata.message)}
           </p>
         )}
+
+        {isSuccess && (() => {
+          const provResp = transaction?.metadata?.provider_response as Record<string, unknown> | undefined
+          const token = provResp?.token as string | undefined
+          const units = provResp?.units as string | number | undefined
+          if (token) {
+            return (
+              <div className="w-full mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-left">
+                <p className="text-xs font-medium text-amber-700 mb-1">Electricity Token</p>
+                <p className="text-sm font-mono font-bold text-amber-900 tracking-widest break-all">{token}</p>
+                {units != null && (
+                  <p className="text-xs text-amber-700 mt-1">{units} units</p>
+                )}
+              </div>
+            )
+          }
+          const cablePackage = (provResp?.package ?? provResp?.Package ?? provResp?.Bouquet ?? provResp?.bouquet) as string | undefined
+          const cableCustomer = (provResp?.Customer_Name ?? provResp?.customer_name) as string | undefined
+          const cableDue = (provResp?.Due_Date ?? provResp?.due_date) as string | undefined
+          if (cablePackage || cableCustomer) {
+            return (
+              <div className="w-full mb-4 rounded-xl bg-purple-50 border border-purple-200 px-4 py-3 text-left space-y-1">
+                {cableCustomer && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-purple-700 font-medium">Customer</span>
+                    <span className="text-purple-900">{cableCustomer}</span>
+                  </div>
+                )}
+                {cablePackage && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-purple-700 font-medium">Package</span>
+                    <span className="text-purple-900">{cablePackage}</span>
+                  </div>
+                )}
+                {cableDue && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-purple-700 font-medium">Due Date</span>
+                    <span className="text-purple-900">{cableDue}</span>
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // WAEC: carddetails with serial numbers distinguish it from JAMB
+          type CardEntry = { pin?: string; Pin?: string; serial?: string; Serial?: string }
+          const examCards = (provResp?.carddetails ?? provResp?.pins) as CardEntry[] | undefined
+          const hasSerial = examCards?.some(c => !!(c.Serial ?? c.serial))
+          if (examCards && examCards.length > 0 && hasSerial) {
+            return (
+              <div className="w-full mb-4 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-left space-y-3">
+                <p className="text-xs font-semibold text-blue-700">WAEC PIN{examCards.length > 1 ? 's' : ''}</p>
+                {examCards.map((card, i) => {
+                  const pin    = card.Pin    ?? card.pin    ?? ''
+                  const serial = card.Serial ?? card.serial ?? ''
+                  return (
+                    <div key={i} className="space-y-1">
+                      {pin && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-blue-600 font-medium uppercase tracking-wide">PIN</p>
+                            <p className="text-sm font-mono font-bold text-blue-900 tracking-widest">{pin}</p>
+                          </div>
+                          <CopyButton text={pin} />
+                        </div>
+                      )}
+                      {serial && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-blue-600 font-medium uppercase tracking-wide">Serial</p>
+                            <p className="text-xs font-mono text-blue-800">{serial}</p>
+                          </div>
+                          <CopyButton text={serial} />
+                        </div>
+                      )}
+                      {i < examCards.length - 1 && <hr className="border-blue-200" />}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          }
+
+          // JAMB: root pin (entries in carddetails have no serial numbers)
+          const jambPin         = (provResp?.pin ?? provResp?.Pin) as string | undefined
+          const jambProfileCode = (provResp?.profile_code ?? provResp?.ProfileCode) as string | undefined
+          if (jambPin || jambProfileCode) {
+            return (
+              <div className="w-full mb-4 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-left space-y-2">
+                <p className="text-xs font-semibold text-green-700">JAMB Details</p>
+                {jambPin && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-green-600 font-medium uppercase tracking-wide">PIN</p>
+                      <p className="text-sm font-mono font-bold text-green-900 tracking-widest">{jambPin}</p>
+                    </div>
+                    <CopyButton text={jambPin} />
+                  </div>
+                )}
+                {jambProfileCode && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-green-600 font-medium uppercase tracking-wide">Profile Code</p>
+                      <p className="text-xs font-mono text-green-800">{jambProfileCode}</p>
+                    </div>
+                    <CopyButton text={jambProfileCode} />
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          return null
+        })()}
 
         {isPolling && (
           <p className="text-xs text-ink-muted mb-4">
@@ -78,17 +224,23 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
 
         {isTimedOut && (
           <p className="text-xs text-ink-muted mb-4">
-            Your transaction is still being processed. Check Transaction History for the final status.
+            Your transaction is still being confirmed. Check Transaction History shortly.
+          </p>
+        )}
+
+        {isReview && (
+          <p className="text-xs text-ink-muted mb-4">
+            We couldn't confirm your transaction automatically. Our team is reviewing it and you'll be notified of the outcome.
           </p>
         )}
 
         <div className="flex gap-3 w-full">
-          {!isSuccess && !isPending && onRetry && (
+          {!isSuccess && !isPending && !isReview && onRetry && (
             <Button variant="outline" fullWidth onClick={onRetry} icon={<RefreshCw className="h-4 w-4" />}>
               Try Again
             </Button>
           )}
-          {isTimedOut && (
+          {(isTimedOut || isReview) && (
             <Button
               variant="outline"
               fullWidth

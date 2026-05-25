@@ -11,23 +11,24 @@ interface ServiceCardProps {
   disabled?: boolean
 }
 
-export function ServiceCard({ to, label, icon: Icon, color = 'text-brand-600', bgColor = 'bg-brand-50', disabled = false }: ServiceCardProps) {
+export function ServiceCard({ to, label, icon: Icon, color = 'text-teal-500', bgColor, disabled = false }: ServiceCardProps) {
   return (
     <Link
       to={disabled ? '#' : to}
       className={cn(
-        'flex flex-col items-center gap-2 p-3 rounded-2xl border border-border',
-        'bg-surface-1 transition-all duration-150',
-        disabled
-          ? 'opacity-50 cursor-not-allowed'
-          : 'hover:border-brand-200 hover:shadow-card active:scale-95'
+        'flex flex-col items-center gap-2.5 py-3',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95 transition-transform duration-100'
       )}
       onClick={(e) => disabled && e.preventDefault()}
     >
-      <div className={cn('h-11 w-11 rounded-xl flex items-center justify-center', bgColor)}>
-        <Icon className={cn('h-5 w-5', color)} />
+      {/* Circular icon */}
+      <div className={cn(
+        'h-14 w-14 rounded-full flex items-center justify-center border-2',
+        bgColor ?? 'bg-teal-50 border-teal-400/50'
+      )}>
+        <Icon className={cn('h-6 w-6', color)} />
       </div>
-      <span className="text-[11px] font-medium text-ink-muted text-center leading-tight">{label}</span>
+      <span className="text-[11px] font-semibold text-ink-muted text-center leading-tight">{label}</span>
     </Link>
   )
 }

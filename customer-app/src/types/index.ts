@@ -82,6 +82,13 @@ export interface FundingVerifyResponse {
   message?: string
 }
 
+export interface DedicatedAccount {
+  account_number: string
+  account_name:   string
+  bank_name:      string
+  bank_slug:      string
+}
+
 export interface LedgerEntry {
   id: string
   type: 'credit' | 'debit'
@@ -94,7 +101,7 @@ export interface LedgerEntry {
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 
-export type TransactionStatus = 'pending' | 'processing' | 'success' | 'failed' | 'refunded' | 'reversed'
+export type TransactionStatus = 'pending' | 'processing' | 'success' | 'failed' | 'refunded' | 'reversed' | 'requires_review'
 
 export type TransactionType =
   | 'airtime'
@@ -152,20 +159,46 @@ export interface DataPurchaseInput {
   plan?: PlanMeta
 }
 
-export interface ElectricityPurchaseInput {
-  meter_number: string
-  amount: number
+export interface ElectricityVerifyInput {
+  meter_number:   string
   variation_code: string
-  description: string
-  plan?: PlanMeta
+}
+
+export interface MeterVerifyResult {
+  success:       boolean
+  customer_name: string
+  address?:      string
+  meter_number:  string
+  message:       string
+}
+
+export interface ElectricityPurchaseInput {
+  meter_number:           string
+  amount:                 number
+  variation_code:         string
+  phone?:                 string
+  verified_customer_name?: string
+}
+
+export interface CableTvVerifyInput {
+  smartcard_number: string
+  biller_code:      string
+}
+
+export interface CableVerifyResult {
+  success:          boolean
+  customer_name?:   string
+  current_package?: string
+  due_date?:        string
+  smartcard_number?: string
+  message:          string
 }
 
 export interface CableTvPurchaseInput {
-  smartcard_number: string
-  amount: number
-  variation_code: string
-  description: string
-  plan?: PlanMeta
+  smartcard_number:       string
+  variation_code:         string
+  phone?:                 string
+  verified_customer_name?: string
 }
 
 export interface ExamPinPurchaseInput {

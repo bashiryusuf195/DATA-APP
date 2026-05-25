@@ -8,10 +8,13 @@ import {
   bulkToggleServicePlans,
   getCategoryProviderSummary,
   bulkAssignProvider,
+  bulkClearProviderOverride,
+  bulkSetProviderById,
   createCatalogService,
   updateCatalogService,
   createServicePlan,
   updateServicePlan,
+  bulkImportServicePlans,
 } from "../services/catalog.service";
 
 const SERVICE_TYPES = [
@@ -143,9 +146,14 @@ export async function listServicePlansAdminController(
     const limit  = req.query.limit  ? parseInt(req.query.limit  as string, 10) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
 
+    const has_provider_override =
+      req.query.has_provider_override === "true" ? true
+      : req.query.has_provider_override === "false" ? false
+      : undefined;
+
     const { plans, total } = await adminListServicePlans({
       service_id, service_type, provider_code, network_operator,
-      plan_category, search, is_active, limit, offset,
+      plan_category, search, is_active, has_provider_override, limit, offset,
     });
     res.json({
       success: true,
@@ -264,6 +272,44 @@ export async function bulkAssignProviderController(
   }
 }
 
+const BulkClearOverrideSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+});
+
+const BulkSetProviderByIdSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+  primary_provider_code:  z.string().min(1).max(100),
+  fallback_provider_code: z.string().max(100).nullable().optional(),
+});
+
+export async function bulkClearOverrideController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { ids } = BulkClearOverrideSchema.parse(req.body);
+    const count = await bulkClearProviderOverride(ids);
+    res.json({ success: true, data: { updated: count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkSetProviderByIdController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { ids, primary_provider_code, fallback_provider_code } = BulkSetProviderByIdSchema.parse(req.body);
+    const count = await bulkSetProviderById(ids, primary_provider_code, fallback_provider_code);
+    res.json({ success: true, data: { updated: count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function bulkToggleServicePlansController(
   req: Request,
   res: Response,
@@ -273,6 +319,49 @@ export async function bulkToggleServicePlansController(
     const { is_active, ...filters } = BulkTogglePlansSchema.parse(req.body);
     const count = await bulkToggleServicePlans(filters, is_active);
     res.json({ success: true, data: { updated: count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── POST /admin/service-plans/bulk-import ─────────────────────────────────────
+
+const BulkImportPlanItemSchema = z.object({
+  name:                    z.string().min(1).max(200),
+  variation_code:          z.string().min(1).max(100),
+  amount:                  z.number().min(0),
+  cost_price:              z.number().min(0).nullable().optional(),
+  selling_price:           z.number().min(0).nullable().optional(),
+  network_operator:        z.string().max(100).nullable().optional(),
+  plan_category:           z.string().max(100).nullable().optional(),
+  duration_days:           z.number().int().positive().nullable().optional(),
+  provider_variation_code: z.string().max(100).nullable().optional(),
+});
+
+const BulkImportSchema = z.object({
+  service_id:           z.string().uuid(),
+  provider_code:        z.string().min(1),
+  primary_provider_code: z.string().min(1),
+  plans:                z.array(BulkImportPlanItemSchema).min(1).max(500),
+});
+
+export async function bulkImportServicePlansController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { service_id, provider_code, primary_provider_code, plans } =
+      BulkImportSchema.parse(req.body);
+
+    const result = await bulkImportServicePlans(
+      service_id,
+      provider_code,
+      primary_provider_code,
+      plans,
+    );
+
+    res.status(200).json({ success: true, data: result });
   } catch (err) {
     next(err);
   }

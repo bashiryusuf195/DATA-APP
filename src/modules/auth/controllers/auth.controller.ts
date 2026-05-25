@@ -255,6 +255,60 @@ export async function getMeController(
   } catch (err) { next(err); }
 }
 
+// ── PATCH /auth/profile ────────────────────────────────────────
+
+export async function updateProfileController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
+
+    const { first_name, last_name, phone, username } = req.body as Record<string, string>;
+    const db = getDbInstance();
+
+    // Fields that live on the users table
+    const usersUpdate: Record<string, string | null> = {};
+    if (phone    !== undefined) usersUpdate.phone    = String(phone).trim()    || null;
+    if (username !== undefined) usersUpdate.username = String(username).trim() || null;
+
+    // Fields that live on user_profiles
+    const profileUpdate: Record<string, string | null> = {};
+    if (first_name !== undefined) profileUpdate.first_name = String(first_name).trim() || null;
+    if (last_name  !== undefined) profileUpdate.last_name  = String(last_name).trim()  || null;
+
+    if (Object.keys(usersUpdate).length === 0 && Object.keys(profileUpdate).length === 0) {
+      res.status(400).json({ success: false, error: "No fields to update" });
+      return;
+    }
+
+    if (Object.keys(usersUpdate).length > 0) {
+      await db("users").where({ id: req.user.id }).update({ ...usersUpdate, updated_at: new Date() });
+    }
+
+    if (Object.keys(profileUpdate).length > 0) {
+      const exists = await db("user_profiles").where({ user_id: req.user.id }).first();
+      if (exists) {
+        await db("user_profiles").where({ user_id: req.user.id }).update({ ...profileUpdate, updated_at: new Date() });
+      } else {
+        await db("user_profiles").insert({ id: require("crypto").randomUUID(), user_id: req.user.id, ...profileUpdate, created_at: new Date(), updated_at: new Date() });
+      }
+    }
+
+    const updated = await db("users")
+      .leftJoin("user_profiles as p", "p.user_id", "users.id")
+      .where("users.id", req.user.id)
+      .select(
+        "users.id", "users.email", "users.phone", "users.username",
+        "users.status", "users.kyc_level", "users.is_email_verified",
+        "users.referral_code", "users.created_at",
+        "p.first_name", "p.last_name",
+      )
+      .first();
+
+    res.status(200).json({ success: true, data: updated });
+  } catch (err) { next(err); }
+}
+
 // ── POST /auth/change-password ────────────────────────────────
 
 export async function changePasswordController(

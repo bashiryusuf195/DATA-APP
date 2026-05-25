@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import type {
   WalletBalance,
+  DedicatedAccount,
   FundingInitResponse,
   FundingVerifyResponse,
   LedgerEntry,
@@ -82,5 +83,10 @@ export const walletApi = {
   verifyFunding: (reference: string): Promise<FundingVerifyResponse> =>
     apiClient
       .post<ApiResponse<FundingVerifyResponse>>(`/wallet/fund/verify/${reference}`)
+      .then((r) => r.data.data),
+
+  getDedicatedAccount: (): Promise<DedicatedAccount> =>
+    apiClient
+      .get<ApiResponse<DedicatedAccount>>('/wallet/account')
       .then((r) => r.data.data),
 }

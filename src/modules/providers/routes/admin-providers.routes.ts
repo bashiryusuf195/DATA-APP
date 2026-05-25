@@ -7,9 +7,11 @@ import {
   getProviderController,
   upsertCredentialsController,
   healthCheckController,
+  credentialDiagnosticController,
   createProviderController,
   updateProviderController,
   disableProviderController,
+  fetchProviderPlansController,
 } from "../controllers/admin-providers.controller";
 
 const router = Router();
@@ -28,6 +30,10 @@ router.delete("/providers/:providerCode",               ...adminGuard, adminRate
 // Upsert credentials for a provider (secrets accepted, never returned)
 router.patch( "/providers/:providerCode/credentials",   ...adminGuard, adminRateLimiter, upsertCredentialsController);
 // Run live health check against a provider
-router.post(  "/providers/:providerCode/health-check",  ...adminGuard, adminRateLimiter, healthCheckController);
+router.post(  "/providers/:providerCode/health-check",          ...adminGuard, adminRateLimiter, healthCheckController);
+// Clubkonnect credential diagnostic: loads creds, calls balance endpoint, returns validity
+router.post(  "/providers/:providerCode/credential-diagnostic", ...adminGuard, adminRateLimiter, credentialDiagnosticController);
+// Fetch available plans for any provider (?service=data|cable_tv &network=mtn|airtel|glo|9mobile)
+router.get(   "/providers/:providerCode/plans",                 ...adminGuard, adminRateLimiter, fetchProviderPlansController);
 
 export { router as adminProvidersRouter };

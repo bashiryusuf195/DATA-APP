@@ -76,10 +76,24 @@ export async function getSuccessfulAttempt(
 export async function getFailedAttemptProviderCodes(
   transactionReference: string
 ): Promise<string[]> {
+  // Exclude PENDING-classified attempts — those are not hard failures and the
+  // provider should be retried if the pending verification eventually expires.
   const rows = await db("provider_attempts")
     .where({ transaction_reference: transactionReference, success: false })
+    .whereNot("error_classification", "PENDING")
     .select("provider_code");
   return rows.map((r: { provider_code: string }) => r.provider_code);
+}
+
+export async function getPendingAttemptForReference(
+  transactionReference: string
+): Promise<ProviderAttempt | null> {
+  const row = await db("provider_attempts")
+    .where({ transaction_reference: transactionReference, success: false })
+    .where("error_classification", "PENDING")
+    .orderBy("attempt_number", "desc")
+    .first();
+  return row ? coerce(row) : null;
 }
 
 export async function listProviderAttempts(options: {

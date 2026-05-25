@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Eye, EyeOff, Plus, ArrowRightLeft } from 'lucide-react'
+import { Eye, EyeOff, Plus, ArrowDownLeft } from 'lucide-react'
 import { useState } from 'react'
 import { fmtCurrency } from '@/utils/format'
 import { Skeleton } from '@/components/ui'
@@ -15,49 +15,51 @@ export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: Wall
   const [hidden, setHidden] = useState(false)
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-lg shadow-brand-600/25">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
-      <div className="absolute bottom-0 left-0 h-24 w-24 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/2" />
+    <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet"
+      style={{ background: 'linear-gradient(135deg, #1E4E7E 0%, #163A5E 100%)' }}>
+      {/* Decorative circles */}
+      <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/5" />
+      <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
 
       <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-white/70 text-sm font-medium">Wallet Balance</p>
+        {/* Top row */}
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-white/70 text-xs font-medium tracking-wide uppercase">Current Balance</p>
           <button
             onClick={() => setHidden((h) => !h)}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
             aria-label={hidden ? 'Show balance' : 'Hide balance'}
           >
-            {hidden ? (
-              <EyeOff className="h-4 w-4 text-white/70" />
-            ) : (
-              <Eye className="h-4 w-4 text-white/70" />
-            )}
+            {hidden
+              ? <EyeOff className="h-4 w-4 text-white/60" />
+              : <Eye    className="h-4 w-4 text-white/60" />}
           </button>
         </div>
 
+        {/* Balance */}
         {isLoading ? (
-          <Skeleton className="h-9 w-40 bg-white/20 mb-6" />
+          <Skeleton className="h-10 w-44 bg-white/20 mb-5 mt-1" />
         ) : (
-          <p className={cn('text-3xl font-bold tracking-tight mb-6', hidden && 'blur-md select-none')}>
+          <p className={cn('text-4xl font-bold tracking-tight mb-5 mt-1', hidden && 'blur-md select-none')}>
             {fmtCurrency(balance ?? 0, currency)}
           </p>
         )}
 
+        {/* Action buttons */}
         <div className="flex gap-3">
           <Link
             to="/wallet/fund"
-            className="flex-1 flex items-center justify-center gap-2 bg-white text-brand-700 font-semibold text-sm rounded-xl py-2.5 hover:bg-brand-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-white text-wallet font-semibold text-sm rounded-2xl py-2.5 hover:bg-blue-50 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Money
           </Link>
           <Link
             to="/wallet"
-            className="flex-1 flex items-center justify-center gap-2 bg-white/15 text-white font-semibold text-sm rounded-xl py-2.5 hover:bg-white/20 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-white/15 border border-white/25 text-white font-semibold text-sm rounded-2xl py-2.5 hover:bg-white/20 transition-colors"
           >
-            <ArrowRightLeft className="h-4 w-4" />
-            History
+            <ArrowDownLeft className="h-4 w-4" />
+            Withdraw
           </Link>
         </div>
       </div>

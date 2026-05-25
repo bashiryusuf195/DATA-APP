@@ -3,11 +3,12 @@ import type { TransactionStatus, FundingStatus, ProviderHealthStatus } from '@/t
 
 export function TransactionStatusBadge({ status }: { status: TransactionStatus }) {
   const map: Record<TransactionStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
-    successful: { label: 'Successful', variant: 'success' },
-    pending:    { label: 'Pending',    variant: 'warning' },
-    processing: { label: 'Processing', variant: 'info' },
-    failed:     { label: 'Failed',     variant: 'danger' },
-    refunded:   { label: 'Refunded',   variant: 'neutral' },
+    successful:      { label: 'Successful',    variant: 'success' },
+    pending:         { label: 'Pending',        variant: 'warning' },
+    processing:      { label: 'Processing',     variant: 'info' },
+    failed:          { label: 'Failed',         variant: 'danger' },
+    refunded:        { label: 'Refunded',       variant: 'neutral' },
+    requires_review: { label: 'Needs Review',   variant: 'warning' },
   }
   const { label, variant } = map[status] ?? { label: status, variant: 'neutral' as const }
   return <Badge variant={variant} dot>{label}</Badge>

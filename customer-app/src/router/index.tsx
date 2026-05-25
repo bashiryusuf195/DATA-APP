@@ -1,8 +1,12 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import { AppLayout }  from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RouteError } from '@/components/shared/RouteError'
+
+// Public pages
+import { LandingPage }    from '@/pages/landing/Landing'
+import { OnboardingPage } from '@/pages/onboarding/Onboarding'
 
 // Auth pages
 import { LoginPage }          from '@/pages/auth/Login'
@@ -23,13 +27,19 @@ import { CableTvPage }       from '@/pages/services/CableTV'
 import { ExamPinPage }       from '@/pages/services/ExamPin'
 import { IdentityPage }      from '@/pages/services/Identity'
 import { ProfilePage }       from '@/pages/profile/Profile'
+import { EditProfilePage }   from '@/pages/profile/EditProfile'
 import { SettingsPage }      from '@/pages/settings/Settings'
 import { NotificationsPage } from '@/pages/notifications/Notifications'
 import { ReferralsPage }     from '@/pages/referrals/Referrals'
 import { NotFoundPage }      from '@/pages/NotFound'
 import { KycPage }           from '@/pages/kyc/Kyc'
+import { SupportPage }       from '@/pages/support/Support'
 
 export const router = createBrowserRouter([
+  // ── Public pages ─────────────────────────────────────────────────────────────
+  { path: '/',           element: <LandingPage />,    errorElement: <RouteError /> },
+  { path: '/onboarding', element: <OnboardingPage />, errorElement: <RouteError /> },
+
   // ── Auth ────────────────────────────────────────────────────────────────────
   {
     element:      <AuthLayout />,
@@ -50,7 +60,6 @@ export const router = createBrowserRouter([
     ),
     errorElement: <RouteError />,
     children: [
-      { path: '/',              element: <Navigate to="/dashboard" replace /> },
       { path: '/dashboard',     element: <DashboardPage /> },
 
       // Wallet
@@ -73,9 +82,11 @@ export const router = createBrowserRouter([
       // Profile & account
       { path: '/kyc',            element: <KycPage /> },
       { path: '/profile',        element: <ProfilePage /> },
+      { path: '/profile/edit',   element: <EditProfilePage /> },
       { path: '/settings',       element: <SettingsPage /> },
       { path: '/notifications',  element: <NotificationsPage /> },
       { path: '/referrals',      element: <ReferralsPage /> },
+      { path: '/support',        element: <SupportPage /> },
     ],
   },
 

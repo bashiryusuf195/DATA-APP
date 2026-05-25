@@ -1,27 +1,93 @@
 // src/lib/logger.ts
 //
-// Structured logger using Winston.
+// Structured logger (Winston).
 //
 // Development  → colourised, human-readable text
-// Production   → JSON (one object per line — easy to parse in Grafana / Datadog)
+// Production   → JSON one-object-per-line (Grafana / Datadog / BetterStack)
 //
-// Every log line gets three automatic fields:
-//   service  — app name
-//   version  — app version
-//   env      — "development" | "production" | "staging"
+// Automatic fields on every log line:
+//   service    — app name
+//   version    — app version
+//   env        — "development" | "production" | "staging"
 //
-// Usage (anywhere in the codebase):
-//   import { logger } from '../lib/logger';
-//   logger.info('user_login',   { userId: '123', ip: '1.2.3.4' });
-//   logger.warn('high_risk',    { userId: '123', score: 72 });
-//   logger.error('db_failure',  { error: err.message, query: sql });
-//   logger.debug('cache_hit',   { key: 'catalog:services' });
+// When called inside an HTTP request (i.e. after requestLogger middleware),
+// these fields are also injected automatically from AsyncLocalStorage:
+//   request_id           — X-Request-Id of the current request
+//   user_id              — authenticated user (if auth middleware has run)
+//   transaction_reference — active transaction reference (if set)
+//   provider_code        — active provider (if set)
+//
+// Secret sanitisation: sensitive field names (password, token, api_key, …)
+// are replaced with "[REDACTED]". Phone numbers matching Nigerian patterns
+// are masked to show only the last 4 digits.
+//
+// Usage:
+//   logger.info('user_login',    { userId, ip });
+//   logger.warn('high_risk',     { userId, score });
+//   logger.error('db_failure',   { error: err.message });
+//   logger.debug('cache_hit',    { key });
 
 import winston from 'winston';
 import { config } from '../config';
+import { correlation } from './correlation';
 
-// ── Format for development (pretty, coloured) ─────────────────────────────────
+// ── Secret sanitisation ───────────────────────────────────────────────────────
+
+const SENSITIVE_KEYS = new Set([
+  'password', 'secret', 'token', 'api_key', 'apikey', 'authorization',
+  'credential', 'credentials', 'private_key', 'access_token', 'refresh_token',
+  'x_signature', 'webhook_secret', 'encryption_key', 'pin', 'cvv', 'otp',
+  'jwt', 'bearer', 'signing_key', 'service_role_key',
+]);
+
+// Nigerian mobile number pattern (local and international)
+const PHONE_RE = /(\+?234|0)[789]\d{9}/g;
+
+function sanitize(val: unknown, depth = 0): unknown {
+  if (depth > 6 || val === null || val === undefined) return val;
+  if (typeof val === 'string') return val.replace(PHONE_RE, (m) => `***${m.slice(-4)}`);
+  if (Array.isArray(val)) return val.map((v) => sanitize(v, depth + 1));
+  if (typeof val === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+      out[k] = SENSITIVE_KEYS.has(k.toLowerCase()) ? '[REDACTED]' : sanitize(v, depth + 1);
+    }
+    return out;
+  }
+  return val;
+}
+
+// ── Winston formats ───────────────────────────────────────────────────────────
+
+// 1. Inject correlation context from AsyncLocalStorage into every log record.
+//    Fields are only set if they are not already present in the log call —
+//    explicit call-site values always win over the context store.
+const correlationFormat = winston.format((info) => {
+  const ctx = correlation.get();
+  if (!ctx) return info;
+  const i = info as Record<string, unknown>;
+  if (ctx.requestId)      i['request_id']            ??= ctx.requestId;
+  if (ctx.userId)         i['user_id']               ??= ctx.userId;
+  if (ctx.transactionRef) i['transaction_reference'] ??= ctx.transactionRef;
+  if (ctx.providerCode)   i['provider_code']         ??= ctx.providerCode;
+  return info;
+})();
+
+// 2. Redact sensitive field names and mask phone numbers.
+//    Skips a small set of known-safe system fields for performance.
+const sanitizeFormat = winston.format((info) => {
+  const SKIP = new Set(['level', 'message', 'timestamp', 'service', 'version', 'env']);
+  for (const key of Object.keys(info)) {
+    if (SKIP.has(key)) continue;
+    const i = info as Record<string, unknown>;
+    i[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? '[REDACTED]' : sanitize(i[key]);
+  }
+  return info;
+})();
+
+// ── Development format (colourised, human-readable) ───────────────────────────
 const devFormat = winston.format.combine(
+  correlationFormat,
   winston.format.colorize(),
   winston.format.timestamp({ format: 'HH:mm:ss' }),
   winston.format.printf(({ timestamp, level, message, ...meta }: {
@@ -37,8 +103,10 @@ const devFormat = winston.format.combine(
   }),
 );
 
-// ── Format for production (structured JSON) ───────────────────────────────────
+// ── Production format (structured JSON) ───────────────────────────────────────
 const prodFormat = winston.format.combine(
+  correlationFormat,
+  sanitizeFormat,
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
   winston.format.json(),

@@ -11,8 +11,9 @@ import type {
 import {
   Zap, Plus, Edit2, Key, Activity, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Wifi, WifiOff,
-  RefreshCw, X, Shield, Globe, Info,
+  RefreshCw, X, Shield, Globe, Info, Loader2,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { cn } from '@/utils/cn'
 
 // ── Auth type configuration ───────────────────────────────────────────────────
@@ -23,6 +24,7 @@ interface AuthTypeConfig {
   description: string
   requiredFields: readonly string[]
   shownFields: readonly string[]
+  fieldLabels?: Partial<Record<string, string>>
 }
 
 const AUTH_TYPES: AuthTypeConfig[] = [
@@ -75,6 +77,14 @@ const AUTH_TYPES: AuthTypeConfig[] = [
     requiredFields: [],
     shownFields:    ['base_url', 'api_key', 'secret_key', 'bearer_token', 'username', 'password', 'custom_headers'],
   },
+  {
+    value:          'userid_apikey',
+    label:          'UserID + APIKey',
+    description:    'Clubkonnect authentication — UserID (username field) and APIKey (api_key field) are both required',
+    requiredFields: ['username', 'api_key'],
+    shownFields:    ['base_url', 'username', 'api_key'],
+    fieldLabels:    { username: 'UserID', api_key: 'APIKey' },
+  },
 ]
 
 const AUTH_TYPE_MAP = Object.fromEntries(
@@ -100,14 +110,49 @@ const SERVICE_LABELS: Record<string, string> = {
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
 
-function Badge({ active }: { active: boolean }) {
-  return active ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-      <CheckCircle2 className="h-3 w-3" /> Active
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">
-      <XCircle className="h-3 w-3" /> Disabled
+function Badge({
+  active,
+  onClick,
+  loading = false,
+}: {
+  active: boolean
+  onClick?: () => void
+  loading?: boolean
+}) {
+  const icon = loading
+    ? <Loader2 className="h-3 w-3 animate-spin" />
+    : active
+      ? <CheckCircle2 className="h-3 w-3" />
+      : <XCircle className="h-3 w-3" />
+
+  const label = active ? 'Active' : 'Disabled'
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={loading}
+        title={active ? 'Click to disable provider' : 'Click to enable provider'}
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors',
+          active
+            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+            : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200',
+          loading && 'cursor-wait opacity-60',
+        )}
+      >
+        {icon} {label}
+      </button>
+    )
+  }
+
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+      active ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-500',
+    )}>
+      {icon} {label}
     </span>
   )
 }
@@ -268,10 +313,10 @@ function CredSection({
       {/* API Key */}
       {shown.includes('api_key') && (
         <CredField
-          label="API Key"
+          label={config.fieldLabels?.api_key ?? 'API Key'}
           value={apiKey}
           onChange={setApiKey}
-          placeholder="Your API key"
+          placeholder={config.fieldLabels?.api_key ? `Your ${config.fieldLabels.api_key}` : 'Your API key'}
           configured={existing ? hasField('api_key') : undefined}
           isRequired={required.includes('api_key') && !hasField('api_key')}
         />
@@ -301,13 +346,13 @@ function CredSection({
         />
       )}
 
-      {/* Username */}
+      {/* Username / UserID */}
       {shown.includes('username') && (
         <CredField
-          label="Username"
+          label={config.fieldLabels?.username ?? 'Username'}
           value={username}
           onChange={setUsername}
-          placeholder="Username"
+          placeholder={config.fieldLabels?.username ?? 'Username'}
           configured={existing ? hasField('username') : undefined}
           isRequired={required.includes('username') && !hasField('username')}
         />
@@ -406,7 +451,9 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
 
   // ── Credential state ──────────────────────────────────────────────────────
   const [authType, setAuthType]           = useState<ProviderAuthType>(
-    (initial?.auth_type ?? 'api_key') as ProviderAuthType
+    initial?.provider_code === 'clubkonnect'
+      ? 'userid_apikey'
+      : ((initial?.auth_type ?? 'api_key') as ProviderAuthType)
   )
   const [baseUrl, setBaseUrl]             = useState('')
   const [apiKey, setApiKey]               = useState('')
@@ -420,6 +467,11 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
   const [isLive, setIsLive]               = useState(initial?.is_live ?? false)
 
   const [formError, setFormError] = useState('')
+
+  // Auto-select the correct auth type when provider code matches a known provider
+  useEffect(() => {
+    if (mode === 'create' && code === 'clubkonnect') setAuthType('userid_apikey')
+  }, [mode, code])
 
   function toggleService(svc: string) {
     setServices((prev) =>
@@ -476,8 +528,12 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
     )
     if (missingRequired.length > 0) {
       const labels: Record<string, string> = {
-        api_key: 'API Key', secret_key: 'Secret Key', bearer_token: 'Bearer Token',
-        username: 'Username', password: 'Password', custom_headers: 'Custom Headers',
+        api_key:        config.fieldLabels?.api_key    ?? 'API Key',
+        secret_key:     'Secret Key',
+        bearer_token:   'Bearer Token',
+        username:       config.fieldLabels?.username   ?? 'Username',
+        password:       'Password',
+        custom_headers: 'Custom Headers',
       }
       setFormError(
         `Credentials required for ${config.label}: ${missingRequired.map((f) => labels[f] ?? f).join(', ')}`
@@ -680,7 +736,9 @@ interface CredentialsModalProps {
 
 function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModalProps) {
   const [authType, setAuthType]           = useState<ProviderAuthType>(
-    (provider.auth_type ?? 'api_key') as ProviderAuthType
+    provider.provider_code === 'clubkonnect'
+      ? 'userid_apikey'
+      : ((provider.auth_type ?? 'api_key') as ProviderAuthType)
   )
   const [baseUrl, setBaseUrl]             = useState('')
   const [apiKey, setApiKey]               = useState('')
@@ -738,8 +796,12 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
     const missingRequired = required.filter((f) => !hasField(f) && !fieldValue(f).trim())
     if (missingRequired.length > 0) {
       const labels: Record<string, string> = {
-        api_key: 'API Key', secret_key: 'Secret Key', bearer_token: 'Bearer Token',
-        username: 'Username', password: 'Password', custom_headers: 'Custom Headers',
+        api_key:        config.fieldLabels?.api_key  ?? 'API Key',
+        secret_key:     'Secret Key',
+        bearer_token:   'Bearer Token',
+        username:       config.fieldLabels?.username ?? 'Username',
+        password:       'Password',
+        custom_headers: 'Custom Headers',
       }
       setFormError(`Required for ${config.label}: ${missingRequired.map((f) => labels[f] ?? f).join(', ')}`)
       return
@@ -813,9 +875,11 @@ interface ProviderCardProps {
   onEditCreds: (p: ProviderRegistryRow) => void
   onHealthCheck: (code: string) => void
   checkingHealth: boolean
+  onToggle: (p: ProviderRegistryRow) => void
+  isToggling: boolean
 }
 
-function ProviderCard({ provider, onEdit, onEditCreds, onHealthCheck, checkingHealth }: ProviderCardProps) {
+function ProviderCard({ provider, onEdit, onEditCreds, onHealthCheck, checkingHealth, onToggle, isToggling }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(false)
 
   const authConfig = provider.auth_type
@@ -828,17 +892,18 @@ function ProviderCard({ provider, onEdit, onEditCreds, onHealthCheck, checkingHe
     const cfg = AUTH_TYPE_MAP[at as ProviderAuthType]
     const shown = cfg?.shownFields ?? []
     const flags: Array<{ label: string; present: boolean }> = []
-    const maybe = (field: string, label: string) => {
+    const maybe = (field: string, defaultLabel: string) => {
       if (shown.includes(field) || at === 'advanced') {
+        const label = cfg?.fieldLabels?.[field] ?? defaultLabel
         flags.push({ label, present: !!provider[`has_${field}` as keyof ProviderRegistryRow] })
       }
     }
-    maybe('api_key',       'API Key')
-    maybe('secret_key',    'Secret Key')
-    maybe('bearer_token',  'Bearer Token')
-    maybe('username',      'Username')
-    maybe('password',      'Password')
-    maybe('custom_headers','Custom Headers')
+    maybe('api_key',        'API Key')
+    maybe('secret_key',     'Secret Key')
+    maybe('bearer_token',   'Bearer Token')
+    maybe('username',       'Username')
+    maybe('password',       'Password')
+    maybe('custom_headers', 'Custom Headers')
     if (provider.has_webhook_secret) flags.push({ label: 'Webhook Secret', present: true })
     return flags
   }, [provider])
@@ -867,7 +932,11 @@ function ProviderCard({ provider, onEdit, onEditCreds, onHealthCheck, checkingHe
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-          <Badge active={provider.is_active} />
+          <Badge
+            active={provider.is_active}
+            onClick={() => onToggle(provider)}
+            loading={isToggling}
+          />
           <button
             onClick={() => setExpanded((x) => !x)}
             className="p-1 rounded text-ink-faint hover:text-ink hover:bg-surface-2"
@@ -1015,7 +1084,15 @@ export function ApiIntegrationsPage() {
       if (credData) await providersApi.upsertCredentials(created.provider_code, credData)
       return created
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['providers-registry'] }); setModal({ type: 'none' }) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['providers-registry'] })
+      setModal({ type: 'none' })
+      toast.success('Provider registered')
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to register provider'
+      toast.error(msg)
+    },
   })
 
   const updateMutation = useMutation({
@@ -1032,14 +1109,55 @@ export function ApiIntegrationsPage() {
       if (credData) await providersApi.upsertCredentials(code, credData)
       return updated
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['providers-registry'] }); setModal({ type: 'none' }) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['providers-registry'] })
+      setModal({ type: 'none' })
+      toast.success('Provider updated')
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to update provider'
+      toast.error(msg)
+    },
   })
 
   const credsMutation = useMutation({
     mutationFn: ({ code, body }: { code: string; body: UpsertProviderCredentialsInput }) =>
       providersApi.upsertCredentials(code, body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['providers-registry'] }); setModal({ type: 'none' }) },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['providers-registry'] })
+      setModal({ type: 'none' })
+      toast.success('Credentials saved')
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to save credentials'
+      toast.error(msg)
+    },
   })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ code, is_active }: { code: string; is_active: boolean }) =>
+      providersApi.updateRegistry(code, { is_active }),
+    onSuccess: (_, { is_active }) => {
+      qc.invalidateQueries({ queryKey: ['providers-registry'] })
+      toast.success(is_active ? 'Provider enabled' : 'Provider disabled')
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Toggle failed'
+      toast.error(msg)
+    },
+  })
+
+  function handleToggle(provider: ProviderRegistryRow) {
+    const enabling = !provider.is_active
+    if (enabling && !provider.has_credentials) {
+      toast.error(
+        `Add API credentials for ${provider.name} before enabling it`,
+        { duration: 4000 },
+      )
+      return
+    }
+    toggleMutation.mutate({ code: provider.provider_code, is_active: enabling })
+  }
 
   async function handleHealthCheck(code: string) {
     setCheckingCode(code)
@@ -1155,6 +1273,8 @@ export function ApiIntegrationsPage() {
               onEditCreds={(pr) => setModal({ type: 'credentials', provider: pr })}
               onHealthCheck={handleHealthCheck}
               checkingHealth={checkingCode === p.provider_code}
+              onToggle={handleToggle}
+              isToggling={toggleMutation.isPending && toggleMutation.variables?.code === p.provider_code}
             />
           ))}
         </div>

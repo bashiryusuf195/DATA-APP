@@ -20,13 +20,30 @@ export const notificationsApi = {
   markRead: (id: string): Promise<void> =>
     apiClient.patch(`/notifications/${id}/read`).then(() => undefined),
 
-  getPreferences: (): Promise<NotificationPreferences> =>
-    apiClient
-      .get<ApiResponse<NotificationPreferences>>('/notifications/preferences')
-      .then((r) => r.data.data),
+  getPreferences: async (): Promise<NotificationPreferences> => {
+    const r = await apiClient.get<ApiResponse<Record<string, unknown>>>('/notifications/preferences')
+    const d = r.data.data
+    return {
+      email:  Boolean(d.email_enabled ?? true),
+      push:   Boolean(d.push_enabled  ?? false),
+      sms:    Boolean(d.sms_enabled   ?? false),
+      in_app: true,
+    }
+  },
 
-  updatePreferences: (prefs: Partial<NotificationPreferences>): Promise<NotificationPreferences> =>
-    apiClient
-      .patch<ApiResponse<NotificationPreferences>>('/notifications/preferences', prefs)
-      .then((r) => r.data.data),
+  updatePreferences: async (prefs: Partial<NotificationPreferences>): Promise<NotificationPreferences> => {
+    // Map frontend field names → backend field names
+    const body: Record<string, boolean> = {}
+    if (prefs.email  !== undefined) body.email_enabled = prefs.email
+    if (prefs.push   !== undefined) body.push_enabled  = prefs.push
+    if (prefs.sms    !== undefined) body.sms_enabled   = prefs.sms
+    const r = await apiClient.patch<ApiResponse<Record<string, unknown>>>('/notifications/preferences', body)
+    const d = r.data.data
+    return {
+      email:  Boolean(d.email_enabled ?? true),
+      push:   Boolean(d.push_enabled  ?? false),
+      sms:    Boolean(d.sms_enabled   ?? false),
+      in_app: true,
+    }
+  },
 }

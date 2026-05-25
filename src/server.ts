@@ -63,22 +63,36 @@ async function startServer(): Promise<void> {
     });
 
     // ── Graceful shutdown ───────────────────────────────────────────────────
-    // Finish in-flight requests before closing connections.
+    // Order: stop accepting requests → drain active HTTP → close queues → DB → Redis
     const shutdown = (signal: string) => {
       logger.info(`${signal} received — shutting down gracefully…`);
 
       server.close(async () => {
+        logger.info('HTTP server closed — draining queue connections…');
+
+        // Close all BullMQ queue connections held by this process.
+        // Workers in the separate worker process handle their own shutdown.
+        try {
+          const { QUEUE_REGISTRY } = await import('./modules/queue/services/queue-monitor.service');
+          await Promise.allSettled(
+            Object.values(QUEUE_REGISTRY).map((q) => q.close()),
+          );
+          logger.info('Queue connections closed.');
+        } catch (qErr) {
+          logger.warn('Could not close queue connections', { error: (qErr as Error).message });
+        }
+
         await db.destroy();
         await redis.quit();
         logger.info('Server shut down cleanly.');
         process.exit(0);
       });
 
-      // Force-exit if graceful shutdown takes more than 10 seconds
+      // Force-exit after 15 s — gives in-flight jobs a chance to finish
       setTimeout(() => {
         logger.error('Graceful shutdown timed out — forcing exit.');
         process.exit(1);
-      }, 10_000).unref(); // .unref() so this timer doesn't keep the process alive
+      }, 15_000).unref();
     };
 
     process.on('SIGTERM', () => shutdown('SIGTERM'));

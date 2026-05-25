@@ -49,9 +49,12 @@ import { BlacklistPage }            from '@/pages/Blacklist'
 import { FrozenAccountsPage }       from '@/pages/FrozenAccounts'
 import { ManualWalletOpsPage }        from '@/pages/ManualWalletOps'
 import { ServiceAvailabilityPage }    from '@/pages/ServiceAvailability'
+import { SystemHealthPage }           from '@/pages/SystemHealth'
+import { BackupRestorePage }          from '@/pages/BackupRestore'
 import { PaymentGatewaysPage }        from '@/pages/PaymentGateways'
 import { ApiIntegrationsPage }        from '@/pages/ApiIntegrations'
 import { ReferralProgramPage }        from '@/pages/ReferralProgram'
+import { AppContentPage }            from '@/pages/AppContent'
 
 import {
   Landmark,
@@ -182,6 +185,9 @@ export const router = createBrowserRouter([
       },
 
       // ── Operations ─────────────────────────────────────────────────────────
+      { path: '/operations/system-health',          element: <SystemHealthPage /> },
+      { path: '/operations/backup-integrity',       element: <BackupRestorePage /> },
+      { path: '/operations/queue-monitor',         element: <QueueMonitorPage /> },
       { path: '/operations/paystack-transactions', element: <PaystackTransactionsPage /> },
       { path: '/operations/funding',               element: <FundingPage /> },
       { path: '/operations/webhooks',              element: <WebhookEventsPage /> },
@@ -235,6 +241,7 @@ export const router = createBrowserRouter([
 
       // ── System ─────────────────────────────────────────────────────────────
       { path: '/wallets',              element: <WalletPage /> },
+      { path: '/app-content',          element: <AppContentPage /> },
       { path: '/settings',             element: <SettingsPage /> },
       { path: '/system/wallet-adjust', element: <ManualWalletOpsPage /> },
 

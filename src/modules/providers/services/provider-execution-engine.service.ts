@@ -6,7 +6,9 @@ import {
   recordProviderAttempt,
   getSuccessfulAttempt,
   getFailedAttemptProviderCodes,
+  getPendingAttemptForReference,
 } from "./provider-attempts.service";
+import { vtuVerifyPendingQueue } from "../../queue/queues/vtu-verify-pending.queue";
 import {
   updateTransactionStatus,
   getTransactionByReference,
@@ -56,21 +58,26 @@ export interface RejectedProvider {
 }
 
 export interface ExecuteWithFailoverResult {
-  success:              boolean;
-  provider_result:      ProviderPurchaseResult | null;
-  final_provider:       string | null;
-  attempted_providers:  string[];
-  rejected_providers:   RejectedProvider[];
-  failover_triggered:   boolean;
-  total_attempts:       number;
-  idempotent_replay:    boolean;
-  total_latency_ms:     number;
+  success:                    boolean;
+  /** True when the provider accepted the order but hasn't confirmed delivery yet.
+   *  A verification polling job has been enqueued to follow up. */
+  pending:                    boolean;
+  provider_result:            ProviderPurchaseResult | null;
+  final_provider:             string | null;
+  attempted_providers:        string[];
+  rejected_providers:         RejectedProvider[];
+  failover_triggered:         boolean;
+  total_attempts:             number;
+  idempotent_replay:          boolean;
+  total_latency_ms:           number;
+  provider_resolution_source: 'plan_override' | 'service_route' | 'priority_fallback' | null;
 }
 
 interface ProviderCandidate {
-  providerCode: string;
-  provider:     VTUProvider;
-  isFailover:   boolean;
+  providerCode:     string;
+  provider:         VTUProvider;
+  isFailover:       boolean;
+  resolutionSource: 'plan_override' | 'service_route' | 'priority_fallback';
 }
 
 // ── Engine ────────────────────────────────────────────────────────────────────
@@ -129,13 +136,14 @@ class ProviderExecutionEngine {
           provider: existingSuccess.provider_code,
           metadata: { finalized_on_replay: true, replayed_at: new Date().toISOString() },
         });
-        // Best-effort notification
+        // Best-effort idempotent notification
         createNotification({
-          user_id: transaction.user_id,
-          channel: "in_app",
-          type:    "purchase_successful",
-          title:   "Transaction Successful",
-          message: `Your ${service_type} purchase was successful.`,
+          user_id:          transaction.user_id,
+          channel:          "in_app",
+          type:             "purchase_successful",
+          title:            "Transaction Successful",
+          message:          `Your ${service_type} purchase was successful.`,
+          notification_key: `purchase_successful:${transaction_reference}`,
           metadata: {
             reference: transaction_reference,
             type:      service_type,
@@ -183,20 +191,22 @@ class ProviderExecutionEngine {
         service_type,
         rejected:    rejectedProviders.length,
       });
-      await this.handleAllFailed(params, [], rejectedProviders, reason, executionStartedAt);
+      await this.handleAllFailed(params, [], rejectedProviders, reason, executionStartedAt, null);
       return {
-        success: false, provider_result: null, final_provider: null,
+        success: false, pending: false, provider_result: null, final_provider: null,
         attempted_providers: [], rejected_providers: rejectedProviders,
         failover_triggered: false, total_attempts: 0, idempotent_replay: false,
         total_latency_ms: Date.now() - executionStartedAt.getTime(),
+        provider_resolution_source: null,
       };
     }
 
     // ── Execute with provider-level failover ──────────────────────────────────
-    const attemptedProviders: string[] = [];
-    let failoverTriggered              = false;
-    let attemptNumber                  = existingAttemptCount + 1;
-    let lastError                      = "All providers exhausted";
+    const attemptedProviders: string[]          = [];
+    let failoverTriggered                        = false;
+    let attemptNumber                            = existingAttemptCount + 1;
+    let lastError                                = "All providers exhausted";
+    let lastResult: ProviderPurchaseResult | null = null;
 
     for (const candidate of candidates) {
       const { providerCode, provider, isFailover } = candidate;
@@ -227,20 +237,32 @@ class ProviderExecutionEngine {
         });
       }
 
-      const latencyMs = Date.now() - start;
-      const success   = result?.success === true;
+      const latencyMs  = Date.now() - start;
+      const success    = result?.success === true;
+      // Processing: provider accepted the order but delivery is not yet confirmed.
+      // Do NOT fail the transaction — enqueue a verification polling job.
+      const isPending  = !success && result?.status === "processing";
 
       logger.info("engine_provider_result", {
         reference:   transaction_reference,
         provider:    providerCode,
         success,
+        pending:     isPending,
         status:      result?.status ?? null,
         message:     result?.message ?? errorMsg ?? null,
         latency_ms:  latencyMs,
       });
 
-      const rawError   = errorMsg ?? (result?.success ? null : (result?.message ?? null));
-      const errorClass = rawError ? classifyError(rawError) : null;
+      // For pending results, don't classify as a hard error so that
+      // getFailedAttemptProviderCodes doesn't skip this provider on retry.
+      const rawError   = errorMsg ?? (!success && !isPending ? (result?.message ?? null) : null);
+      const errorClass = errorMsg
+        ? classifyError(errorMsg)
+        : isPending
+          ? "PENDING"
+          : rawError
+            ? classifyError(rawError)
+            : null;
 
       const safeRequest: Record<string, unknown> = {
         service_type:   purchase_input.service_type,
@@ -272,8 +294,9 @@ class ProviderExecutionEngine {
         // Continue — the purchase result is what matters, not the audit record.
       }
 
-      // Update circuit breaker metrics (non-critical)
-      if (success) {
+      // Update circuit breaker metrics (non-critical).
+      // Pending is not a failure for circuit-breaker purposes.
+      if (success || isPending) {
         metricsRecordSuccess(providerCode).catch((e: Error) =>
           logger.warn("engine_metrics_success_failed", { error: e.message })
         );
@@ -288,27 +311,69 @@ class ProviderExecutionEngine {
       if (success && result) {
         const totalLatencyMs = Date.now() - executionStartedAt.getTime();
         logger.info("engine_provider_succeeded", {
-          reference:       transaction_reference,
-          provider:        providerCode,
-          latency_ms:      latencyMs,
-          total_ms:        totalLatencyMs,
-          failover:        failoverTriggered,
+          reference:  transaction_reference,
+          provider:   providerCode,
+          latency_ms: latencyMs,
+          total_ms:   totalLatencyMs,
+          failover:   failoverTriggered,
         });
-        await this.handleSuccess(params, result, attemptedProviders, rejectedProviders, failoverTriggered, executionStartedAt);
+        await this.handleSuccess(params, result, attemptedProviders, rejectedProviders, failoverTriggered, executionStartedAt, candidate.resolutionSource);
         return {
-          success:             true,
-          provider_result:     result,
-          final_provider:      providerCode,
-          attempted_providers: attemptedProviders,
-          rejected_providers:  rejectedProviders,
-          failover_triggered:  failoverTriggered,
-          total_attempts:      attemptedProviders.length,
-          idempotent_replay:   false,
-          total_latency_ms:    totalLatencyMs,
+          success:                    true,
+          pending:                    false,
+          provider_result:            result,
+          final_provider:             providerCode,
+          attempted_providers:        attemptedProviders,
+          rejected_providers:         rejectedProviders,
+          failover_triggered:         failoverTriggered,
+          total_attempts:             attemptedProviders.length,
+          idempotent_replay:          false,
+          total_latency_ms:           totalLatencyMs,
+          provider_resolution_source: candidate.resolutionSource,
         };
       }
 
-      lastError = rawError ?? `Provider '${providerCode}' returned failure`;
+      if (isPending && result) {
+        const totalLatencyMs = Date.now() - executionStartedAt.getTime();
+        logger.info("engine_provider_pending", {
+          reference:         transaction_reference,
+          provider:          providerCode,
+          provider_reference: result.provider_reference,
+          latency_ms:        latencyMs,
+          total_ms:          totalLatencyMs,
+        });
+        await this.handlePending(params, result, attemptedProviders, rejectedProviders, failoverTriggered, executionStartedAt, candidate.resolutionSource);
+        return {
+          success:                    false,
+          pending:                    true,
+          provider_result:            result,
+          final_provider:             providerCode,
+          attempted_providers:        attemptedProviders,
+          rejected_providers:         rejectedProviders,
+          failover_triggered:         failoverTriggered,
+          total_attempts:             attemptedProviders.length,
+          idempotent_replay:          false,
+          total_latency_ms:           totalLatencyMs,
+          provider_resolution_source: candidate.resolutionSource,
+        };
+      }
+
+      // Non-retryable errors (invalid phone/meter/smartcard, auth failures, etc.)
+      // will produce the same result on every provider — fail fast without failover.
+      if (errorClass === "VALIDATION_ERROR") {
+        lastError  = rawError ?? `Non-retryable error from provider '${providerCode}'`;
+        lastResult = result;
+        logger.warn("engine_non_retryable_abort", {
+          reference:      transaction_reference,
+          provider:       providerCode,
+          classification: errorClass,
+          reason:         lastError,
+        });
+        break;
+      }
+
+      lastError  = rawError ?? `Provider '${providerCode}' returned failure`;
+      lastResult = result;
       logger.warn("engine_provider_failed_trying_next", {
         reference:       transaction_reference,
         provider:        providerCode,
@@ -325,22 +390,42 @@ class ProviderExecutionEngine {
       rejected:    rejectedProviders.map((r) => r.provider_code),
       service_type,
     });
-    await this.handleAllFailed(params, attemptedProviders, rejectedProviders, lastError, executionStartedAt);
+    await this.handleAllFailed(params, attemptedProviders, rejectedProviders, lastError, executionStartedAt, lastResult);
 
     return {
-      success:             false,
-      provider_result:     null,
-      final_provider:      null,
-      attempted_providers: attemptedProviders,
-      rejected_providers:  rejectedProviders,
-      failover_triggered:  failoverTriggered,
-      total_attempts:      attemptedProviders.length,
-      idempotent_replay:   false,
-      total_latency_ms:    Date.now() - executionStartedAt.getTime(),
+      success:                    false,
+      pending:                    false,
+      provider_result:            null,
+      final_provider:             null,
+      attempted_providers:        attemptedProviders,
+      rejected_providers:         rejectedProviders,
+      failover_triggered:         failoverTriggered,
+      total_attempts:             attemptedProviders.length,
+      idempotent_replay:          false,
+      total_latency_ms:           Date.now() - executionStartedAt.getTime(),
+      provider_resolution_source: null,
     };
   }
 
   // ── Candidate resolution ───────────────────────────────────────────────────
+  //
+  // Resolution is EXCLUSIVE — exactly one path runs per call, with early return:
+  //
+  //   Path A — plan_override:   plan.primary_provider_code is set.
+  //             Only plan primary + plan fallback are added.
+  //             Routing rules and priority-based are NEVER consulted.
+  //
+  //   Path B — service_route:   No plan override. Active routing rule exists.
+  //             Only rule primary + rule fallback are added.
+  //             Priority-based is NEVER consulted. If the routed provider is
+  //             ineligible (e.g. is_active=false), the purchase fails — it does
+  //             not silently fall through to a different provider.
+  //
+  //   Path C — priority_fallback: No plan override, no active routing rule.
+  //             All active eligible providers sorted by priority are added.
+  //
+  // This ensures the provider selected at runtime matches what the admin
+  // configured in the UI (Service Plans / API Routing).
 
   private async resolveProviderCandidates(
     serviceType:    ProviderServiceType,
@@ -355,38 +440,74 @@ class ProviderExecutionEngine {
       rejectedProviders.push({ provider_code: code, reason: "ALREADY_ATTEMPTED" });
     }
 
-    // 1. Plan-level overrides (highest priority)
+    // ── Path A: Plan-level override (exclusive — highest priority) ─────────────
     if (planOverrides?.primary_provider_code) {
-      const primary = planOverrides.primary_provider_code;
-      logger.debug("engine_routing_plan_override", { primary, service_type: serviceType });
-      await this.tryAddCandidate(primary, serviceType, false, seen, candidates, rejectedProviders);
-      if (planOverrides.fallback_provider_code) {
-        await this.tryAddCandidate(
-          planOverrides.fallback_provider_code, serviceType, true, seen, candidates, rejectedProviders
-        );
+      const primary  = planOverrides.primary_provider_code;
+      const fallback = planOverrides.fallback_provider_code ?? null;
+
+      logger.info("engine_routing_path_plan_override", {
+        service_type: serviceType,
+        primary,
+        fallback,
+      });
+
+      await this.tryAddCandidate(primary, serviceType, false, seen, candidates, rejectedProviders, 'plan_override');
+      if (fallback) {
+        await this.tryAddCandidate(fallback, serviceType, true, seen, candidates, rejectedProviders, 'plan_override');
       }
+
+      logger.info("engine_routing_resolved", {
+        service_type: serviceType,
+        path:         'plan_override',
+        candidates:   candidates.map((c) => c.providerCode),
+        rejected:     rejectedProviders.filter((r) => r.reason !== "ALREADY_ATTEMPTED").map((r) => `${r.provider_code}(${r.reason})`),
+      });
+      return { candidates, rejectedProviders };
     }
 
-    // 2. Routing-rule path (primary → fallback)
+    // ── Path B: Service routing rule (exclusive — no priority fallback) ─────────
     let rule = null;
     try {
       rule = await getActiveRoutingRule(serviceType);
     } catch {
-      // table missing — fall through to priority-based
+      logger.warn("engine_routing_rule_table_missing", { service_type: serviceType });
     }
 
     if (rule) {
+      logger.info("engine_routing_path_service_rule", {
+        service_type: serviceType,
+        primary:      rule.primary_provider_code,
+        fallback:     rule.fallback_provider_code ?? null,
+        rule_id:      rule.id,
+      });
+
       await this.tryAddCandidate(
-        rule.primary_provider_code, serviceType, false, seen, candidates, rejectedProviders
+        rule.primary_provider_code, serviceType, false, seen, candidates, rejectedProviders, 'service_route',
       );
       if (rule.fallback_provider_code) {
         await this.tryAddCandidate(
-          rule.fallback_provider_code, serviceType, true, seen, candidates, rejectedProviders
+          rule.fallback_provider_code, serviceType, true, seen, candidates, rejectedProviders, 'service_route',
         );
       }
+
+      // Routing rule is AUTHORITATIVE. Do not add priority-based candidates.
+      // If the routed provider is ineligible, the purchase fails rather than
+      // silently executing against an unintended provider.
+      logger.info("engine_routing_resolved", {
+        service_type: serviceType,
+        path:         'service_route',
+        candidates:   candidates.map((c) => c.providerCode),
+        rejected:     rejectedProviders.filter((r) => r.reason !== "ALREADY_ATTEMPTED").map((r) => `${r.provider_code}(${r.reason})`),
+      });
+      return { candidates, rejectedProviders };
     }
 
-    // 3. Priority-based path (active + supports service_type + not already included)
+    // ── Path C: Priority-based (only when no routing is configured) ─────────────
+    logger.info("engine_routing_path_priority_fallback", {
+      service_type: serviceType,
+      reason:       "no plan override and no active routing rule",
+    });
+
     const configs = await db("provider_configs")
       .where({ is_active: true })
       .whereRaw("supported_services @> ?::jsonb", [JSON.stringify([serviceType])])
@@ -397,10 +518,16 @@ class ProviderExecutionEngine {
       const code = config.provider_code as string;
       if (seen.has(code)) continue;
       await this.tryAddCandidate(
-        code, serviceType, candidates.length > 0, seen, candidates, rejectedProviders
+        code, serviceType, candidates.length > 0, seen, candidates, rejectedProviders, 'priority_fallback',
       );
     }
 
+    logger.info("engine_routing_resolved", {
+      service_type: serviceType,
+      path:         'priority_fallback',
+      candidates:   candidates.map((c) => c.providerCode),
+      rejected:     rejectedProviders.filter((r) => r.reason !== "ALREADY_ATTEMPTED").map((r) => `${r.provider_code}(${r.reason})`),
+    });
     return { candidates, rejectedProviders };
   }
 
@@ -410,7 +537,8 @@ class ProviderExecutionEngine {
     isFailover:        boolean,
     seen:              Set<string>,
     candidates:        ProviderCandidate[],
-    rejectedProviders: RejectedProvider[]
+    rejectedProviders: RejectedProvider[],
+    resolutionSource:  ProviderCandidate['resolutionSource'],
   ): Promise<void> {
     if (seen.has(providerCode)) return;
 
@@ -436,7 +564,7 @@ class ProviderExecutionEngine {
       return;
     }
 
-    candidates.push({ providerCode, provider, isFailover });
+    candidates.push({ providerCode, provider, isFailover, resolutionSource });
     seen.add(providerCode);
   }
 
@@ -462,21 +590,30 @@ class ProviderExecutionEngine {
     attemptedProviders: string[],
     rejectedProviders:  RejectedProvider[],
     failoverTriggered:  boolean,
-    executionStartedAt: Date
+    executionStartedAt: Date,
+    resolutionSource:   ProviderCandidate['resolutionSource'],
   ): Promise<void> {
     const executionCompletedAt = new Date();
     const executionMeta = {
-      attempted_providers:    attemptedProviders,
-      rejected_providers:     rejectedProviders,
-      failover_triggered:     failoverTriggered,
-      final_provider:         result.provider,
-      failure_stage:          null,
-      total_attempts:         attemptedProviders.length,
-      all_failed:             false,
-      execution_started_at:   executionStartedAt.toISOString(),
-      execution_completed_at: executionCompletedAt.toISOString(),
-      total_latency_ms:       executionCompletedAt.getTime() - executionStartedAt.getTime(),
+      attempted_providers:        attemptedProviders,
+      rejected_providers:         rejectedProviders,
+      failover_triggered:         failoverTriggered,
+      final_provider:             result.provider,
+      failure_stage:              null,
+      total_attempts:             attemptedProviders.length,
+      all_failed:                 false,
+      execution_started_at:       executionStartedAt.toISOString(),
+      execution_completed_at:     executionCompletedAt.toISOString(),
+      total_latency_ms:           executionCompletedAt.getTime() - executionStartedAt.getTime(),
+      provider_resolution_source: resolutionSource,
     };
+
+    logger.info("engine_tx_status_update_starting", {
+      reference:    params.transaction_reference,
+      service_type: params.service_type,
+      new_status:   "successful",
+      provider:     result.provider,
+    });
 
     await updateTransactionStatus(params.transaction_reference, {
       status:             "successful",
@@ -486,6 +623,12 @@ class ProviderExecutionEngine {
         provider_response: result.raw_response ?? null,
         execution:         executionMeta,
       },
+    });
+
+    logger.info("engine_tx_status_update_completed", {
+      reference:    params.transaction_reference,
+      service_type: params.service_type,
+      new_status:   "successful",
     });
 
     logger.info("engine_transaction_finalized_successful", {
@@ -504,11 +647,12 @@ class ProviderExecutionEngine {
     );
 
     createNotification({
-      user_id: params.transaction.user_id,
-      channel: "in_app",
-      type:    "purchase_successful",
-      title:   "Transaction Successful",
-      message: `Your ${params.service_type} purchase was successful.`,
+      user_id:          params.transaction.user_id,
+      channel:          "in_app",
+      type:             "purchase_successful",
+      title:            "Transaction Successful",
+      message:          `Your ${params.service_type} purchase was successful.`,
+      notification_key: `purchase_successful:${params.transaction_reference}`,
       metadata: {
         reference: params.transaction_reference,
         type:      params.service_type,
@@ -520,6 +664,60 @@ class ProviderExecutionEngine {
     );
   }
 
+  // ── Pending handler ───────────────────────────────────────────────────────
+
+  private async handlePending(
+    params:             ExecuteWithFailoverParams,
+    result:             ProviderPurchaseResult,
+    attemptedProviders: string[],
+    rejectedProviders:  RejectedProvider[],
+    failoverTriggered:  boolean,
+    executionStartedAt: Date,
+    resolutionSource:   ProviderCandidate['resolutionSource'],
+  ): Promise<void> {
+    const { transaction_reference, service_type, transaction } = params;
+
+    await updateTransactionStatus(transaction_reference, {
+      status:             "processing",
+      provider:           result.provider,
+      provider_reference: result.provider_reference,
+      metadata: {
+        provider_response: result.raw_response ?? null,
+        execution: {
+          attempted_providers:        attemptedProviders,
+          rejected_providers:         rejectedProviders,
+          failover_triggered:         failoverTriggered,
+          final_provider:             result.provider,
+          pending_at:                 executionStartedAt.toISOString(),
+          provider_resolution_source: resolutionSource,
+        },
+      },
+    });
+
+    await vtuVerifyPendingQueue.add(
+      "verify_pending",
+      {
+        reference:             transaction_reference,
+        provider_code:         result.provider,
+        provider_reference:    result.provider_reference,
+        user_id:               transaction.user_id,
+        service_type,
+        amount:                Number(transaction.amount),
+        source_wallet_id:      transaction.source_wallet_id,
+        destination_wallet_id: transaction.destination_wallet_id,
+        currency:              transaction.currency ?? "NGN",
+        attempt_count:         0,
+      },
+      { delay: 5_000, removeOnComplete: 100, removeOnFail: 500 },
+    );
+
+    logger.info("engine_transaction_pending_queued", {
+      reference:          transaction_reference,
+      provider:           result.provider,
+      provider_reference: result.provider_reference,
+    });
+  }
+
   // ── All-failed handler ────────────────────────────────────────────────────
 
   private async handleAllFailed(
@@ -527,7 +725,8 @@ class ProviderExecutionEngine {
     attemptedProviders: string[],
     rejectedProviders:  RejectedProvider[],
     reason:             string,
-    executionStartedAt: Date
+    executionStartedAt: Date,
+    lastProviderResult: ProviderPurchaseResult | null,
   ): Promise<void> {
     const { transaction_reference, transaction, service_type } = params;
     const executionCompletedAt = new Date();
@@ -561,6 +760,17 @@ class ProviderExecutionEngine {
       }
     }
 
+    const providerResponse = lastProviderResult?.raw_response
+      ? (lastProviderResult.raw_response as Record<string, unknown>)
+      : null;
+
+    logger.info("engine_tx_status_update_starting", {
+      reference:    transaction_reference,
+      service_type,
+      new_status:   "failed",
+      reason,
+    });
+
     await updateTransactionStatus(transaction_reference, {
       status:         "failed",
       failure_reason: reason,
@@ -578,8 +788,15 @@ class ProviderExecutionEngine {
           execution_completed_at: executionCompletedAt.toISOString(),
           total_latency_ms:       executionCompletedAt.getTime() - executionStartedAt.getTime(),
         },
+        provider_response: providerResponse,
         refund: refundBatchId ? { journal_batch_id: refundBatchId } : null,
       },
+    });
+
+    logger.info("engine_tx_status_update_completed", {
+      reference:    transaction_reference,
+      service_type,
+      new_status:   "failed",
     });
 
     logger.info("engine_transaction_finalized_failed", {
@@ -589,11 +806,12 @@ class ProviderExecutionEngine {
     });
 
     createNotification({
-      user_id: transaction.user_id,
-      channel: "in_app",
-      type:    "purchase_failed",
-      title:   "Transaction Failed",
-      message: `Your ${service_type} purchase failed and has been refunded.`,
+      user_id:          transaction.user_id,
+      channel:          "in_app",
+      type:             "purchase_failed",
+      title:            "Transaction Failed",
+      message:          `Your ${service_type} purchase failed and has been refunded.`,
+      notification_key: `purchase_failed:${transaction_reference}`,
       metadata: {
         reference: transaction_reference,
         type:      service_type,
@@ -620,14 +838,16 @@ class ProviderExecutionEngine {
   ): ExecuteWithFailoverResult {
     return {
       success,
-      provider_result:     null,
-      final_provider:      finalProvider,
-      attempted_providers: [],
-      rejected_providers:  [],
-      failover_triggered:  false,
-      total_attempts:      0,
-      idempotent_replay:   true,
-      total_latency_ms:    0,
+      pending:                    false,
+      provider_result:            null,
+      final_provider:             finalProvider,
+      attempted_providers:        [],
+      rejected_providers:         [],
+      failover_triggered:         false,
+      total_attempts:             0,
+      idempotent_replay:          true,
+      total_latency_ms:           0,
+      provider_resolution_source: null,
     };
   }
 }

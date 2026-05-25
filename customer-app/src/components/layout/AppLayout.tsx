@@ -14,8 +14,8 @@ export function AppLayout() {
         {/* Mobile header */}
         <AppHeader />
 
-        {/* Page content — top padding for mobile header, bottom padding for bottom nav */}
-        <main className="flex-1 px-4 pt-[72px] pb-24 md:pt-0 md:pb-0 md:px-8 md:py-8 max-w-2xl w-full mx-auto">
+        {/* Page content */}
+        <main className="flex-1 px-4 pt-[72px] pb-24 md:pt-8 md:pb-8 md:px-8 max-w-lg w-full mx-auto md:max-w-2xl">
           <Outlet />
         </main>
       </div>

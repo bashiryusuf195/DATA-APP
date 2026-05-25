@@ -18,11 +18,13 @@ import {
   initializeFundingController,
   verifyFundingController,
 } from "../controllers/wallet-funding.controller";
+import { getDedicatedAccountController } from "../controllers/dva.controller";
 
 const router = Router();
 
 router.get("/balance",  authenticate, balanceRateLimiter, getBalanceController);
 router.get("/ledger",   authenticate, balanceRateLimiter, getLedgerController);
+router.get("/account",  authenticate, balanceRateLimiter, getDedicatedAccountController);
 
 router.post("/fund/initialize",       authenticate, fundingRateLimiter, idempotency, initializeFundingController);
 router.post("/fund/verify/:reference", authenticate, fundingRateLimiter, verifyFundingController);

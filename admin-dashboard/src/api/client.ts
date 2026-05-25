@@ -16,8 +16,14 @@ export const apiClient = axios.create({
 
 // ── Request interceptor: attach JWT ──────────────────────────────────────────
 apiClient.interceptors.request.use((config) => {
+  // Always read from the store at request time — works correctly even before
+  // syncAuthHeader() has been called (i.e. before the first useEffect fires).
   const token = useAuthStore.getState().access_token
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  } else {
+    delete config.headers.Authorization
+  }
 
   if (import.meta.env.DEV) {
     const method = (config.method ?? 'GET').toUpperCase()
@@ -28,6 +34,21 @@ apiClient.interceptors.request.use((config) => {
 
   return config
 })
+
+// ── 401 redirect guard ────────────────────────────────────────────────────────
+// Prevents multiple simultaneous 401 responses from triggering multiple redirects.
+let _isRedirectingToLogin = false
+
+function redirectToLogin() {
+  if (_isRedirectingToLogin) return
+  _isRedirectingToLogin = true
+  useAuthStore.getState().clearAuth()
+  delete apiClient.defaults.headers.common['Authorization']
+  // Flag for the login page to show a "session expired" toast.
+  sessionStorage.setItem('session_expired', '1')
+  // replace() so the broken page is removed from history (Back button works correctly).
+  window.location.replace('/login')
+}
 
 // ── Response interceptor: debug + error normalisation ────────────────────────
 apiClient.interceptors.response.use(
@@ -51,18 +72,27 @@ apiClient.interceptors.response.use(
     }
 
     if (status === 401) {
-      // If the 401 came from the login endpoint itself, it means wrong credentials —
-      // do NOT redirect; let the error propagate to the form's error handler so the
-      // user sees the message instead of silently reloading the login page.
+      // If the 401 came from the login/2FA endpoint, it means wrong credentials —
+      // do NOT redirect; let the error propagate so the form shows the message.
       const isLoginRequest = (
         !!error.config?.url?.includes('/auth/login') ||
         !!error.config?.url?.includes('/auth/2fa/verify-login')
       )
-      useAuthStore.getState().clearAuth()
-      delete apiClient.defaults.headers.common['Authorization']
+
       if (!isLoginRequest) {
-        window.location.href = '/login'
+        // Normalize to a friendly message before anything else so that if any
+        // component briefly re-renders before navigation it shows clean text,
+        // not the raw API JSON body.
+        error.message = 'Session expired. Please log in again.'
+        redirectToLogin()
+        // Return a promise that never settles — the page is navigating away
+        // and no component should ever render this error response.
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        return new Promise(() => {})
       }
+
+      // Login endpoint: let the form handle it normally.
+      error.message = error.response?.data?.message ?? 'Invalid credentials.'
       return Promise.reject(error)
     }
 
@@ -81,8 +111,9 @@ apiClient.interceptors.response.use(
         : 'Too many requests. Please wait a moment before trying again.'
       // Attach for components that want to show a countdown.
       error.retryAfterSeconds = seconds
-    } else if (status != null && status >= 500) {
-      error.message = `Server error (${status}). Please try again shortly.`
+    } else if (status != null && status >= 400) {
+      error.message = error.response?.data?.message
+        ?? (status >= 500 ? `Server error (${status}). Please try again shortly.` : error.message)
     }
 
     return Promise.reject(error)
@@ -91,13 +122,15 @@ apiClient.interceptors.response.use(
 
 /**
  * Sync the default Authorization header from the persisted auth store.
- * Call once at app startup so requests fired before the first interceptor run
- * (e.g. React Query cache hydration) are already authenticated.
+ * Call after hydration (AuthHeaderSync component) so requests fired before
+ * the first interceptor run are already authenticated.
  */
 export function syncAuthHeader() {
   const token = useAuthStore.getState().access_token
   if (token) {
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    // A fresh valid token means we're no longer mid-redirect — reset the guard.
+    _isRedirectingToLogin = false
   } else {
     delete apiClient.defaults.headers.common['Authorization']
   }

@@ -25,6 +25,14 @@ export interface ProviderPurchaseInput {
   // the internal variation_code.
   provider_variation_code?: string | null;
 
+  // Plan category forwarded from service_plans.plan_category.
+  // Used by electricity providers (e.g. SMShika) to distinguish prepaid/postpaid.
+  plan_category?: string | null;
+
+  // Network operator / biller forwarded from service_plans.network_operator.
+  // Used by cable TV providers (e.g. SMShika) as the provider_code (dstv/gotv/startimes).
+  network_operator?: string | null;
+
   customer_name?: string;
 
   reference: string;
@@ -41,7 +49,8 @@ export interface ProviderPurchaseResult {
 
   message: string;
 
-  status: "successful" | "pending" | "failed";
+  /** "processing" means the provider accepted the order but delivery is not yet confirmed. */
+  status: "successful" | "processing" | "failed";
 
   raw_response?: unknown;
 }
@@ -64,4 +73,34 @@ export interface ProviderHealthResult {
   healthy: boolean;
   latency_ms?: number;
   message: string;
+}
+
+export interface MeterVerifyInput {
+  meter_number: string;
+  disco_name: string;
+  meter_type: string;
+}
+
+export interface MeterVerifyResult {
+  success: boolean;
+  customer_name: string;
+  address?: string;
+  meter_number: string;
+  message: string;
+  raw_response?: unknown;
+}
+
+export interface CableVerifyInput {
+  smartcard_number: string;
+  biller_code: string;
+}
+
+export interface CableVerifyResult {
+  success: boolean;
+  customer_name?: string;
+  current_package?: string;
+  due_date?: string;
+  smartcard_number?: string;
+  message: string;
+  raw_response?: unknown;
 }

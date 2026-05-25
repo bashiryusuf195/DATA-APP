@@ -19,6 +19,7 @@ import {
   refreshController,
   getMeController,
   changePasswordController,
+  updateProfileController,
 } from "../controllers/auth.controller";
 import {
   getSecurityStatusController,
@@ -37,9 +38,10 @@ router.post("/login",           loginRateLimiter,    loginController);
 router.post("/refresh",         refreshLimiter,     refreshController);
 
 // ── Protected routes (authenticate middleware required) ────────
-router.post("/logout",          authenticate, logoutController);
-router.get( "/me",              authenticate, getMeController);
-router.post("/change-password", authenticate, changePasswordLimiter, changePasswordController);
+router.post( "/logout",          authenticate, logoutController);
+router.get(  "/me",              authenticate, getMeController);
+router.patch("/profile",         authenticate, updateProfileController);
+router.post( "/change-password", authenticate, changePasswordLimiter, changePasswordController);
 
 // ── 2FA login verification (public — uses challenge token, no session) ────────
 router.post("/2fa/verify-login", twoFactorVerifyLimiter, verifyLoginTotpController);

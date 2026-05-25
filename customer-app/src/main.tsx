@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { syncAuthHeader } from '@/api/client'
+import { applyPersistedTheme } from '@/store/theme.store'
 import App from './App'
 import './index.css'
 
+// Apply persisted theme before first render to prevent flash
+applyPersistedTheme()
 // Sync the auth header from persisted store before first render
 syncAuthHeader()
 

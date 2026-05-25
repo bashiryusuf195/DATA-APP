@@ -14,7 +14,7 @@ import { fmtDate } from '@/utils/format'
 import type { RoutingRule, CreateRoutingRuleInput, CategoryProviderRow, BulkAssignProviderInput, ProviderRegistryRow } from '@/types'
 import {
   Plus, Edit, ToggleLeft, ToggleRight, RefreshCw, GitBranch, Layers,
-  Wifi, Phone, Zap, Tv, BookOpen, Fingerprint, Globe, Loader2, Check,
+  Wifi, Phone, Zap, Tv, BookOpen, Fingerprint, Globe, Loader2, Check, AlertTriangle,
 } from 'lucide-react'
 import { ENDPOINTS } from '@/config/endpoints'
 import toast from 'react-hot-toast'
@@ -95,6 +95,13 @@ function ServiceRoutingTab() {
     queryKey: ['routing-rules'],
     queryFn: routingApi.list,
   })
+
+  const { data: overridePlansResult } = useQuery({
+    queryKey: ['service-plans-with-overrides-count'],
+    queryFn: () => catalogApi.listServicePlans({ has_provider_override: true, limit: 1 }),
+    staleTime: 30_000,
+  })
+  const overrideCount = overridePlansResult?.meta.total ?? 0
 
   // Shares the ['providers-registry'] cache with ApiIntegrations — same endpoint, same data.
   const { data: providers = [] } = useQuery({
@@ -180,6 +187,15 @@ function ServiceRoutingTab() {
         <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>New rule</Button>
       </div>
 
+      {overrideCount > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 mb-4">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-300">
+            <strong>{overrideCount}</strong> plan{overrideCount !== 1 ? 's have' : ' has'} a plan-level provider override
+            and will bypass these routing rules. Manage in <strong>Service Plans</strong>.
+          </p>
+        </div>
+      )}
       <p className="text-xs text-ink-faint mb-4">
         Service-type routing rules define which provider handles all requests for a given service type by default.
         For finer-grained per-operator or per-category provider assignment, use the <strong>Category Routing</strong> tab.
@@ -214,14 +230,27 @@ function ServiceRoutingTab() {
               {
                 key: 'primary',
                 header: 'Primary Provider',
-                render: (r) => (
-                  <div>
-                    <span className="font-mono text-sm text-ink">{r.primary_provider_code}</span>
-                    {providerNameByCode[r.primary_provider_code] && (
-                      <p className="text-[10px] text-ink-faint">{providerNameByCode[r.primary_provider_code]}</p>
-                    )}
-                  </div>
-                ),
+                render: (r) => {
+                  const providerRow = providers.find((p: ProviderRegistryRow) => p.provider_code === r.primary_provider_code)
+                  const inactive = providerRow && !providerRow.is_active
+                  return (
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-sm text-ink">{r.primary_provider_code}</span>
+                        {inactive && (
+                          <span title="Provider is disabled — routing rule will fail to execute">
+                            <AlertTriangle className="h-3 w-3 text-amber-400" />
+                          </span>
+                        )}
+                      </div>
+                      {providerNameByCode[r.primary_provider_code] && (
+                        <p className={`text-[10px] ${inactive ? 'text-amber-400' : 'text-ink-faint'}`}>
+                          {providerNameByCode[r.primary_provider_code]}{inactive ? ' — disabled' : ''}
+                        </p>
+                      )}
+                    </div>
+                  )
+                },
               },
               {
                 key: 'fallback',

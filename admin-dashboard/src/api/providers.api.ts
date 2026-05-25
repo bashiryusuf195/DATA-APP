@@ -59,4 +59,22 @@ export const providersApi = {
     apiClient
       .post<{ success: boolean; data: { provider_code: string; healthy: boolean; latency_ms: number; message: string } }>(`/admin/providers/${code}/health-check`)
       .then((r) => r.data.data),
+
+  credentialDiagnostic: (code: string): Promise<{
+    valid:    boolean
+    message:  string
+    details:  {
+      userId_length?: number
+      apiKey_length?: number
+      baseUrl?:       string
+      balance?:       number
+      raw_status?:    string
+      http_status?:   number
+    }
+  }> =>
+    apiClient
+      .post<{ success: boolean; data: { valid: boolean; message: string; details: Record<string, unknown> } }>(
+        `/admin/providers/${code}/credential-diagnostic`
+      )
+      .then((r) => r.data.data as { valid: boolean; message: string; details: { userId_length?: number; apiKey_length?: number; baseUrl?: string; balance?: number; raw_status?: string; http_status?: number } }),
 }

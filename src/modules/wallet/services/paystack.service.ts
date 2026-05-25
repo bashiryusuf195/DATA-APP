@@ -12,6 +12,56 @@ const TIMEOUT_MS = 15_000;
 
 // ── Internal response shapes ──────────────────────────────────────────────────
 
+interface PaystackCustomerResponse {
+  status:  boolean;
+  message: string;
+  data: {
+    customer_code: string;
+    email:         string;
+    id:            number;
+  };
+}
+
+interface PaystackFetchCustomerResponse {
+  status:  boolean;
+  message: string;
+  data: {
+    customer_code:    string;
+    email:            string;
+    id:               number;
+    dedicated_account?: {
+      account_number: string;
+      account_name:   string;
+      bank: { name: string; slug: string };
+      active:         boolean;
+    } | null;
+  };
+}
+
+interface PaystackDVAResponse {
+  status:  boolean;
+  message: string;
+  data: {
+    account_number: string;
+    account_name:   string;
+    bank: {
+      name: string;
+      slug: string;
+    };
+    customer: {
+      customer_code: string;
+    };
+    active: boolean;
+  };
+}
+
+export interface DVADetails {
+  account_number: string;
+  account_name:   string;
+  bank_name:      string;
+  bank_slug:      string;
+}
+
 interface PaystackInitializeResponse {
   status:  boolean;
   message: string;
@@ -51,7 +101,7 @@ function authHeader(): string {
 }
 
 async function paystackFetch<T>(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path:   string,
   body?:  Record<string, unknown>
 ): Promise<T> {
@@ -157,6 +207,103 @@ class PaystackGateway implements PaymentGateway {
       customer_email:    d.customer?.email ?? null,
       metadata:          d.metadata ?? {},
     };
+  }
+
+  // ── Dedicated Virtual Accounts ────────────────────────────────────────────
+
+  async createOrFetchCustomer(params: {
+    email:      string;
+    first_name: string;
+    last_name:  string;
+    phone:      string;
+  }): Promise<{ customer_code: string }> {
+    if (!isConfigured()) {
+      throw new Error("Paystack is not configured — PAYSTACK_SECRET_KEY missing");
+    }
+
+    const profileFields = {
+      first_name: params.first_name,
+      last_name:  params.last_name,
+      phone:      params.phone,
+    };
+
+    // Try fetching by email first to avoid duplicate customer errors.
+    // When customer already exists, always update with the latest profile data so
+    // that accounts created before first_name/last_name/phone were set get backfilled.
+    try {
+      const fetchRes = await paystackFetch<PaystackFetchCustomerResponse>(
+        "GET",
+        `/customer/${encodeURIComponent(params.email)}`
+      );
+      if (fetchRes.status && fetchRes.data?.customer_code) {
+        const code = fetchRes.data.customer_code;
+        await paystackFetch<PaystackCustomerResponse>("PUT", `/customer/${encodeURIComponent(code)}`, profileFields);
+        return { customer_code: code };
+      }
+    } catch {
+      // Customer doesn't exist yet — fall through to create
+    }
+
+    const res = await paystackFetch<PaystackCustomerResponse>("POST", "/customer", {
+      email: params.email,
+      ...profileFields,
+    });
+
+    if (!res.status) {
+      throw new Error(`Paystack create customer failed: ${res.message}`);
+    }
+
+    return { customer_code: res.data.customer_code };
+  }
+
+  async createDedicatedAccount(
+    customerCode: string,
+    preferredBank = "wema-bank"
+  ): Promise<DVADetails> {
+    if (!isConfigured()) {
+      throw new Error("Paystack is not configured — PAYSTACK_SECRET_KEY missing");
+    }
+
+    const res = await paystackFetch<PaystackDVAResponse>("POST", "/dedicated_account", {
+      customer:       customerCode,
+      preferred_bank: preferredBank,
+      country:        "NG",
+    });
+
+    if (!res.status) {
+      throw new Error(`Paystack create dedicated account failed: ${res.message}`);
+    }
+
+    return {
+      account_number: res.data.account_number,
+      account_name:   res.data.account_name,
+      bank_name:      res.data.bank.name,
+      bank_slug:      res.data.bank.slug,
+    };
+  }
+
+  async fetchDedicatedAccounts(customerCode: string): Promise<DVADetails[]> {
+    if (!isConfigured()) return [];
+
+    try {
+      const res = await paystackFetch<PaystackFetchCustomerResponse>(
+        "GET",
+        `/customer/${encodeURIComponent(customerCode)}`
+      );
+
+      if (res.status && res.data?.dedicated_account) {
+        const dva = res.data.dedicated_account;
+        return [{
+          account_number: dva.account_number,
+          account_name:   dva.account_name,
+          bank_name:      dva.bank.name,
+          bank_slug:      dva.bank.slug,
+        }];
+      }
+      return [];
+    } catch {
+      return [];
+    }
   }
 
   // Paystack signs webhook payloads with HMAC-SHA512 of the raw request body.

@@ -26,6 +26,7 @@ import { vtuPurchaseWorker }     from '../modules/queue/workers/vtu-purchase.wor
 import { paystackWebhookWorker } from '../modules/queue/workers/paystack-webhook.worker';
 import { reconciliationWorker }  from '../modules/reconciliation/workers/reconciliation.worker';
 import { notificationWorker }    from '../modules/notifications/workers/notification.worker';
+import { integrityWorker }       from '../modules/backup/workers/integrity.worker';
 
 const workers = [
   airtimeWorker,
@@ -33,13 +34,14 @@ const workers = [
   paystackWebhookWorker,
   reconciliationWorker,
   notificationWorker,
+  integrityWorker,
 ];
 
 async function startWorkers() {
   logger.info('Worker process starting…', {
     env:     config.env,
     version: config.appVersion,
-    queues:  ['airtime-purchases', 'vtu-purchases', 'paystack-webhooks', 'vtu-reconciliation', 'vtu-notifications'],
+    queues:  ['airtime-purchases', 'vtu-purchases', 'paystack-webhooks', 'vtu-reconciliation', 'vtu-notifications', 'integrity-checks'],
   });
 
   await redis.connect().catch(() => {

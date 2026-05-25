@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type {
-  ReconciliationReport, ReconciliationIssue,
+  ReconciliationReport, ReconciliationIssue, ReconciliationStats,
   ProviderBalance, Refund, Reversal,
   PaginatedResponse,
 } from '@/types'
@@ -27,6 +27,11 @@ export const financeApi = {
     apiClient
       .post<{ success: boolean; message: string; job_id: string | number }>('/admin/reconciliation/run')
       .then((r) => r.data),
+
+  getReconciliationStats: () =>
+    apiClient
+      .get<{ success: boolean; data: ReconciliationStats }>('/admin/reconciliation/stats')
+      .then((r) => r.data.data),
 
   // ── Finance analytics ───────────────────────────────────────────────────────
   getRevenueSummary: (params?: DateRange) =>

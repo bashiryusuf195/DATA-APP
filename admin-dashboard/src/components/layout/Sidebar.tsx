@@ -32,6 +32,10 @@ import {
   Flag,
   PackageX,
   Webhook,
+  Layout,
+  MonitorDot,
+  HeartHandshake,
+  HardDrive,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -102,17 +106,21 @@ const nav: NavSection[] = [
     key: 'security',
     title: 'Security & Compliance',
     items: [
-      { to: '/compliance/kyc', label: 'KYC / Compliance', icon: <ShieldCheck   className="h-4 w-4" /> },
-      { to: '/audit-logs',     label: 'Audit Logs',       icon: <ClipboardList className="h-4 w-4" /> },
-      { to: '/settings',       label: 'Settings',         icon: <SlidersHorizontal className="h-4 w-4" /> },
+      { to: '/compliance/kyc',   label: 'KYC / Compliance', icon: <ShieldCheck       className="h-4 w-4" /> },
+      { to: '/audit-logs',       label: 'Audit Logs',       icon: <ClipboardList     className="h-4 w-4" /> },
+      { to: '/app-content',      label: 'App Content',      icon: <Layout            className="h-4 w-4" /> },
+      { to: '/settings',         label: 'Settings',         icon: <SlidersHorizontal className="h-4 w-4" /> },
     ],
   },
   {
     key: 'system',
     title: 'System',
     items: [
-      { to: '/failed-jobs',          label: 'Failed Jobs',   icon: <PackageX className="h-4 w-4" /> },
-      { to: '/operations/webhooks',  label: 'Webhook Logs',  icon: <Webhook  className="h-4 w-4" /> },
+      { to: '/operations/system-health',     label: 'System Health',     icon: <HeartHandshake className="h-4 w-4" /> },
+      { to: '/operations/backup-integrity',  label: 'Backup & Integrity', icon: <HardDrive      className="h-4 w-4" /> },
+      { to: '/operations/queue-monitor', label: 'Queue Monitor', icon: <MonitorDot     className="h-4 w-4" /> },
+      { to: '/failed-jobs',              label: 'Failed Jobs',   icon: <PackageX       className="h-4 w-4" /> },
+      { to: '/operations/webhooks',      label: 'Webhook Logs',  icon: <Webhook        className="h-4 w-4" /> },
     ],
   },
 ]

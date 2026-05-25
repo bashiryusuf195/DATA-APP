@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme CSS variables ─────────────────────────────────────────────────────
+   surface/ink/border colors are defined here so all Tailwind classes that
+   reference var(--surface-*) etc. automatically switch in dark mode without
+   needing to add dark: variants to every component.
+────────────────────────────────────────────────────────────────────────────── */
+:root {
+  --surface-0: #EEEEF5;
+  --surface-1: #FFFFFF;
+  --surface-2: #F5F5FB;
+  --ink:       #111827;
+  --ink-muted: #6B7280;
+  --ink-faint: #9CA3AF;
+  --border:    #E5E7EB;
+}
+
+html.dark {
+  --surface-0: #0D1117;
+  --surface-1: #161B22;
+  --surface-2: #21262D;
+  --ink:       #E6EDF3;
+  --ink-muted: #8B949E;
+  --ink-faint: #6E7681;
+  --border:    #30363D;
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -15,8 +40,8 @@
 
   body {
     font-family: 'Inter', system-ui, sans-serif;
-    background-color: theme('colors.surface.0');
-    color: theme('colors.ink.DEFAULT');
+    background-color: var(--surface-0);
+    color: var(--ink);
   }
 
   /* Safe area bottom padding for iPhone notch */
@@ -28,6 +53,8 @@
 @layer utilities {
   .h-4\.5 { height: 1.125rem; }
   .w-4\.5 { width:  1.125rem; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /* Smooth number input without spinners */

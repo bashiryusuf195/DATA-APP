@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import axios from 'axios'
 import { catalogApi } from '@/api/catalog.api'
 import { providersApi } from '@/api/providers.api'
+import { routingApi } from '@/api/routing.api'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FilterBar } from '@/components/shared/FilterBar'
 import { DataTable } from '@/components/shared/DataTable'
@@ -13,8 +14,8 @@ import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtCurrency } from '@/utils/format'
 import { ENDPOINTS } from '@/config/endpoints'
-import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput } from '@/types'
-import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon } from 'lucide-react'
+import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule } from '@/types'
+import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2 } from 'lucide-react'
 
 const PAGE_SIZE = 50
 
@@ -55,45 +56,242 @@ interface PlanFormState extends CreateServicePlanInput {
   duration_days_str: string
 }
 
-const OPERATOR_OPTIONS = [
-  { value: '', label: 'None' },
-  // Telecom
-  { value: 'mtn', label: 'MTN' },
-  { value: 'airtel', label: 'Airtel' },
-  { value: 'glo', label: 'Glo' },
-  { value: '9mobile', label: '9mobile' },
-  // Cable TV
-  { value: 'dstv', label: 'DStv' },
-  { value: 'gotv', label: 'GOtv' },
-  { value: 'startimes', label: 'StarTimes' },
-  // Electricity DISCOs
-  { value: 'ekedc', label: 'EKEDC' },
-  { value: 'ikedc', label: 'IKEDC' },
-  { value: 'aedc', label: 'AEDC' },
-  { value: 'phed', label: 'PHED' },
-  { value: 'kedco', label: 'KEDCO' },
-  // Exams
-  { value: 'waec', label: 'WAEC' },
-  { value: 'neco', label: 'NECO' },
-  { value: 'jamb', label: 'JAMB' },
-  // Identity
-  { value: 'nin', label: 'NIN' },
-  { value: 'bvn', label: 'BVN' },
-]
+// ── Service-type field configuration ─────────────────────────────────────────
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'None' },
-  { value: 'sme', label: 'SME' },
-  { value: 'corporate', label: 'Corporate' },
-  { value: 'gifting', label: 'Gifting' },
-  { value: 'direct', label: 'Direct' },
-  { value: 'dnd', label: 'DND' },
-  { value: 'social', label: 'Social' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'annual', label: 'Annual' },
-]
+interface ServiceTypeConfig {
+  operatorLabel: string
+  operatorOptions: { value: string; label: string }[]
+  categoryLabel: string
+  categoryOptions: { value: string; label: string }[]
+  variableAmountDefault: boolean
+  providerCodeLabel: string
+  providerCodeHint: string
+  variationCodePlaceholder?: string
+  variationCodeHint?: string
+  providerCodePlaceholder?: string
+}
+
+const SERVICE_TYPE_CONFIGS: Record<string, ServiceTypeConfig> = {
+  data: {
+    operatorLabel: 'Network',
+    operatorOptions: [
+      { value: 'mtn',     label: 'MTN'     },
+      { value: 'airtel',  label: 'Airtel'  },
+      { value: 'glo',     label: 'Glo'     },
+      { value: '9mobile', label: '9mobile' },
+    ],
+    categoryLabel: 'Category',
+    categoryOptions: [
+      { value: 'sme',       label: 'SME'       },
+      { value: 'corporate', label: 'Corporate' },
+      { value: 'gifting',   label: 'Gifting'   },
+      { value: 'direct',    label: 'Direct'    },
+      { value: 'dnd',       label: 'DND'       },
+      { value: 'social',    label: 'Social'    },
+      { value: 'daily',     label: 'Daily'     },
+      { value: 'weekly',    label: 'Weekly'    },
+      { value: 'monthly',   label: 'Monthly'   },
+    ],
+    variableAmountDefault: false,
+    providerCodeLabel: 'Provider Plan ID',
+    providerCodeHint: 'SMShika data: enter the numeric plan ID from your SMShika plan list (e.g. 1, 7, 42). Required — purchase will fail without it.',
+  },
+  airtime: {
+    operatorLabel: 'Network',
+    operatorOptions: [
+      { value: 'mtn',     label: 'MTN'     },
+      { value: 'airtel',  label: 'Airtel'  },
+      { value: 'glo',     label: 'Glo'     },
+      { value: '9mobile', label: '9mobile' },
+    ],
+    categoryLabel: 'Airtime Type',
+    categoryOptions: [
+      { value: 'vtu',            label: 'VTU'            },
+      { value: 'share-and-sell', label: 'Share & Sell'   },
+      { value: 'recharge-card',  label: 'Recharge Card'  },
+    ],
+    variableAmountDefault: true,
+    providerCodeLabel: 'Provider Plan ID / Variation Code',
+    providerCodeHint: 'Provider-specific plan identifier. Usually not needed for airtime VTU.',
+  },
+  electricity: {
+    operatorLabel: 'DISCO',
+    operatorOptions: [
+      { value: 'ekedc',  label: 'EKEDC — Eko Electric (01)'    },
+      { value: 'ikedc',  label: 'IKEDC — Ikeja Electric (02)'  },
+      { value: 'aedc',   label: 'AEDC — Abuja Electric (03)'   },
+      { value: 'kedc',   label: 'KEDC — Kano Electric (04)'    },
+      { value: 'phedc',  label: 'PHEDC — Port Harcourt (05)'   },
+      { value: 'jedc',   label: 'JEDC — Jos Electric (06)'     },
+      { value: 'ibedc',  label: 'IBEDC — Ibadan Electric (07)' },
+      { value: 'kaedc',  label: 'KAEDC — Kaduna Electric (08)' },
+      { value: 'eedc',   label: 'EEDC — Enugu Electric (09)'   },
+      { value: 'bedc',   label: 'BEDC — Benin Electric (10)'   },
+      { value: 'yedc',   label: 'YEDC — Yola Electric (11)'    },
+      { value: 'aba',    label: 'ABA/APLE — Aba Power (12)'    },
+    ],
+    categoryLabel: 'Meter Type',
+    categoryOptions: [
+      { value: 'prepaid',  label: 'Prepaid'  },
+      { value: 'postpaid', label: 'Postpaid' },
+    ],
+    variableAmountDefault: true,
+    providerCodeLabel: 'Provider DISCO Code (Clubkonnect)',
+    providerCodeHint: 'Clubkonnect numeric DISCO ID — required for purchase and meter verification. Use the code shown in brackets next to the DISCO name above (01=EKEDC, 02=IKEDC … 11=YEDC, 12=ABA/APLE).',
+    providerCodePlaceholder: 'e.g. 11 (YEDC), 02 (IKEDC)',
+    variationCodePlaceholder: 'e.g. yedc-prepaid',
+    variationCodeHint: 'Internal app code — combine DISCO slug + meter type. Must be unique per service type (e.g. yedc-prepaid, ikedc-postpaid, aedc-prepaid).',
+  },
+  cable_tv: {
+    operatorLabel: 'Biller',
+    operatorOptions: [
+      { value: 'dstv',       label: 'DStv'       },
+      { value: 'gotv',       label: 'GOtv'       },
+      { value: 'startimes',  label: 'StarTimes'  },
+      { value: 'showmax',    label: 'Showmax'    },
+    ],
+    categoryLabel: 'Package Type',
+    categoryOptions: [
+      { value: 'compact',       label: 'Compact'       },
+      { value: 'compact-plus',  label: 'Compact Plus'  },
+      { value: 'premium',       label: 'Premium'       },
+      { value: 'yanga',         label: 'Yanga'         },
+      { value: 'jolli',         label: 'Jolli'         },
+      { value: 'max',           label: 'Max'           },
+      { value: 'basic',         label: 'Basic'         },
+      { value: 'classic',       label: 'Classic'       },
+      { value: 'mobile',        label: 'Mobile'        },
+      { value: 'pro',           label: 'Pro'           },
+    ],
+    variableAmountDefault: false,
+    providerCodeLabel: 'Provider Plan ID',
+    providerCodeHint: 'Provider plan code for this bouquet (e.g. VTPass cable plan code). Required — purchase will fail without it.',
+  },
+  exam_pin: {
+    operatorLabel: 'Exam Body',
+    operatorOptions: [
+      { value: 'waec', label: 'WAEC' },
+      { value: 'neco', label: 'NECO' },
+      { value: 'jamb', label: 'JAMB' },
+    ],
+    categoryLabel: 'PIN Type',
+    categoryOptions: [
+      { value: 'result-checker',   label: 'Result Checker'   },
+      { value: 'registration-pin', label: 'Registration PIN' },
+      { value: 'epin',             label: 'ePIN'             },
+      { value: 'token',            label: 'Token'            },
+    ],
+    variableAmountDefault: false,
+    providerCodeLabel: 'Provider Plan ID',
+    providerCodeHint: 'Provider plan code for this exam PIN type. Required.',
+  },
+  identity_verification: {
+    operatorLabel: 'Verification Type',
+    operatorOptions: [
+      { value: 'nin',   label: 'NIN'   },
+      { value: 'bvn',   label: 'BVN'   },
+      { value: 'phone', label: 'Phone' },
+      { value: 'cac',   label: 'CAC'   },
+    ],
+    categoryLabel: 'Package / Tier',
+    categoryOptions: [
+      { value: 'basic',    label: 'Basic'    },
+      { value: 'standard', label: 'Standard' },
+      { value: 'premium',  label: 'Premium'  },
+    ],
+    variableAmountDefault: false,
+    providerCodeLabel: 'Provider Plan ID / Variation Code',
+    providerCodeHint: 'Provider-specific plan identifier. Optional depending on provider.',
+  },
+}
+
+const DEFAULT_CONFIG: ServiceTypeConfig = {
+  operatorLabel: 'Operator / Biller',
+  operatorOptions: [
+    { value: 'mtn', label: 'MTN' }, { value: 'airtel', label: 'Airtel' },
+    { value: 'glo', label: 'Glo' }, { value: '9mobile', label: '9mobile' },
+    { value: 'dstv', label: 'DStv' }, { value: 'gotv', label: 'GOtv' },
+    { value: 'ekedc', label: 'EKEDC' }, { value: 'ikedc', label: 'IKEDC' },
+    { value: 'aedc', label: 'AEDC' }, { value: 'phed', label: 'PHED' },
+    { value: 'kedco', label: 'KEDCO' }, { value: 'waec', label: 'WAEC' },
+    { value: 'neco', label: 'NECO' }, { value: 'jamb', label: 'JAMB' },
+    { value: 'nin', label: 'NIN' }, { value: 'bvn', label: 'BVN' },
+  ],
+  categoryLabel: 'Category',
+  categoryOptions: [
+    { value: 'sme', label: 'SME' }, { value: 'corporate', label: 'Corporate' },
+    { value: 'prepaid', label: 'Prepaid' }, { value: 'postpaid', label: 'Postpaid' },
+    { value: 'gifting', label: 'Gifting' }, { value: 'direct', label: 'Direct' },
+  ],
+  variableAmountDefault: false,
+  providerCodeLabel: 'Provider Plan ID / Variation Code',
+  providerCodeHint: "Provider-specific plan identifier. Leave blank to use the plan's variation_code.",
+}
+
+// ── ComboField: dropdown with inline custom-value escape hatch ────────────────
+
+interface ComboFieldProps {
+  label: string
+  value: string | null
+  onChange: (v: string | null) => void
+  options: { value: string; label: string }[]
+  noneLabel?: string
+  hint?: string
+  error?: string
+}
+
+function ComboField({ label, value, onChange, options, noneLabel = 'None', hint, error }: ComboFieldProps) {
+  const isKnown = !value || options.some((o) => o.value === value)
+  const [mode, setMode] = useState<'select' | 'custom'>(isKnown ? 'select' : 'custom')
+  const [customVal, setCustomVal] = useState(!isKnown ? (value ?? '') : '')
+
+  function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    const v = e.target.value
+    if (v === '__custom__') {
+      setMode('custom')
+      setCustomVal('')
+      onChange(null)
+    } else {
+      setMode('select')
+      onChange(v || null)
+    }
+  }
+
+  function handleCustomChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value
+    setCustomVal(v)
+    onChange(v.trim() || null)
+  }
+
+  const selectValue = mode === 'custom' ? '__custom__' : (value ?? '')
+
+  return (
+    <div>
+      <Select
+        label={label}
+        value={selectValue}
+        onChange={handleSelect}
+        options={[
+          { value: '', label: noneLabel },
+          ...options,
+          { value: '__custom__', label: '+ Custom…' },
+        ]}
+        error={mode === 'select' ? error : undefined}
+      />
+      {mode === 'custom' && (
+        <div className="mt-1.5">
+          <Input
+            value={customVal}
+            onChange={handleCustomChange}
+            placeholder={`Type custom ${label.toLowerCase()}…`}
+            error={error}
+          />
+        </div>
+      )}
+      {hint && !error && <p className="mt-1 text-xs text-ink-faint">{hint}</p>}
+    </div>
+  )
+}
 
 function buildFormState(initial?: ServicePlan | null): PlanFormState {
   if (initial) {
@@ -144,11 +342,15 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
   const isEdit = !!initial
   const [form, setForm] = useState<PlanFormState>(() => buildFormState(initial))
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
+  // Incrementing key forces ComboField components to remount on form reset,
+  // so their local select/custom mode re-initialises from the new form values.
+  const [formKey, setFormKey] = useState(0)
 
   useEffect(() => {
     if (open) {
       setForm(buildFormState(initial))
       setErrors({})
+      setFormKey((k) => k + 1)
     }
   }, [open, initial])
 
@@ -159,9 +361,19 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
 
   const selectedService = services.find((s) => s.id === form.service_id)
   const selectedServiceType = selectedService?.service_type ?? ''
-  const operatorFieldLabel = ['data', 'airtime'].includes(selectedServiceType)
-    ? 'Network'
-    : 'Operator / Biller'
+  const config = SERVICE_TYPE_CONFIGS[selectedServiceType] ?? DEFAULT_CONFIG
+
+  // When service type changes on a new plan, apply sensible defaults
+  function handleServiceChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newServiceId = e.target.value
+    const newService = services.find((s) => s.id === newServiceId)
+    const newConfig = newService ? (SERVICE_TYPE_CONFIGS[newService.service_type] ?? DEFAULT_CONFIG) : null
+    setForm((f) => ({
+      ...f,
+      service_id: newServiceId,
+      ...(!isEdit && newConfig ? { is_variable_amount: newConfig.variableAmountDefault } : {}),
+    }))
+  }
 
   const providerOptions = [
     { value: '', label: 'None (use routing rules)' },
@@ -197,6 +409,31 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
     try { JSON.parse(form.provider_metadata_raw) } catch {
       e.provider_metadata_raw = 'Must be valid JSON'
     }
+
+    // Service-type-aware rules
+    if (selectedServiceType) {
+      // Operator/DISCO/Biller required when there are defined options
+      if (config.operatorOptions.length > 0 && !form.network_operator) {
+        e.network_operator = `${config.operatorLabel} is required`
+      }
+      // Electricity and cable_tv require category (meter type / package type)
+      if (['electricity', 'cable_tv'].includes(selectedServiceType) && !form.plan_category) {
+        e.plan_category = `${config.categoryLabel} is required`
+      }
+      // Electricity always requires provider_variation_code (Clubkonnect numeric DISCO ID)
+      if (selectedServiceType === 'electricity' && !form.provider_variation_code) {
+        e.provider_variation_code = 'Clubkonnect DISCO ID is required (e.g. 11 for YEDC, 02 for IKEDC)'
+      }
+      // Data requires provider_variation_code for SMShika
+      if (
+        selectedServiceType === 'data' &&
+        form.primary_provider_code === 'smshika' &&
+        !form.provider_variation_code
+      ) {
+        e.provider_variation_code = `${config.providerCodeLabel} is required for SMShika`
+      }
+    }
+
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -280,6 +517,16 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
     )
   }
 
+  // Inline service-type hint shown below the service selector
+  const serviceTypeHint: Record<string, string> = {
+    electricity: 'Variable Amount auto-enabled. Set: Variation Code (e.g. yedc-prepaid) · DISCO · Meter Type · Provider DISCO Code (Clubkonnect numeric, e.g. 11).',
+    airtime:     'Variable Amount auto-enabled for new plans. Set Network.',
+    data:        'Set Network + Category + Provider Plan ID (required for SMShika).',
+    cable_tv:    'Set Biller + Package Type + Provider Plan ID.',
+    exam_pin:    'Set Exam Body + PIN Type + Provider Plan ID.',
+    identity_verification: 'Set Verification Type + Tier.',
+  }
+
   return (
     <Modal
       open={open}
@@ -301,13 +548,19 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
         <div className="space-y-4">
           <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-widest">Plan Details</p>
 
-          <Select
-            label="Service"
-            value={form.service_id}
-            onChange={(e) => setForm((f) => ({ ...f, service_id: e.target.value }))}
-            options={serviceOptions}
-            error={errors.service_id}
-          />
+          <div>
+            <Select
+              label="Service"
+              value={form.service_id}
+              onChange={handleServiceChange}
+              options={serviceOptions}
+              error={errors.service_id}
+            />
+            {selectedServiceType && serviceTypeHint[selectedServiceType] && (
+              <p className="mt-1 text-xs text-ink-faint">{serviceTypeHint[selectedServiceType]}</p>
+            )}
+          </div>
+
           <Input
             label="Legacy Provider Code"
             value={form.provider_code}
@@ -327,22 +580,29 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
             label="Variation Code"
             value={form.variation_code}
             onChange={(e) => setForm((f) => ({ ...f, variation_code: e.target.value }))}
-            placeholder="e.g. mtn-1gb-30"
+            placeholder={config.variationCodePlaceholder ?? 'e.g. mtn-1gb-30'}
+            hint={config.variationCodeHint ?? 'Internal slug — must be unique per service type'}
             error={errors.variation_code}
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <Select
-              label={operatorFieldLabel}
-              value={form.network_operator ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, network_operator: e.target.value || null }))}
-              options={OPERATOR_OPTIONS}
+            <ComboField
+              key={`${formKey}-operator`}
+              label={config.operatorLabel}
+              value={form.network_operator ?? null}
+              onChange={(v) => setForm((f) => ({ ...f, network_operator: v }))}
+              options={config.operatorOptions}
+              noneLabel="None"
+              error={errors.network_operator}
             />
-            <Select
-              label="Category"
-              value={form.plan_category ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, plan_category: e.target.value || null }))}
-              options={CATEGORY_OPTIONS}
+            <ComboField
+              key={`${formKey}-category`}
+              label={config.categoryLabel}
+              value={form.plan_category ?? null}
+              onChange={(v) => setForm((f) => ({ ...f, plan_category: v }))}
+              options={config.categoryOptions}
+              noneLabel="None"
+              error={errors.plan_category}
             />
           </div>
 
@@ -358,7 +618,7 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
             error={errors.duration_days_str}
           />
 
-          {numField('amount', 'Base Amount (₦)', 'Provider face value')}
+          {numField('amount', 'Base Amount (₦)', 'Provider face value (0 for variable-amount plans)')}
           {numField('cost_price', 'Cost Price (₦)', 'What you pay the provider')}
           {numField('selling_price', 'Selling Price (₦)', 'What users pay')}
 
@@ -394,15 +654,17 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
             options={providerOptions}
           />
           <Input
-            label="Provider Plan ID / Variation Code"
+            label={config.providerCodeLabel}
             value={form.provider_variation_code ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, provider_variation_code: e.target.value || null }))}
-            placeholder="e.g. 7 (SMShika data) or leave blank"
-            hint={
-              selectedServiceType === 'data'
-                ? 'SMShika data: enter the numeric plan ID from your SMShika plan list (e.g. 1, 7, 42). Required — purchase will fail without it.'
-                : "Provider-specific plan identifier. Leave blank to use the plan's variation_code."
+            placeholder={
+              config.providerCodePlaceholder ??
+              (selectedServiceType === 'data'
+                ? 'e.g. 7 (SMShika numeric plan ID)'
+                : 'Provider-specific identifier')
             }
+            hint={config.providerCodeHint}
+            error={errors.provider_variation_code}
           />
 
           <div>
@@ -423,7 +685,7 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
 
           <div className="pt-2 space-y-3 border-t border-border">
             <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-widest">Flags</p>
-            {toggle('is_variable_amount', 'Variable Amount', 'User supplies amount at purchase')}
+            {toggle('is_variable_amount', 'Variable Amount', 'User supplies amount at purchase (electricity, airtime)')}
             {toggle('is_active', 'Active')}
           </div>
         </div>
@@ -473,6 +735,361 @@ function BulkToggleModal({ open, onClose, selectedIds, targetActive, onConfirm, 
   )
 }
 
+// ── Bulk clear override confirmation modal ────────────────────────────────────
+
+interface BulkClearOverrideModalProps {
+  open: boolean
+  onClose: () => void
+  selectedIds: string[]
+  onConfirm: () => void
+  isPending: boolean
+}
+
+function BulkClearOverrideModal({ open, onClose, selectedIds, onConfirm, isPending }: BulkClearOverrideModalProps) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Clear Provider Override"
+      subtitle={`${selectedIds.length} plan${selectedIds.length !== 1 ? 's' : ''} selected`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button variant="danger" size="sm" onClick={onConfirm} disabled={isPending}>
+            {isPending ? 'Clearing…' : `Clear Override on ${selectedIds.length} Plan${selectedIds.length !== 1 ? 's' : ''}`}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-ink-muted">
+        This will remove the primary and fallback provider overrides from {selectedIds.length} selected
+        plan{selectedIds.length !== 1 ? 's' : ''}. Plans will revert to using service routing rules.
+        Provider plan codes (variation codes) are not affected.
+      </p>
+    </Modal>
+  )
+}
+
+// ── Bulk set provider modal ───────────────────────────────────────────────────
+
+interface BulkSetProviderModalProps {
+  open: boolean
+  onClose: () => void
+  selectedIds: string[]
+  providers: Provider[]
+  onConfirm: (providerCode: string) => void
+  isPending: boolean
+}
+
+function BulkSetProviderModal({ open, onClose, selectedIds, providers, onConfirm, isPending }: BulkSetProviderModalProps) {
+  const [chosenProvider, setChosenProvider] = useState('')
+
+  useEffect(() => {
+    if (!open) setChosenProvider('')
+  }, [open])
+
+  const providerOptions = [
+    { value: '', label: 'Select provider…' },
+    ...providers.map((p) => ({ value: p.provider_code, label: `${p.name} (${p.provider_code})` })),
+  ]
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Set Primary Provider"
+      subtitle={`${selectedIds.length} plan${selectedIds.length !== 1 ? 's' : ''} selected`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={isPending}>Cancel</Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => { if (chosenProvider) onConfirm(chosenProvider) }}
+            disabled={isPending || !chosenProvider}
+          >
+            {isPending ? 'Applying…' : `Set Provider for ${selectedIds.length} Plan${selectedIds.length !== 1 ? 's' : ''}`}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-ink-muted">
+          This will set the primary provider override for {selectedIds.length} selected
+          plan{selectedIds.length !== 1 ? 's' : ''}, bypassing service routing rules.
+        </p>
+        <Select
+          label="Primary Provider"
+          value={chosenProvider}
+          onChange={(e) => setChosenProvider(e.target.value)}
+          options={providerOptions}
+        />
+      </div>
+    </Modal>
+  )
+}
+
+// ── Import Plans Modal ────────────────────────────────────────────────────────
+
+interface ImportPlan {
+  plan_code:       string
+  name:            string
+  operator:        string
+  amount:          number
+  category?:       string
+  duration_days?:  number
+  provider_plan_id: string
+}
+
+function parseDuration(s: string): number | undefined {
+  const m = /(\d+)\s*day/i.exec(s)
+  if (m) return parseInt(m[1], 10)
+  const m2 = /(\d+)\s*month/i.exec(s)
+  if (m2) return parseInt(m2[1], 10) * 30
+  const n = parseInt(s, 10)
+  return isNaN(n) ? undefined : n
+}
+
+function normalizeDataPlan(raw: Record<string, unknown>, network: string): ImportPlan | null {
+  const id   = raw.id ?? raw.plan_id ?? raw.data_id
+  const name = String(raw.plan ?? raw.name ?? raw.description ?? raw.plan_name ?? id ?? '').trim()
+  const amt  = parseFloat(String(raw.amount ?? raw.price ?? raw.plan_amount ?? 0))
+  if (!id || !name) return null
+  return {
+    plan_code:       `${network.toLowerCase()}-${id}`,
+    name:            name || String(id),
+    operator:        network.toLowerCase(),
+    amount:          isNaN(amt) ? 0 : amt,
+    category:        String(raw.plan_type ?? raw.type ?? raw.category ?? '').toLowerCase() || undefined,
+    duration_days:   raw.month_validate ? parseDuration(String(raw.month_validate)) : undefined,
+    provider_plan_id: String(id),
+  }
+}
+
+function normalizeCablePlan(raw: Record<string, unknown>): ImportPlan | null {
+  const plan_code = String(raw.plan_code ?? '')
+  const name      = String(raw.name ?? '')
+  const operator  = String(raw.operator ?? '')
+  if (!plan_code || !name) return null
+  const amt = parseFloat(String(raw.amount ?? 0))
+  return { plan_code, name, operator, amount: isNaN(amt) ? 0 : amt, provider_plan_id: plan_code }
+}
+
+function normalizeElectricityPlan(raw: Record<string, unknown>): ImportPlan | null {
+  const plan_code     = String(raw.plan_code ?? '')
+  const name          = String(raw.name ?? '')
+  const operator      = String(raw.operator ?? '')
+  const category      = String(raw.plan_category ?? raw.category ?? '')
+  const provider_code = String(raw.provider_code ?? '')
+  if (!plan_code || !name || !provider_code) return null
+  return { plan_code, name, operator, amount: 0, category, provider_plan_id: provider_code }
+}
+
+interface ImportPlansModalProps {
+  open:     boolean
+  onClose:  () => void
+  services: CatalogService[]
+  onSaved:  () => void
+}
+
+const IMPORT_PROVIDER_OPTIONS = [
+  { value: 'legitdataway', label: 'LegitDataWay' },
+  { value: 'smshika',      label: 'SMShika'       },
+]
+
+function ImportPlansModal({ open, onClose, services, onSaved }: ImportPlansModalProps) {
+  const [providerCode,  setProviderCode]  = useState('legitdataway')
+  const [serviceType,   setServiceType]   = useState<'data' | 'cable_tv' | 'electricity'>('data')
+  const [network,       setNetwork]       = useState('mtn')
+  const [serviceId,     setServiceId]     = useState('')
+  const [markupPct,     setMarkupPct]     = useState('5')
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
+  const [plans,         setPlans]         = useState<ImportPlan[]>([])
+  const [fetched,       setFetched]       = useState(false)
+  const [fetchError,    setFetchError]    = useState('')
+
+  useEffect(() => {
+    if (!open) { setFetched(false); setPlans([]); setSelectedCodes(new Set()); setFetchError('') }
+  }, [open])
+
+  const fetchMutation = useMutation({
+    mutationFn: () => catalogApi.fetchProviderPlans(providerCode, serviceType, serviceType === 'data' ? network : undefined),
+    onSuccess: (data) => {
+      const normalized = data.plans
+        .map((raw) =>
+          serviceType === 'data'        ? normalizeDataPlan(raw, network) :
+          serviceType === 'electricity' ? normalizeElectricityPlan(raw) :
+          normalizeCablePlan(raw)
+        )
+        .filter((p): p is ImportPlan => p !== null)
+      setPlans(normalized)
+      setSelectedCodes(new Set(normalized.map((p) => p.plan_code)))
+      setFetched(true)
+      setFetchError('')
+    },
+    onError: (err: Error) => { setFetchError(err.message); setFetched(true) },
+  })
+
+  const importMutation = useMutation({
+    mutationFn: () => {
+      const markup   = parseFloat(markupPct) || 0
+      const selected = plans.filter((p) => selectedCodes.has(p.plan_code))
+      return catalogApi.bulkImportPlans({
+        service_id:            serviceId,
+        provider_code:         providerCode,
+        primary_provider_code: providerCode,
+        plans: selected.map((p) => ({
+          name:                    p.name,
+          variation_code:          p.plan_code,
+          amount:                  p.amount,
+          cost_price:              p.amount > 0 ? p.amount : null,
+          selling_price:           p.amount > 0 ? parseFloat((p.amount * (1 + markup / 100)).toFixed(2)) : null,
+          network_operator:        p.operator || null,
+          plan_category:           p.category || null,
+          duration_days:           p.duration_days ?? null,
+          provider_variation_code: p.provider_plan_id,
+        })),
+      })
+    },
+    onSuccess: (result) => {
+      toast.success(`Imported ${result.created} plan${result.created !== 1 ? 's' : ''}${result.skipped ? ` (${result.skipped} skipped — already existed)` : ''}`)
+      onSaved()
+      onClose()
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const filteredServices = services.filter((s) =>
+    serviceType === 'electricity'
+      ? s.service_type === 'electricity'
+      : s.service_type === serviceType
+  )
+  const serviceOptions   = [{ value: '', label: 'Select a service…' }, ...filteredServices.map((s) => ({ value: s.id, label: s.name }))]
+  const networkOptions   = [
+    { value: 'mtn',     label: 'MTN'     },
+    { value: 'airtel',  label: 'Airtel'  },
+    { value: 'glo',     label: 'Glo'     },
+    { value: '9mobile', label: '9mobile' },
+  ]
+
+  const allSelected = plans.length > 0 && plans.every((p) => selectedCodes.has(p.plan_code))
+  const toggleAll   = () => setSelectedCodes(allSelected ? new Set() : new Set(plans.map((p) => p.plan_code)))
+  const toggleOne   = (code: string) => setSelectedCodes((prev) => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n })
+  const changeType     = (t: 'data' | 'cable_tv' | 'electricity') => { setServiceType(t); setFetched(false); setPlans([]); setSelectedCodes(new Set()); setFetchError(''); setServiceId('') }
+  const changeProvider = (code: string) => { setProviderCode(code); setFetched(false); setPlans([]); setSelectedCodes(new Set()); setFetchError('') }
+
+  const providerLabel = IMPORT_PROVIDER_OPTIONS.find((p) => p.value === providerCode)?.label ?? providerCode
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Import Plans from ${providerLabel}`}
+      subtitle="Fetch available plans and bulk-add them to a service"
+      size="lg"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={importMutation.isPending}>Cancel</Button>
+          <Button
+            variant="primary" size="sm"
+            onClick={() => importMutation.mutate()}
+            disabled={!serviceId || selectedCodes.size === 0 || !fetched || !!fetchError || importMutation.isPending}
+          >
+            {importMutation.isPending ? 'Importing…' : `Import ${selectedCodes.size} Plan${selectedCodes.size !== 1 ? 's' : ''}`}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Provider selector */}
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium text-ink-muted w-24 shrink-0">Provider</p>
+          <div className="flex gap-2">
+            {IMPORT_PROVIDER_OPTIONS.map((p) => (
+              <button key={p.value} type="button" onClick={() => changeProvider(p.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${providerCode === p.value ? 'border-accent bg-accent/10 text-accent' : 'border-border text-ink-muted hover:border-accent/40'}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Type selector */}
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium text-ink-muted w-24 shrink-0">Service type</p>
+          <div className="flex gap-2 flex-wrap">
+            {([['data', 'Data'], ['cable_tv', 'Cable TV'], ['electricity', 'Electricity']] as const).map(([t, label]) => (
+              <button key={t} type="button" onClick={() => changeType(t)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${serviceType === t ? 'border-accent bg-accent/10 text-accent' : 'border-border text-ink-muted hover:border-accent/40'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {serviceType === 'data' && (
+          <Select label="Network" value={network}
+            onChange={(e) => { setNetwork(e.target.value); setFetched(false); setPlans([]); setSelectedCodes(new Set()) }}
+            options={networkOptions} />
+        )}
+
+        <Button variant="secondary" size="sm"
+          onClick={() => fetchMutation.mutate()}
+          disabled={fetchMutation.isPending}
+          icon={fetchMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}>
+          {fetchMutation.isPending ? 'Fetching…' : 'Fetch Plans'}
+        </Button>
+
+        {fetchError && <p className="text-xs text-danger bg-danger/10 rounded-lg px-3 py-2">{fetchError}</p>}
+        {fetched && !fetchError && plans.length === 0 && <p className="text-xs text-ink-muted">No plans returned.</p>}
+
+        {plans.length > 0 && (
+          <>
+            <div className="max-h-56 overflow-y-auto border border-border rounded-lg">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-2 sticky top-0 z-10">
+                  <tr>
+                    <th className="p-2 text-left w-8">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-3 w-3 accent-accent" />
+                    </th>
+                    <th className="p-2 text-left font-medium text-ink-muted">Name</th>
+                    <th className="p-2 text-left font-medium text-ink-muted">Operator</th>
+                    {(serviceType === 'data' || serviceType === 'electricity') && <th className="p-2 text-left font-medium text-ink-muted">Category</th>}
+                    <th className="p-2 text-right font-medium text-ink-muted">Provider ID</th>
+                    <th className="p-2 text-right font-medium text-ink-muted">Cost (₦)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plans.map((p) => (
+                    <tr key={p.plan_code} className="border-t border-border hover:bg-surface-2/50">
+                      <td className="p-2"><input type="checkbox" checked={selectedCodes.has(p.plan_code)} onChange={() => toggleOne(p.plan_code)} className="h-3 w-3 accent-accent" /></td>
+                      <td className="p-2 font-medium text-ink">{p.name}</td>
+                      <td className="p-2 text-ink-muted uppercase">{p.operator}</td>
+                      {(serviceType === 'data' || serviceType === 'electricity') && <td className="p-2 text-ink-muted">{p.category ?? '—'}</td>}
+                      <td className="p-2 text-right font-mono text-ink-faint">{p.provider_plan_id}</td>
+                      <td className="p-2 text-right text-ink">{p.amount > 0 ? `₦${p.amount.toLocaleString()}` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <Select label="Add to Service" value={serviceId} onChange={(e) => setServiceId(e.target.value)} options={serviceOptions} />
+              <Input label="Markup %" type="number" min={0} step={0.5} value={markupPct}
+                onChange={(e) => setMarkupPct(e.target.value)}
+                hint="Applied to cost price → selling price. Cable TV plans have no cost price — set prices after import." />
+            </div>
+            <p className="text-xs text-ink-faint">Plans with the same variation code are skipped automatically.</p>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function ServicePlansPage() {
@@ -485,10 +1102,14 @@ export function ServicePlansPage() {
   const [filterActive, setFilterActive] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [filterOverride, setFilterOverride] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editItem, setEditItem] = useState<ServicePlan | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkTarget, setBulkTarget] = useState<boolean | null>(null)
+  const [bulkClearOpen, setBulkClearOpen] = useState(false)
+  const [bulkSetProviderOpen, setBulkSetProviderOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const { data: services = [] } = useQuery({
     queryKey: ['admin-services'],
@@ -500,6 +1121,19 @@ export function ServicePlansPage() {
     queryFn: providersApi.list,
   })
 
+  const { data: routingRules = [] } = useQuery({
+    queryKey: ['routing-rules'],
+    queryFn: routingApi.list,
+  })
+
+  const routeMap = useMemo(() => {
+    const map = new Map<string, RoutingRule>()
+    for (const rule of routingRules) {
+      if (rule.is_active) map.set(rule.service_type, rule)
+    }
+    return map
+  }, [routingRules])
+
   const queryParams = {
     service_id: filterServiceId || undefined,
     service_type: filterServiceType || undefined,
@@ -508,6 +1142,7 @@ export function ServicePlansPage() {
     provider_code: filterProvider || undefined,
     search: search.trim() || undefined,
     is_active: filterActive === '' ? undefined : filterActive === 'true',
+    has_provider_override: filterOverride === '' ? undefined : filterOverride === 'true',
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
   }
@@ -544,6 +1179,29 @@ export function ServicePlansPage() {
     onError: (err) => toast.error(errMsg(err, 'Bulk update failed')),
   })
 
+  const bulkClearMutation = useMutation({
+    mutationFn: (ids: string[]) => catalogApi.bulkClearOverride(ids),
+    onSuccess: (_data, ids) => {
+      qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
+      setSelectedIds(new Set())
+      setBulkClearOpen(false)
+      toast.success(`Provider override cleared on ${ids.length} plan${ids.length !== 1 ? 's' : ''}`)
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to clear overrides')),
+  })
+
+  const bulkSetProviderMutation = useMutation({
+    mutationFn: ({ ids, provider }: { ids: string[]; provider: string }) =>
+      catalogApi.bulkSetProviderByIds(ids, provider),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
+      setSelectedIds(new Set())
+      setBulkSetProviderOpen(false)
+      toast.success(`Primary provider set to ${vars.provider} for ${vars.ids.length} plan${vars.ids.length !== 1 ? 's' : ''}`)
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to set provider')),
+  })
+
   const handleSaved = () => {
     qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
     setSelectedIds(new Set())
@@ -564,15 +1222,23 @@ export function ServicePlansPage() {
     { value: 'identity_verification', label: 'Identity' },
   ]
 
-  const operatorOptions = [
-    { value: '', label: 'All operators' },
-    ...OPERATOR_OPTIONS.filter((o) => o.value),
-  ]
+  const operatorOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const all = Object.values(SERVICE_TYPE_CONFIGS).flatMap((c) => c.operatorOptions)
+    return [
+      { value: '', label: 'All operators' },
+      ...all.filter((o) => !seen.has(o.value) && seen.add(o.value)),
+    ]
+  }, [])
 
-  const categoryOptions = [
-    { value: '', label: 'All categories' },
-    ...CATEGORY_OPTIONS.filter((o) => o.value),
-  ]
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const all = Object.values(SERVICE_TYPE_CONFIGS).flatMap((c) => c.categoryOptions)
+    return [
+      { value: '', label: 'All categories' },
+      ...all.filter((o) => !seen.has(o.value) && seen.add(o.value)),
+    ]
+  }, [])
 
   const providerCodes = useMemo(() => {
     const codes = new Set(plans.map((p) => p.provider_code))
@@ -613,7 +1279,7 @@ export function ServicePlansPage() {
     return <ErrorMessage error={error} onRetry={() => void refetch()} endpoint={ENDPOINTS.adminServicePlans.path} />
   }
 
-  const hasFilters = !!(filterServiceId || filterServiceType || filterOperator || filterCategory || filterProvider || filterActive || search)
+  const hasFilters = !!(filterServiceId || filterServiceType || filterOperator || filterCategory || filterProvider || filterActive || filterOverride || search)
 
   const columns = [
     {
@@ -666,18 +1332,28 @@ export function ServicePlansPage() {
     },
     {
       key: 'provider',
-      header: 'Provider',
-      render: (p: ServicePlan) => (
-        <div className="space-y-0.5">
-          <Badge variant="neutral" className="font-mono text-xs">{p.provider_code}</Badge>
-          {p.primary_provider_code && (
-            <div className="text-[10px] text-ink-faint">
-              Route → <span className="font-mono text-accent">{p.primary_provider_code}</span>
-              {p.fallback_provider_code && <span> / {p.fallback_provider_code}</span>}
+      header: 'Provider / Route',
+      render: (p: ServicePlan) => {
+        const rule = routeMap.get(p.service_type)
+        const hasOverride = !!p.primary_provider_code
+        const sourceLabel = hasOverride
+          ? `Plan Override: ${p.primary_provider_code}`
+          : rule
+            ? `Service Route: ${rule.primary_provider_code}`
+            : 'Priority routing'
+        return (
+          <div className="space-y-0.5">
+            <Badge variant="neutral" className="font-mono text-xs">{p.provider_code}</Badge>
+            <div className={`flex items-center gap-1 text-[10px] ${hasOverride ? 'text-amber-400' : 'text-ink-faint'}`}>
+              {hasOverride && <AlertTriangle className="h-2.5 w-2.5 shrink-0" />}
+              <span>{sourceLabel}</span>
+              {p.fallback_provider_code && (
+                <span className="text-ink-faint"> / {p.fallback_provider_code}</span>
+              )}
             </div>
-          )}
-        </div>
-      ),
+          </div>
+        )
+      },
     },
     {
       key: 'pricing',
@@ -753,6 +1429,8 @@ export function ServicePlansPage() {
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />}
               onClick={() => void refetch()}>Refresh</Button>
+            <Button variant="secondary" size="sm" icon={<Download className="h-3.5 w-3.5" />}
+              onClick={() => setImportOpen(true)}>Import Plans</Button>
             <Button variant="primary" size="sm" icon={<Plus className="h-3.5 w-3.5" />}
               onClick={() => setCreateOpen(true)}>New Plan</Button>
           </div>
@@ -807,11 +1485,21 @@ export function ServicePlansPage() {
           ]}
           className="w-32"
         />
+        <Select
+          value={filterOverride}
+          onChange={(e) => { setFilterOverride(e.target.value); resetPage() }}
+          options={[
+            { value: '', label: 'All routing' },
+            { value: 'true', label: 'Has override' },
+            { value: 'false', label: 'No override' },
+          ]}
+          className="w-36"
+        />
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={() => {
             setSearch(''); setFilterServiceId(''); setFilterServiceType('')
             setFilterOperator(''); setFilterCategory(''); setFilterProvider('')
-            setFilterActive(''); resetPage()
+            setFilterActive(''); setFilterOverride(''); resetPage()
           }}>
             Clear
           </Button>
@@ -833,7 +1521,7 @@ export function ServicePlansPage() {
           </span>
         </div>
         {selCount > 0 && (
-          <div className="flex gap-2 ml-auto">
+          <div className="flex gap-2 ml-auto flex-wrap">
             <Button
               variant="secondary"
               size="sm"
@@ -851,6 +1539,24 @@ export function ServicePlansPage() {
               disabled={bulkMutation.isPending}
             >
               Disable
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<UserCheck className="h-3.5 w-3.5 text-blue-400" />}
+              onClick={() => setBulkSetProviderOpen(true)}
+              disabled={bulkSetProviderMutation.isPending}
+            >
+              Set Provider
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<XCircle className="h-3.5 w-3.5 text-amber-400" />}
+              onClick={() => setBulkClearOpen(true)}
+              disabled={bulkClearMutation.isPending}
+            >
+              Clear Override
             </Button>
             <Button
               variant="ghost"
@@ -921,6 +1627,27 @@ export function ServicePlansPage() {
         targetActive={bulkTarget ?? true}
         onConfirm={() => bulkMutation.mutate({ ids: Array.from(selectedIds), is_active: bulkTarget ?? true })}
         isPending={bulkMutation.isPending}
+      />
+      <BulkClearOverrideModal
+        open={bulkClearOpen}
+        onClose={() => setBulkClearOpen(false)}
+        selectedIds={Array.from(selectedIds)}
+        onConfirm={() => bulkClearMutation.mutate(Array.from(selectedIds))}
+        isPending={bulkClearMutation.isPending}
+      />
+      <BulkSetProviderModal
+        open={bulkSetProviderOpen}
+        onClose={() => setBulkSetProviderOpen(false)}
+        selectedIds={Array.from(selectedIds)}
+        providers={providers}
+        onConfirm={(providerCode) => bulkSetProviderMutation.mutate({ ids: Array.from(selectedIds), provider: providerCode })}
+        isPending={bulkSetProviderMutation.isPending}
+      />
+      <ImportPlansModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        services={services}
+        onSaved={handleSaved}
       />
     </div>
   )

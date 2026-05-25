@@ -48,6 +48,7 @@ export interface VtuPurchaseInput {
   meter_number?: string;
   variation_code?: string;
   customer_name?: string;
+  verified_customer_name?: string;
   plan?: VtuPlanMeta;
 }
 
@@ -95,6 +96,7 @@ export async function initializeVtuPurchase(
       meter_number: input.meter_number,
       variation_code: input.variation_code,
       customer_name: input.customer_name,
+      ...(input.verified_customer_name && { verified_customer_name: input.verified_customer_name }),
       ...(input.plan && {
         plan_id: input.plan.plan_id,
         plan_name: input.plan.plan_name,

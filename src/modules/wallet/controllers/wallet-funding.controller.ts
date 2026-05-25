@@ -20,6 +20,7 @@ import {
   calculateCharge,
 } from "../../payment-gateways/services/payment-gateway.service";
 import { processReferralReward } from "../../referral/services/referral-reward.service";
+import { checkFundingVelocity } from "../../transactions/services/velocity.service";
 
 const db            = getDbInstance();
 const walletService = new WalletService(db);
@@ -139,6 +140,7 @@ export async function initializeFundingController(
         gateway:            activeGateway.code,
       },
     });
+    void checkFundingVelocity(userId, reference).catch(() => undefined);
   } catch (err) {
     next(err);
   }

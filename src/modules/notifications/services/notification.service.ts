@@ -8,12 +8,13 @@ export type NotificationChannel = "email" | "sms" | "in_app" | "push" | "webhook
 export type NotificationStatus  = "pending" | "sent" | "failed" | "read";
 
 export interface CreateNotificationInput {
-  user_id?:  string | null;
-  channel:   NotificationChannel;
-  type:      string;
-  title:     string;
-  message:   string;
-  metadata?: Record<string, unknown>;
+  user_id?:          string | null;
+  channel:           NotificationChannel;
+  type:              string;
+  title:             string;
+  message:           string;
+  metadata?:         Record<string, unknown>;
+  notification_key?: string | null;
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ export async function createNotification(
       );
     }
   }
-  return createNotificationIdempotent({ ...input, notification_key: null });
+  return createNotificationIdempotent({ ...input, notification_key: input.notification_key ?? null });
 }
 
 // ── Idempotent create ─────────────────────────────────────────────────────────

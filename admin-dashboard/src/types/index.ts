@@ -160,6 +160,7 @@ export type ProviderAuthType =
   | 'custom_headers'
   | 'none'
   | 'advanced'
+  | 'userid_apikey'
 
 export interface UpsertProviderCredentialsInput {
   auth_type?: ProviderAuthType
@@ -248,7 +249,7 @@ export interface CreateRoutingRuleInput {
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 
-export type TransactionStatus = 'pending' | 'processing' | 'successful' | 'failed' | 'refunded'
+export type TransactionStatus = 'pending' | 'processing' | 'successful' | 'failed' | 'refunded' | 'requires_review'
 
 export interface Transaction {
   id: string
@@ -304,6 +305,39 @@ export interface ProviderAttempt {
 }
 
 // ── Provider Health / Circuit State ───────────────────────────────────────────
+
+export type HealthWindow         = '1h' | '24h' | '7d'
+export type ComputedHealthStatus = 'healthy' | 'degraded' | 'down'
+
+export interface ProviderHealthDashboard {
+  provider_code:                 string
+  name:                          string
+  is_active:                     boolean
+  priority:                      number
+  supported_services:            string[]
+  config_health_status:          string
+  // circuit
+  circuit_open:                  boolean
+  consecutive_failures:          number
+  circuit_opened_at:             string | null
+  lifetime_successes:            number
+  lifetime_failures:             number
+  // window stats
+  window:                        HealthWindow
+  total_attempts:                number
+  successful_attempts:           number
+  failed_attempts:               number
+  success_rate:                  number | null
+  avg_latency_ms:                number | null
+  p95_latency_ms:                number | null
+  last_success_at:               string | null
+  last_failure_at:               string | null
+  recent_failure_reason:         string | null
+  recent_failure_classification: string | null
+  // computed
+  computed_health:               ComputedHealthStatus
+  protection_applied:            boolean
+}
 
 export interface ProviderCircuitState {
   id: number
@@ -824,6 +858,15 @@ export interface ReconciliationIssue {
   created_at: string
 }
 
+export interface ReconciliationStats {
+  repaired_successful: number
+  refunded_failed:     number
+  still_pending:       number
+  provider_errors:     number
+  total_reconciled:    number
+  last_run_at:         string | null
+}
+
 // ── Finance ───────────────────────────────────────────────────────────────────
 
 export interface RevenueSummary {
@@ -1059,6 +1102,8 @@ export interface RiskFlag {
   resolved_by: string | null
   resolved_at: string | null
   resolution_notes: string | null
+  /** 'admin' = manually created by a staff member; 'system' = auto-flagged by velocity checks */
+  source: 'admin' | 'system'
   created_at: string
   updated_at: string
   email: string | null
@@ -1320,4 +1365,34 @@ export interface UserReferralInfo {
     created_at: string
     reward_status: string | null
   }>
+}
+
+// ── Queue Monitor ─────────────────────────────────────────────────────────────
+
+export type JobState = 'waiting' | 'active' | 'completed' | 'failed' | 'delayed'
+
+export interface QueueStats {
+  name:                  string
+  waiting:               number
+  active:                number
+  completed:             number
+  failed:                number
+  delayed:               number
+  paused:                boolean
+  oldest_waiting_age_ms: number | null
+  latest_failure_reason: string | null
+  latest_failure_at:     number | null   // epoch ms
+}
+
+export interface QueueJobItem {
+  id:            string
+  name:          string
+  queue:         string
+  state:         JobState
+  data:          Record<string, unknown>   // redacted
+  attempts_made: number
+  failed_reason: string | null
+  timestamp:     number                    // epoch ms
+  processed_on:  number | null
+  finished_on:   number | null
 }

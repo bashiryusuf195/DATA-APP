@@ -16,7 +16,7 @@ import { fmtDate, fmtRelative } from '@/utils/format'
 import type { RiskFlag, FlagType, FlagSeverity, FlagStatus } from '@/types'
 import {
   Plus, RefreshCw, AlertTriangle, ShieldOff,
-  Search, CheckCircle2,
+  Search, CheckCircle2, Bot,
 } from 'lucide-react'
 
 function errMsg(e: unknown, fallback: string) {
@@ -259,16 +259,18 @@ export function RiskFlagsPage() {
   const [flagType, setFlagType]   = useState('')
   const [severity, setSeverity]   = useState('')
   const [status, setStatus]       = useState('')
+  const [source, setSource]       = useState('')
   const [page, setPage]           = useState(1)
   const [createOpen, setCreate]   = useState(false)
   const [activeFlag, setFlag]     = useState<RiskFlag | null>(null)
   const limit = 25
 
-  useEffect(() => { setPage(1) }, [search, flagType, severity, status])
+  useEffect(() => { setPage(1) }, [search, flagType, severity, status, source])
 
   const params = {
     search: search || undefined, flag_type: flagType || undefined,
-    severity: severity || undefined, status: status || undefined, page, limit,
+    severity: severity || undefined, status: status || undefined,
+    source: source || undefined, page, limit,
   }
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -285,7 +287,14 @@ export function RiskFlagsPage() {
       key: 'flag', header: 'Flag',
       render: (f: RiskFlag) => (
         <div className="min-w-0">
-          <p className="text-sm font-medium text-ink truncate max-w-[200px]">{f.title}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium text-ink truncate max-w-[200px]">{f.title}</p>
+            {f.source === 'system' && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-400 border border-blue-500/30 bg-blue-500/10 px-1.5 rounded shrink-0">
+                <Bot className="h-2.5 w-2.5" /> Auto
+              </span>
+            )}
+          </div>
           <p className="text-xs text-ink-faint">{FLAG_TYPE_LABELS[f.flag_type]}</p>
         </div>
       ),
@@ -377,8 +386,18 @@ export function RiskFlagsPage() {
           ]}
           className="w-36"
         />
-        {(search || flagType || severity || status) && (
-          <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFlagType(''); setSeverity(''); setStatus('') }}>Clear</Button>
+        <Select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          options={[
+            { value: '',       label: 'All sources' },
+            { value: 'admin',  label: 'Admin' },
+            { value: 'system', label: 'Auto' },
+          ]}
+          className="w-32"
+        />
+        {(search || flagType || severity || status || source) && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFlagType(''); setSeverity(''); setStatus(''); setSource('') }}>Clear</Button>
         )}
       </FilterBar>
 

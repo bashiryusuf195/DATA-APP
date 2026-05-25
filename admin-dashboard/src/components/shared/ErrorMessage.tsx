@@ -28,6 +28,27 @@ export function ErrorMessage({ error, onRetry, endpoint, inline = false, statusO
       : 'py-16'
   )
 
+  // ── 401: session expired ─────────────────────────────────────────────────
+  if (status === 401) {
+    return (
+      <div className={outer}>
+        <div className="p-3 rounded-xl bg-amber-500/10">
+          <AlertTriangle className="h-6 w-6 text-amber-400" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-ink mb-1">Session Expired</p>
+          <p className="text-xs text-ink-muted max-w-xs">
+            Your session has expired. Please{' '}
+            <a href="/login" className="text-accent underline underline-offset-2">
+              log in again
+            </a>{' '}
+            to continue.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   // ── 403: forbidden ────────────────────────────────────────────────────────
   if (status === 403) {
     return (

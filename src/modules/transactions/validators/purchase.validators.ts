@@ -1,46 +1,113 @@
 import { z } from "zod";
 
+// ── Shared field validators ────────────────────────────────────────────────────
+
+// Nigerian phone numbers: 080/081/070/090/091/etc. local format or +234/234 prefix.
+// Accepts: 08012345678, +2348012345678, 2348012345678
+const nigerianPhone = z
+  .string()
+  .regex(
+    /^(\+?234|0)[789]\d{8}$/,
+    "Phone must be a valid Nigerian number (e.g. 08012345678 or +2348012345678)",
+  );
+
+// Meter numbers are 6–13 digits (varies by DISCO: IKEDC=11, EKEDC=13, others=11).
+const meterNumber = z
+  .string()
+  .regex(/^\d{6,13}$/, "Meter number must be 6–13 digits with no spaces or letters");
+
+// Smartcard/IUC numbers: DSTV/GOtv are 10 digits; Startimes may be alphanumeric.
+const smartcardNumber = z
+  .string()
+  .regex(
+    /^[0-9A-Za-z]{5,15}$/,
+    "Smartcard number must be 5–15 alphanumeric characters",
+  );
+
+// Variation codes are lowercase slugs stored in the DB (e.g. "mtn-airtime", "ekedc-prepaid").
+// Reject anything with shell-special or URL-special characters.
+const variationCode = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Variation code contains invalid characters",
+  );
+
+// Biller codes (cable TV) follow the same safe-slug pattern.
+const billerCode = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[a-zA-Z0-9_-]+$/, "Biller code contains invalid characters");
+
+// Customer name: printable characters only, no control chars or HTML.
+const customerName = z
+  .string()
+  .min(2)
+  .max(100)
+  .regex(/^[\w\s'.,-]+$/, "Customer name contains invalid characters");
+
+// ── Purchase schemas ──────────────────────────────────────────────────────────
+
 // Airtime: amount is user-supplied; no plan lookup needed.
 // variation_code carries the network prefix (e.g. "mtn-airtime") and is
 // forwarded to the queue so providers can resolve the operator.
 export const AirtimePurchaseSchema = z.object({
-  phone:          z.string().min(11).max(15),
-  amount:         z.number().positive().max(50000),
-  variation_code: z.string().optional(),
+  phone:          nigerianPhone,
+  amount:         z.number().positive().int().max(50_000),
+  variation_code: variationCode.optional(),
 });
 
 // Data: amount comes from DB plan; only variation_code is needed.
 export const DataPurchaseSchema = z.object({
-  phone: z.string().min(11).max(15),
-  variation_code: z.string().min(1),
+  phone:          nigerianPhone,
+  variation_code: variationCode,
 });
 
-// Electricity: amount is user-supplied (variable top-up); variation_code selects meter type.
+// Electricity verify: resolves disco + meter type from plan (no wallet debit).
+export const ElectricityVerifySchema = z.object({
+  meter_number:   meterNumber,
+  variation_code: variationCode,
+});
+
+// Electricity: amount is user-supplied (variable top-up); variation_code is the full
+// plan slug (e.g. "ekedc-prepaid"), not just "prepaid"/"postpaid".
 export const ElectricityPurchaseSchema = z.object({
-  meter_number: z.string().min(6).max(20),
-  amount: z.number().positive().max(500000),
-  variation_code: z.enum(["prepaid", "postpaid"]),
-  phone: z.string().min(11).max(15).optional(),
+  meter_number:           meterNumber,
+  amount:                 z.number().positive().int().min(100).max(500_000),
+  variation_code:         variationCode,
+  phone:                  nigerianPhone.optional(),
+  verified_customer_name: z.string().max(150).optional(),
 });
 
-// Cable TV: amount comes from DB plan.
+// Cable TV verify: resolves biller from plan (no wallet debit).
+export const CableTvVerifySchema = z.object({
+  smartcard_number: smartcardNumber,
+  biller_code:      billerCode,
+});
+
+// Cable TV: amount comes from DB plan; phone + verified customer optional.
 export const CableTvPurchaseSchema = z.object({
-  smartcard_number: z.string().min(5).max(20),
-  variation_code: z.string().min(1),
+  smartcard_number:       smartcardNumber,
+  variation_code:         variationCode,
+  phone:                  nigerianPhone.optional(),
+  verified_customer_name: z.string().max(150).optional(),
 });
 
 // Exam PIN: amount comes from DB plan.
 export const ExamPinPurchaseSchema = z.object({
-  phone: z.string().min(11).max(15),
-  variation_code: z.string().min(1),
+  phone:          nigerianPhone,
+  variation_code: variationCode,
 });
 
 // Identity verification: amount comes from DB plan.
 export const IdentityVerificationSchema = z
   .object({
-    phone: z.string().min(11).max(15).optional(),
-    customer_name: z.string().min(2).max(100).optional(),
-    variation_code: z.string().min(1),
+    phone:          nigerianPhone.optional(),
+    customer_name:  customerName.optional(),
+    variation_code: variationCode,
   })
   .refine((d) => d.phone ?? d.customer_name, {
     message: "Either phone or customer_name is required",

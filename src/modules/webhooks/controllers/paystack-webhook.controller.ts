@@ -27,6 +27,14 @@ export async function paystackWebhookController(
       ? (payload.data as Record<string, unknown>)
       : {};
     const reference = typeof data.reference === "string" ? data.reference : null;
+    const channel   = typeof data.channel   === "string" ? data.channel   : null;
+
+    const customer  = (data.customer && typeof data.customer === "object")
+      ? (data.customer as Record<string, unknown>)
+      : {};
+    const customerCode = typeof customer.customer_code === "string" ? customer.customer_code : null;
+    const amountKobo   = typeof data.amount === "number" ? data.amount : null;
+    const paidAt       = typeof data.paid_at === "string" ? data.paid_at : null;
 
     // ── Clear "received" log — satisfies requirement 4 ───────────────────────
     logger.info("paystack_webhook_received", {
@@ -87,6 +95,10 @@ export async function paystackWebhookController(
         webhook_event_id: eventRecord.id,
         reference,
         event,
+        channel:       channel ?? null,
+        customer_code: customerCode ?? null,
+        amount_kobo:   amountKobo ?? null,
+        paid_at:       paidAt ?? null,
       };
 
       await paystackWebhookQueue.add("process-payment", jobPayload, {
@@ -97,12 +109,18 @@ export async function paystackWebhookController(
 
       logger.info("paystack_webhook_enqueued", {
         reference,
+        channel:         channel ?? null,
         webhook_event_id: eventRecord.id,
       });
     } else if (event === "charge.success" && !signatureValid) {
       logger.warn("paystack_webhook_charge_success_rejected", {
         reason:           "invalid_signature",
         reference,
+        webhook_event_id: eventRecord.id,
+      });
+    } else if (event === "dedicatedaccount.assign.success" && signatureValid) {
+      logger.info("paystack_dva_assigned", {
+        customer_code:    customerCode,
         webhook_event_id: eventRecord.id,
       });
     } else if (event && event !== "charge.success") {

@@ -33,7 +33,7 @@ export async function createTransaction(input: CreateTransactionInput) {
 export async function updateTransactionStatus(
   reference: string,
   data: {
-    status: "pending" | "processing" | "successful" | "failed" | "reversed" | "cancelled";
+    status: "pending" | "processing" | "successful" | "failed" | "reversed" | "cancelled" | "requires_review";
     provider_reference?: string | null;
     journal_batch_id?: string | null;
     failure_reason?: string | null;
@@ -45,16 +45,16 @@ export async function updateTransactionStatus(
     .where({ reference })
     .update({
       status: data.status,
-      provider_reference: data.provider_reference ?? undefined,
-      journal_batch_id: data.journal_batch_id ?? undefined,
-      failure_reason: data.failure_reason ?? undefined,
+      ...(data.provider_reference !== undefined ? { provider_reference: data.provider_reference } : {}),
+      ...(data.journal_batch_id   !== undefined ? { journal_batch_id:   data.journal_batch_id   } : {}),
+      ...(data.failure_reason     !== undefined ? { failure_reason:     data.failure_reason     } : {}),
       ...(data.metadata !== undefined
         ? { metadata: db.raw("COALESCE(metadata, '{}'::jsonb) || ?::jsonb", [JSON.stringify(data.metadata)]) }
         : {}),
       processed_at: data.status === "successful" ? new Date() : undefined,
-      failed_at: data.status === "failed" ? new Date() : undefined,
-      updated_at: new Date(),
-      provider: data.provider ?? undefined,
+      failed_at:    data.status === "failed"      ? new Date() : undefined,
+      updated_at:   new Date(),
+      ...(data.provider !== undefined ? { provider: data.provider } : {}),
     })
     .returning("*");
 
@@ -109,4 +109,32 @@ export async function getUserTransactions(
     .orderBy("created_at", "desc")
     .limit(options.limit)
     .offset(options.offset);
+}
+
+export async function listAllTransactions(options: {
+  limit:      number;
+  offset:     number;
+  status?:    string;
+  type?:      string;
+  reference?: string;
+  user_id?:   string;
+}): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+  const base = db("transactions").modify((q) => {
+    if (options.status)    q.where({ status: options.status });
+    if (options.type)      q.where({ type: options.type });
+    if (options.user_id)   q.where({ user_id: options.user_id });
+    if (options.reference) q.whereRaw("reference ILIKE ?", [`%${options.reference}%`]);
+  });
+
+  const [countResult, rows] = await Promise.all([
+    base.clone().count("id as count").first(),
+    base.clone()
+      .select(db.raw("*, type AS service_type"))
+      .orderBy("created_at", "desc")
+      .limit(options.limit)
+      .offset(options.offset),
+  ]);
+
+  const total = Number((countResult as Record<string, unknown> | undefined)?.count ?? 0);
+  return { rows: rows as Record<string, unknown>[], total };
 }

@@ -36,3 +36,12 @@ export function useVerifyFunding() {
     onSuccess: () => qc.invalidateQueries({ queryKey: WALLET_BALANCE_KEY }),
   })
 }
+
+export function useDedicatedAccount() {
+  return useQuery({
+    queryKey: ['wallet-dedicated-account'],
+    queryFn:  walletApi.getDedicatedAccount,
+    staleTime: 24 * 60 * 60 * 1000, // accounts don't change — refetch once per day
+    retry: false, // don't retry 503 when Paystack isn't configured
+  })
+}

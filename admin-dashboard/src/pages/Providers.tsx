@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { providersApi } from '@/api/providers.api'
 import { metricsApi } from '@/api/metrics.api'
@@ -11,7 +11,7 @@ import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtDate, fmtPercent } from '@/utils/format'
 import type { Provider, UpdateProviderInput, ProviderCircuitState } from '@/types'
-import { RefreshCw, Edit, Activity, ShieldOff, ShieldCheck } from 'lucide-react'
+import { RefreshCw, Edit, Activity, ShieldOff, ShieldCheck, KeyRound, CheckCircle2, XCircle } from 'lucide-react'
 import { ENDPOINTS } from '@/config/endpoints'
 import toast from 'react-hot-toast'
 import axios from 'axios'
@@ -34,6 +34,20 @@ export function ProvidersPage() {
   const [editProvider, setEditProvider] = useState<Provider | null>(null)
   const [selected, setSelected] = useState<Provider | null>(null)
   const [form, setForm] = useState<UpdateProviderInput>({})
+  const [diagResult, setDiagResult] = useState<{
+    valid: boolean
+    message: string
+    details?: { userId_length?: number; apiKey_length?: number; baseUrl?: string; balance?: number; raw_status?: string; http_status?: number }
+  } | null>(null)
+
+  const [healthResult, setHealthResult] = useState<{
+    healthy: boolean
+    latency_ms?: number
+    message: string
+  } | null>(null)
+
+  // Reset per-provider results whenever the selected provider changes
+  useEffect(() => { setDiagResult(null); setHealthResult(null) }, [selected])
 
   const { data: providers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['providers'],
@@ -60,12 +74,22 @@ export function ProvidersPage() {
   })
 
   const healthCheckMutation = useMutation({
-    mutationFn: (code: string) => providersApi.healthCheck(code),
-    onSuccess: (_, code) => {
+    mutationFn: (code: string) => providersApi.triggerHealthCheck(code),
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['providers'] })
-      toast.success(`Health check sent to ${code}`)
+      // Store result for the drawer panel
+      setHealthResult({
+        healthy:    result.healthy,
+        latency_ms: result.latency_ms,
+        message:    result.message,
+      })
+      if (result.healthy) {
+        toast.success(`${result.message}`)
+      } else {
+        toast.error(`Health check failed: ${result.message}`)
+      }
     },
-    onError: () => toast.error('Health check failed'),
+    onError: (err) => toast.error(errMsg(err, 'Health check failed')),
   })
 
   const resetCircuitMutation = useMutation({
@@ -75,6 +99,12 @@ export function ProvidersPage() {
       toast.success(`Circuit reset for ${code}`)
     },
     onError: () => toast.error('Reset failed'),
+  })
+
+  const credentialDiagnosticMutation = useMutation({
+    mutationFn: (code: string) => providersApi.credentialDiagnostic(code),
+    onSuccess: (data) => setDiagResult(data),
+    onError:   (err)  => setDiagResult({ valid: false, message: errMsg(err, 'Diagnostic failed') }),
   })
 
   const openEdit = (p: Provider) => {
@@ -348,6 +378,90 @@ export function ProvidersPage() {
                   {m.last_success_at && <Row label="Last Success" value={fmtDate(m.last_success_at)} />}
                   {m.last_failure_at && <Row label="Last Failure" value={fmtDate(m.last_failure_at)} />}
                 </>
+              )}
+
+              {/* Health check — available for all providers */}
+              <div className="border-t border-border pt-3 space-y-3">
+                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Health Check</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Activity className="h-3.5 w-3.5" />}
+                  loading={healthCheckMutation.isPending}
+                  onClick={() => healthCheckMutation.mutate(selected.provider_code)}
+                >
+                  Run Health Check
+                </Button>
+                {healthResult && (
+                  <div className={`rounded-lg border p-3 ${
+                    healthResult.healthy
+                      ? 'bg-emerald-500/10 border-emerald-500/20'
+                      : 'bg-rose-500/10 border-rose-500/20'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      {healthResult.healthy
+                        ? <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                        : <XCircle className="h-4 w-4 text-rose-400 mt-0.5 shrink-0" />}
+                      <p className={`text-xs font-medium ${healthResult.healthy ? 'text-emerald-300' : 'text-rose-300'}`}>
+                        {healthResult.message}
+                      </p>
+                    </div>
+                    {healthResult.latency_ms !== undefined && healthResult.healthy && (
+                      <p className="text-[11px] text-ink-faint mt-1 pl-6">{healthResult.latency_ms} ms</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Clubkonnect credential diagnostic */}
+              {selected.provider_code === 'clubkonnect' && (
+                <div className="border-t border-border pt-3 space-y-3">
+                  <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Credential Diagnostic</p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<KeyRound className="h-3.5 w-3.5" />}
+                    loading={credentialDiagnosticMutation.isPending}
+                    onClick={() => credentialDiagnosticMutation.mutate(selected.provider_code)}
+                  >
+                    Test Credentials
+                  </Button>
+                  {diagResult && (
+                    <div className={`rounded-lg border p-3 ${
+                      diagResult.valid
+                        ? 'bg-emerald-500/10 border-emerald-500/20'
+                        : 'bg-rose-500/10 border-rose-500/20'
+                    }`}>
+                      <div className="flex items-start gap-2">
+                        {diagResult.valid
+                          ? <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                          : <XCircle className="h-4 w-4 text-rose-400 mt-0.5 shrink-0" />}
+                        <p className={`text-xs font-medium ${diagResult.valid ? 'text-emerald-300' : 'text-rose-300'}`}>
+                          {diagResult.message}
+                        </p>
+                      </div>
+                      {diagResult.details && (
+                        <div className="mt-2 space-y-1 pl-6">
+                          {diagResult.details.userId_length !== undefined && (
+                            <p className="text-[11px] text-ink-faint">UserID length: {diagResult.details.userId_length} chars</p>
+                          )}
+                          {diagResult.details.apiKey_length !== undefined && (
+                            <p className="text-[11px] text-ink-faint">APIKey length: {diagResult.details.apiKey_length} chars</p>
+                          )}
+                          {diagResult.details.baseUrl && (
+                            <p className="text-[11px] text-ink-faint font-mono">{diagResult.details.baseUrl}</p>
+                          )}
+                          {diagResult.details.http_status !== undefined && diagResult.details.http_status !== 200 && (
+                            <p className="text-[11px] text-rose-400">HTTP {diagResult.details.http_status}</p>
+                          )}
+                          {diagResult.details.raw_status && (
+                            <p className="text-[11px] text-ink-faint font-mono">{diagResult.details.raw_status}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="border-t border-border pt-3 flex gap-2">

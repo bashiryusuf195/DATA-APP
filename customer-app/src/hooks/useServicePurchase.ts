@@ -24,6 +24,7 @@ export function useServicePurchase<T>(
   const pollTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef  = useRef(0)
   const pollAmountRef = useRef(0) // preserves amount across poll ticks
+  const toastFiredRef = useRef(false) // prevents duplicate toasts per purchase
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current !== null) {
@@ -48,17 +49,22 @@ export function useServicePurchase<T>(
         const polledTx = await transactionsApi.get(reference)
         const status = normalizeTransactionStatus(polledTx.status)
 
-        if (status === 'success' || status === 'failed') {
+        if (status === 'success' || status === 'failed' || status === 'review') {
           stopPolling()
           const amount =
             parseFloat(String(polledTx.amount ?? 0)) || pollAmountRef.current
           setResult({ ...polledTx, amount })
           qc.invalidateQueries({ queryKey: WALLET_BALANCE_KEY })
           qc.invalidateQueries({ queryKey: ['transactions'] })
-          if (status === 'success') {
-            toast.success('Transaction successful!')
-          } else {
-            toast.error('Transaction failed.')
+          if (!toastFiredRef.current) {
+            toastFiredRef.current = true
+            if (status === 'success') {
+              toast.success('Transaction successful!')
+            } else if (status === 'review') {
+              toast('Transaction is under review. We\'ll notify you.', { icon: '🔍' })
+            } else {
+              toast.error('Transaction failed.')
+            }
           }
         } else if (pollCountRef.current >= POLL_MAX_ATTEMPTS) {
           // 30 s elapsed — stop polling silently; modal shows "Check Status" button.
@@ -86,11 +92,14 @@ export function useServicePurchase<T>(
       if (uiStatus === 'success') {
         qc.invalidateQueries({ queryKey: WALLET_BALANCE_KEY })
         qc.invalidateQueries({ queryKey: ['transactions'] })
-        toast.success('Transaction successful!')
+        if (!toastFiredRef.current) { toastFiredRef.current = true; toast.success('Transaction successful!') }
       } else if (uiStatus === 'failed') {
         qc.invalidateQueries({ queryKey: WALLET_BALANCE_KEY })
         qc.invalidateQueries({ queryKey: ['transactions'] })
-        toast.error('Transaction failed.')
+        if (!toastFiredRef.current) { toastFiredRef.current = true; toast.error('Transaction failed.') }
+      } else if (uiStatus === 'review') {
+        qc.invalidateQueries({ queryKey: ['transactions'] })
+        if (!toastFiredRef.current) { toastFiredRef.current = true; toast('Transaction is under review. We\'ll notify you.', { icon: '🔍' }) }
       } else {
         // pending / processing — poll for final status
         pollAmountRef.current = amount
@@ -110,6 +119,7 @@ export function useServicePurchase<T>(
 
   const confirm = () => {
     if (!pending) return
+    toastFiredRef.current = false
     setPhase('submitting')
     mutation.mutate(pending)
   }
@@ -121,6 +131,7 @@ export function useServicePurchase<T>(
 
   const reset = () => {
     stopPolling()
+    toastFiredRef.current = false
     setPhase('idle')
     setPending(null)
     setResult(null)

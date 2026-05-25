@@ -50,15 +50,54 @@ import { adminSupportRouter }          from "./modules/support/routes/admin-supp
 import { adminFinanceRouter }          from "./modules/finance/routes/admin-finance.routes";
 import { adminComplianceRouter }       from "./modules/compliance/routes/admin-compliance.routes";
 import { adminPaymentGatewaysRouter }  from "./modules/payment-gateways/routes/admin-payment-gateways.routes";
+import { adminSystemHealthRouter }     from "./modules/system/routes/admin-system-health.routes";
+import { adminBackupRouter }           from "./modules/backup/routes/admin-backup.routes";
+import { adminIntegrityRouter }        from "./modules/backup/routes/admin-integrity.routes";
 import { adminReferralRouter }         from "./modules/referral/routes/admin-referral.routes";
+import { adminTransactionsRouter }     from "./modules/transactions/routes/admin-transactions.routes";
 import { adminAuditMiddleware }        from "./middleware/adminAudit";
 import { publicAuditMiddleware }       from "./middleware/publicAudit";
+import { publicRouter }               from "./modules/public/routes/public.routes";
 import "./modules/queue";
 export const app = express();
 
 // ── 1. Security headers ───────────────────────────────────────────────────────
-// Sets X-Frame-Options, X-XSS-Protection, Strict-Transport-Security, etc.
-app.use(helmet());
+// Helmet applies a suite of well-known HTTP security headers.
+// CSP is tightened for an API: no scripts/styles/frames from external origins.
+// HSTS is only sent in production — avoids locking localhost into HTTPS during dev.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:     ["'self'"],
+      scriptSrc:      ["'none'"],
+      styleSrc:       ["'none'"],
+      imgSrc:         ["'self'"],
+      connectSrc:     ["'self'"],
+      fontSrc:        ["'none'"],
+      objectSrc:      ["'none'"],
+      mediaSrc:       ["'none'"],
+      frameSrc:       ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri:        ["'self'"],
+      formAction:     ["'self'"],
+    },
+  },
+  // Disable COEP — not needed for a pure REST API and can break legitimate CDN assets.
+  crossOriginEmbedderPolicy: false,
+  // HSTS: 1-year max-age + includeSubDomains. Only set in production so that local
+  // development is never forced onto HTTPS (which has no valid cert on localhost).
+  hsts: config.isProd
+    ? { maxAge: 31_536_000, includeSubDomains: true, preload: true }
+    : false,
+  // Prevent MIME-type sniffing.
+  noSniff: true,
+  // Deny framing everywhere.
+  xFrameOptions: { action: 'deny' },
+  // Hide the X-Powered-By: Express header.
+  hidePoweredBy: true,
+  // Referrer: only send origin, no path (avoids leaking query params to third parties).
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
 
 // ── 2. CORS ───────────────────────────────────────────────────────────────────
 // Only allows requests from the origins listed in CORS_ORIGINS.
@@ -119,8 +158,13 @@ app.use("/admin", adminComplianceRouter);
 app.use("/admin", adminPaymentGatewaysRouter);
 app.use("/admin", adminAuditRouter);
 app.use("/admin", adminReferralRouter);
+app.use("/admin", adminTransactionsRouter);
+app.use("/admin", adminSystemHealthRouter);
+app.use("/admin", adminBackupRouter);
+app.use("/admin", adminIntegrityRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/webhooks", webhookRouter);
+app.use("/public", publicRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.

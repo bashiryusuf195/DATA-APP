@@ -125,4 +125,14 @@ export const authApi = {
     apiClient
       .post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email })
       .then((r) => r.data.data),
+
+  updateProfile: async (body: {
+    first_name?: string
+    last_name?:  string
+    phone?:      string
+    username?:   string
+  }): Promise<User> => {
+    const r = await apiClient.patch<ApiResponse<Record<string, unknown>>>('/auth/profile', body)
+    return mapUser(r.data.data)
+  },
 }

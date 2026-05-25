@@ -174,7 +174,7 @@ export class VTPassProvider extends HttpVTUProvider {
         : isPending ? "Transaction pending"
         : "Transaction failed"
       ),
-      status:      isSuccess ? "successful" : isPending ? "pending" : "failed",
+      status:      isSuccess ? "successful" : isPending ? "processing" : "failed",
       raw_response: raw,
     };
   }

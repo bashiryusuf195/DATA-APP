@@ -1,15 +1,23 @@
 import { Router } from "express";
 import { authenticate } from "../../auth/middleware/authenticate";
 import { requireRole } from "../../auth/middleware/authorize";
-import { adminRateLimiter } from "../../../middleware/rateLimiter.redis";
+import { adminRateLimiter, adminSensitiveLimiter } from "../../../middleware/rateLimiter.redis";
 import {
   listHealthMetricsController,
   getHealthMetricsController,
   resetCircuitController,
+  getHealthDashboardController,
 } from "../controllers/admin-health-metrics.controller";
 
 const router = Router();
 const adminGuard = [authenticate, requireRole("admin", "super_admin")] as const;
+
+router.get(
+  "/provider-health-dashboard",
+  ...adminGuard,
+  adminRateLimiter,
+  getHealthDashboardController
+);
 
 router.get(
   "/provider-health-metrics",
@@ -28,7 +36,7 @@ router.get(
 router.post(
   "/providers/:providerCode/reset-circuit",
   ...adminGuard,
-  adminRateLimiter,
+  adminSensitiveLimiter,
   resetCircuitController
 );
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { authApi } from '@/api/auth.api'
@@ -27,6 +27,14 @@ export function LoginPage() {
 
   const { setAuth, access_token, _hasHydrated } = useAuthStore()
   const navigate = useNavigate()
+
+  // Show a toast if the user was redirected here because their session expired.
+  useEffect(() => {
+    if (sessionStorage.getItem('session_expired') === '1') {
+      sessionStorage.removeItem('session_expired')
+      toast.error('Session expired. Please log in again.')
+    }
+  }, [])
 
   if (!_hasHydrated) return <PageSpinner />
   if (access_token) return <Navigate to="/dashboard" replace />

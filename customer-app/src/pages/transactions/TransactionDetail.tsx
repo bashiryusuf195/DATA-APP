@@ -1,5 +1,6 @@
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Copy, Check, Zap } from 'lucide-react'
 import { useTransaction } from '@/hooks/useTransactions'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -27,27 +28,122 @@ export function TransactionDetailPage() {
       ) : error ? (
         <ErrorMessage error={error} onRetry={refetch} />
       ) : tx ? (
-        <Card>
-          <div className="flex items-center justify-between mb-5">
-            <p className="text-base font-semibold text-ink capitalize">{tx.type.replace(/_/g, ' ')}</p>
-            <StatusBadge status={tx.status} />
-          </div>
-          <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-            {[
-              { label: 'Amount',    value: fmtCurrency(tx.amount) },
-              { label: 'Reference', value: <span className="font-mono text-xs">{tx.reference}</span> },
-              { label: 'Date',      value: fmtDateTime(tx.created_at) },
-              { label: 'Description', value: tx.description },
-              ...(tx.phone ? [{ label: 'Phone', value: tx.phone }] : []),
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-start justify-between px-4 py-3 gap-4">
-                <span className="text-xs text-ink-muted shrink-0">{label}</span>
-                <span className="text-sm text-ink text-right">{value}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <>
+          <Card>
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-base font-semibold text-ink capitalize">{tx.type.replace(/_/g, ' ')}</p>
+              <StatusBadge status={tx.status} />
+            </div>
+            <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+              {[
+                { label: 'Amount',    value: fmtCurrency(tx.amount) },
+                { label: 'Reference', value: <span className="font-mono text-xs">{tx.reference}</span> },
+                { label: 'Date',      value: fmtDateTime(tx.created_at) },
+                { label: 'Description', value: tx.description },
+                ...(tx.phone ? [{ label: 'Phone', value: tx.phone }] : []),
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-start justify-between px-4 py-3 gap-4">
+                  <span className="text-xs text-ink-muted shrink-0">{label}</span>
+                  <span className="text-sm text-ink text-right">{value}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <ElectricityTokenCard metadata={tx.metadata} />
+        </>
       ) : null}
     </div>
+  )
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard API unavailable */ }
+  }, [text])
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+      title="Copy token"
+    >
+      {copied
+        ? <Check className="h-4 w-4 text-amber-500" />
+        : <Copy className="h-4 w-4 text-amber-500" />}
+    </button>
+  )
+}
+
+function ElectricityTokenCard({ metadata }: { metadata?: Record<string, unknown> }) {
+  const provResp = metadata?.provider_response as Record<string, unknown> | undefined
+  const token    = provResp?.token         as string | undefined
+  const units    = provResp?.units         as string | number | undefined
+  const customer = provResp?.customer_name as string | undefined
+  const meter    = provResp?.meter_number  as string | undefined
+  const address  = provResp?.address       as string | undefined
+  const orderId  = provResp?.provider_order_id as string | undefined
+
+  if (!token) return null
+
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
+          <Zap className="h-4 w-4 text-amber-600" />
+        </div>
+        <p className="text-sm font-semibold text-ink">Electricity Token</p>
+      </div>
+
+      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+        <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-widest mb-1.5">Token</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-mono text-base font-bold text-amber-800 tracking-widest break-all leading-snug">
+            {token}
+          </p>
+          <CopyButton text={token} />
+        </div>
+        {units != null && (
+          <div className="mt-2">
+            <span className="inline-block rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+              {units} units
+            </span>
+          </div>
+        )}
+      </div>
+
+      {(customer || meter || address || orderId) && (
+        <div className="mt-3 divide-y divide-border rounded-xl border border-border overflow-hidden">
+          {customer && (
+            <div className="flex items-start justify-between px-4 py-3 gap-4">
+              <span className="text-xs text-ink-muted shrink-0">Customer</span>
+              <span className="text-sm text-ink text-right">{customer}</span>
+            </div>
+          )}
+          {meter && (
+            <div className="flex items-start justify-between px-4 py-3 gap-4">
+              <span className="text-xs text-ink-muted shrink-0">Meter</span>
+              <span className="text-sm font-mono text-ink text-right">{meter}</span>
+            </div>
+          )}
+          {address && (
+            <div className="flex items-start justify-between px-4 py-3 gap-4">
+              <span className="text-xs text-ink-muted shrink-0">Address</span>
+              <span className="text-sm text-ink text-right">{address}</span>
+            </div>
+          )}
+          {orderId && (
+            <div className="flex items-start justify-between px-4 py-3 gap-4">
+              <span className="text-xs text-ink-muted shrink-0">Order ID</span>
+              <span className="text-sm font-mono text-xs text-ink-muted text-right">{orderId}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }

@@ -3,6 +3,8 @@ import type { VTUProvider } from "./provider.interface";
 import { MockVTUProvider } from "./mock-vtu.provider";
 import { VTPassProvider } from "./vtpass.provider";
 import { SmshikaProvider } from "./smshika.provider";
+import { ClubkonnectProvider } from "./clubkonnect.provider";
+import { LegitDataWayProvider } from "./legitdataway.provider";
 import { config } from "../../../config";
 
 class ProviderRegistryService {
@@ -36,6 +38,14 @@ class ProviderRegistryService {
     // which the execution engine handles as a provider error and fails over.
     this.register(new SmshikaProvider());
     console.log("[PROVIDER REGISTRY] SMShika registered (credentials loaded from DB at call time)");
+
+    // Clubkonnect — same DB-credential pattern as SMShika.
+    this.register(new ClubkonnectProvider());
+    console.log("[PROVIDER REGISTRY] Clubkonnect registered (credentials loaded from DB at call time)");
+
+    // LegitDataWay — token-based auth; username+password read from DB at call time.
+    this.register(new LegitDataWayProvider());
+    console.log("[PROVIDER REGISTRY] LegitDataWay registered (credentials loaded from DB at call time)");
   }
 
   register(provider: VTUProvider) {

@@ -5,7 +5,11 @@ import type {
   AirtimePurchaseInput,
   DataPurchaseInput,
   ElectricityPurchaseInput,
+  ElectricityVerifyInput,
+  MeterVerifyResult,
   CableTvPurchaseInput,
+  CableTvVerifyInput,
+  CableVerifyResult,
   ExamPinPurchaseInput,
   IdentityVerificationInput,
   ApiResponse,
@@ -67,7 +71,21 @@ export const transactionsApi = {
   buyAirtime:    (body: AirtimePurchaseInput)          => purchase('airtime',                body),
   buyData:       (body: DataPurchaseInput)             => purchase('data',                   body),
   buyElectricity:(body: ElectricityPurchaseInput)      => purchase('electricity',            body),
+  verifyMeter:   async (body: ElectricityVerifyInput): Promise<MeterVerifyResult> => {
+    const r = await apiClient.post<ApiResponse<MeterVerifyResult>>(
+      '/transactions/electricity/verify',
+      body
+    )
+    return r.data.data
+  },
   buyCableTv:    (body: CableTvPurchaseInput)          => purchase('cable-tv',               body),
+  verifyCable:   async (body: CableTvVerifyInput): Promise<CableVerifyResult> => {
+    const r = await apiClient.post<ApiResponse<CableVerifyResult>>(
+      '/transactions/cable-tv/verify',
+      body
+    )
+    return r.data.data
+  },
   buyExamPin:    (body: ExamPinPurchaseInput)          => purchase('exam-pin',               body),
   verifyIdentity:(body: IdentityVerificationInput)     => purchase('identity-verification',  body),
 }

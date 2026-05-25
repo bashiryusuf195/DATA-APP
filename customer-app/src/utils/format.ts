@@ -77,7 +77,7 @@ export function truncate(str: string, max: number): string {
 // Legacy/provider aliases: 'success', 'completed', 'fail'
 export function normalizeTransactionStatus(
   status: string | null | undefined
-): 'success' | 'failed' | 'pending' {
+): 'success' | 'failed' | 'pending' | 'review' {
   switch (status) {
     case 'successful':
     case 'success':
@@ -86,6 +86,8 @@ export function normalizeTransactionStatus(
     case 'failed':
     case 'fail':
       return 'failed'
+    case 'requires_review':
+      return 'review'
     default:
       return 'pending' // covers: pending, processing, refunded, undefined
   }

@@ -2,6 +2,7 @@ import rateLimit from "express-rate-limit";
 import type { Request, Response } from "express";
 import { redis } from "../config/redis";
 import { config } from "../config";
+import { logger } from "../lib/logger";
 
 // Atomically INCR the key and set a PEXPIRE on the first hit only.
 // Returns an array [hitCount, remainingTtlMs].
@@ -81,18 +82,21 @@ class RedisStore {
 // devOverride: applied only when NODE_ENV=development.
 // Allows shorter windows / higher limits so local testing isn't blocked.
 // Production limits are always enforced when NODE_ENV != development.
+// logKey: when set, emits a rate_limit_triggered log on every blocked request.
 function makeRedisLimiter({
   prefix,
   windowMs,
   max,
   keyGenerator,
   devOverride,
+  logKey,
 }: {
   prefix: string;
   windowMs: number;
   max: number;
   keyGenerator: (req: Request) => string;
   devOverride?: { windowMs?: number; max?: number };
+  logKey?: string;
 }) {
   const effectiveWindowMs = config.isDev && devOverride?.windowMs !== undefined
     ? devOverride.windowMs
@@ -110,9 +114,20 @@ function makeRedisLimiter({
     standardHeaders: true,
     store: new RedisStore(prefix, effectiveWindowMs),
     keyGenerator,
-    handler: (_req: Request, res: Response) => {
+    handler: (req: Request, res: Response) => {
       const retryAfterHeader = res.getHeader("Retry-After");
       const retry_after = retryAfterHeader !== undefined ? Number(retryAfterHeader) : undefined;
+
+      if (logKey) {
+        logger.warn("rate_limit_triggered", {
+          limiter:  logKey,
+          user_id:  (req as Request & { user?: { id: string } }).user?.id,
+          ip:       getClientIp(req),
+          path:     req.path,
+          method:   req.method,
+        });
+      }
+
       res.status(429).json({
         success:     false,
         code:        "RATE_LIMIT_EXCEEDED",
@@ -188,6 +203,7 @@ export const loginRateLimiter = makeRedisLimiter({
   windowMs:     15 * 60 * 1000,
   max:          30,
   keyGenerator: getClientIp,
+  logKey:       "login",
 });
 
 /** Auth — register: 3 per hour per IP (prod) / 30 per 15 min per IP (dev) */
@@ -200,6 +216,7 @@ export const registerRateLimiter = makeRedisLimiter({
     windowMs: 15 * 60 * 1000,   // dev: 15-min window
     max:      30,                // dev: 30 attempts per 15 min
   },
+  logKey: "register",
 });
 
 /** Transactions — purchases: 20 per min per authenticated user */
@@ -208,6 +225,7 @@ export const purchaseRateLimiter = makeRedisLimiter({
   windowMs:     60 * 1000,
   max:          20,
   keyGenerator: (req) => req.user?.id ?? getClientIp(req),
+  logKey:       "purchase",
 });
 
 /** Wallet — balance: 60 per min per authenticated user */
@@ -232,6 +250,7 @@ export const webhookRateLimiter = makeRedisLimiter({
   windowMs:     60 * 1000,
   max:          120,
   keyGenerator: (req) => req.params.providerCode || getClientIp(req),
+  logKey:       "webhook",
 });
 
 /** 2FA login verify: 10 attempts per 5 min per IP */
@@ -240,6 +259,7 @@ export const twoFactorVerifyLimiter = makeRedisLimiter({
   windowMs:     5 * 60 * 1000,
   max:          10,
   keyGenerator: getClientIp,
+  logKey:       "2fa_verify",
 });
 
 /** Wallet funding — initialize: 10 per 15 min per authenticated user */
@@ -248,4 +268,26 @@ export const fundingRateLimiter = makeRedisLimiter({
   windowMs:     15 * 60 * 1000,
   max:          10,
   keyGenerator: (req) => req.user?.id ?? getClientIp(req),
+  logKey:       "funding",
+});
+
+/** Verification endpoints (/electricity/verify, /cable-tv/verify):
+ *  5 per min per authenticated user — tighter than the generic purchase limiter
+ *  because verification hits an external provider API on every call. */
+export const verificationRateLimiter = makeRedisLimiter({
+  prefix:       "verification",
+  windowMs:     60 * 1000,
+  max:          5,
+  keyGenerator: (req) => req.user?.id ?? getClientIp(req),
+  logKey:       "verification",
+});
+
+/** Admin sensitive operations (freeze, unfreeze, create risk flag, reset circuit):
+ *  10 per 5 min per authenticated admin — prevents bulk automation of destructive ops. */
+export const adminSensitiveLimiter = makeRedisLimiter({
+  prefix:       "admin_sensitive",
+  windowMs:     5 * 60 * 1000,
+  max:          10,
+  keyGenerator: (req) => req.user?.id ?? getClientIp(req),
+  logKey:       "admin_sensitive",
 });

@@ -27,6 +27,7 @@ export interface ListServicePlansParams {
   plan_category?: string
   search?: string
   is_active?: boolean
+  has_provider_override?: boolean
   limit?: number
   offset?: number
 }
@@ -78,5 +79,40 @@ export const catalogApi = {
   bulkAssignProvider: (body: BulkAssignProviderInput): Promise<{ updated: number }> =>
     apiClient
       .post<{ success: boolean; data: { updated: number } }>('/admin/service-plans/bulk-assign-provider', body)
+      .then((r) => r.data.data),
+
+  bulkClearOverride: (ids: string[]): Promise<{ updated: number }> =>
+    apiClient
+      .post<{ success: boolean; data: { updated: number } }>('/admin/service-plans/bulk-clear-override', { ids })
+      .then((r) => r.data.data),
+
+  bulkSetProviderByIds: (ids: string[], primary_provider_code: string): Promise<{ updated: number }> =>
+    apiClient
+      .post<{ success: boolean; data: { updated: number } }>('/admin/service-plans/bulk-set-provider', { ids, primary_provider_code })
+      .then((r) => r.data.data),
+
+  fetchProviderPlans: (providerCode: string, service: 'data' | 'cable_tv' | 'electricity', network?: string): Promise<{ service: string; network: string | null; plans: Record<string, unknown>[] }> =>
+    apiClient
+      .get<{ success: boolean; data: { service: string; network: string | null; plans: Record<string, unknown>[] } }>(`/admin/providers/${providerCode}/plans`, { params: { service, network } })
+      .then((r) => r.data.data),
+
+  bulkImportPlans: (body: {
+    service_id: string
+    provider_code: string
+    primary_provider_code: string
+    plans: Array<{
+      name: string
+      variation_code: string
+      amount: number
+      cost_price?: number | null
+      selling_price?: number | null
+      network_operator?: string | null
+      plan_category?: string | null
+      duration_days?: number | null
+      provider_variation_code?: string | null
+    }>
+  }): Promise<{ created: number; skipped: number }> =>
+    apiClient
+      .post<{ success: boolean; data: { created: number; skipped: number } }>('/admin/service-plans/bulk-import', body)
       .then((r) => r.data.data),
 }

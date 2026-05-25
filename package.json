@@ -10,10 +10,13 @@
     "start:prod": "node dist/server.js",
     "worker": "tsx watch src/workers/index.ts",
     "worker:prod": "node dist/workers/index.js",
+    "worker:reconciliation": "node dist/workers/reconciliation-only.js",
+    "worker:integrity": "node dist/workers/integrity-only.js",
     "migrate:prod": "npx knex --knexfile knexfile.ts migrate:latest",
     "type-check": "tsc --noEmit",
     "seed:wallets": "npx tsx scripts/seed-wallets.ts",
     "test:wallet": "npx tsx tests/manual-wallet-test.ts",
+    "test:routing": "npx tsx tests/provider-routing.regression.ts",
     "clear:rate-limits": "npx tsx scripts/clear-rate-limits.ts",
     "reset-admin-password": "npx tsx scripts/reset-admin-password.ts",
     "clear-mock-data": "npx tsx scripts/clear-mock-seed-data.ts"
