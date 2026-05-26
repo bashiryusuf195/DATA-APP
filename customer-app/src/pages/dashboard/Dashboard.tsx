@@ -14,7 +14,6 @@ import { TransactionCard } from '@/components/shared/TransactionCard'
 import { KycBanner } from '@/components/shared/KycBanner'
 import { Skeleton } from '@/components/ui'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { fmtCurrency } from '@/utils/format'
 import { cn } from '@/utils/cn'
 
 function getGreeting(): string {
