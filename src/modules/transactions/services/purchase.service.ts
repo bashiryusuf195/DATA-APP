@@ -6,6 +6,7 @@ import {
 import { createTransaction } from "./transaction.service";
 
 import { generateTransactionReference } from "../../../lib/reference";
+import { getSettlementWalletId } from "../../../lib/system-wallets";
 
 export async function initializeAirtimePurchase(
   userId: string,
@@ -20,14 +21,7 @@ export async function initializeAirtimePurchase(
   const senderWallet =
     await getUserWalletBalance(userId);
 
-  const settlementWalletId =
-    process.env.SYSTEM_SETTLEMENT_WALLET_ID;
-
-  if (!settlementWalletId) {
-    throw new Error(
-      "SYSTEM_SETTLEMENT_WALLET_ID missing"
-    );
-  }
+  const settlementWalletId = await getSettlementWalletId();
 
   const debitResult =
     await walletService.transfer({
