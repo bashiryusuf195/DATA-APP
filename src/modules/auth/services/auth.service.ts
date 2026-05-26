@@ -99,43 +99,41 @@ export async function register(
 ): Promise<{ user: AuthUser; tokens: TokenPair; sessionId: string; rbac: RbacContext }> {
   const traceId = req.traceId ?? "no-trace";
 
-  // 1. Email uniqueness — fail fast before hitting Supabase
+  // Step 1 — local email uniqueness check (fail fast before hitting Supabase)
   const existingLocal = await db("users").where({ email: input.email }).whereNull("deleted_at").first("id");
   if (existingLocal) {
-    logger.warn("register_email_taken", { email: input.email, traceId });
+    logger.warn("register_email_taken_local", { traceId });
     throw new AuthAppError(409, "EMAIL_TAKEN", "An account with this email already exists");
   }
 
-  logger.info("register_start", { email: input.email, traceId });
+  logger.info("register_start", { traceId });
 
-  // 2. Create Supabase auth user.
-  // If Supabase already has this email (orphaned auth user from a failed previous attempt),
-  // we recover by signing in to verify identity and re-use the existing auth user ID.
+  // Step 2 — Supabase auth user creation (or recovery of an orphaned auth user)
+  // An "orphaned" auth user is one where Supabase has the email but no local users row exists —
+  // this happens when a previous registration crashed between step 2 and the DB transaction.
   let authId: string;
   let recoveredSession: Awaited<ReturnType<typeof supabaseSignIn>> | null = null;
   let isOrphanedRecovery = false;
 
   try {
     authId = await supabaseSignUp(input.email, input.password, input.phone);
-    logger.info("register_supabase_signup_ok", { authId, traceId });
+    logger.info("register_step", { step: "auth_signup", status: "ok", traceId });
   } catch (signupErr) {
-    // EMAIL_TAKEN from Supabase but no local users row → orphaned auth user.
-    // Recover by signing in to confirm identity and get the existing auth user ID.
     if (signupErr instanceof AuthAppError && signupErr.code === "EMAIL_TAKEN") {
-      logger.warn("register_orphaned_auth_user_detected", { email: input.email, traceId });
+      // Supabase has this email but local DB doesn't — orphaned auth user from a prior crash.
+      // Verify the caller's identity by signing in; on success, complete local setup.
+      logger.warn("register_step", { step: "auth_signup", status: "orphan_detected", traceId });
       try {
         recoveredSession = await supabaseSignIn(input.email, input.password);
-        // Supabase Session includes the auth user object with its UUID
         const sessionUser = (recoveredSession as unknown as { user?: { id?: string } }).user;
         authId = sessionUser?.id ?? "";
         if (!authId) {
-          throw new AuthAppError(500, "INTERNAL_ERROR", "Recovered Supabase session missing user ID");
+          throw new AuthAppError(500, "REGISTRATION_FAILED", "auth_signup: orphan recovery missing user ID");
         }
         isOrphanedRecovery = true;
-        logger.info("register_orphan_recovery_ok", { authId, traceId });
+        logger.info("register_step", { step: "auth_signup", status: "orphan_recovered", traceId });
       } catch (signinErr) {
         if (signinErr instanceof AuthAppError && signinErr.code === "INVALID_CREDENTIALS") {
-          // Different password — email is truly taken by someone else
           throw new AuthAppError(
             409,
             "EMAIL_TAKEN",
@@ -149,90 +147,153 @@ export async function register(
     }
   }
 
-  // 3–11: Complete local DB setup.
-  // On any failure, clean up a freshly-created Supabase auth user so the email can be retried.
-  // We do NOT delete the auth user if we're in orphan-recovery mode (it pre-existed).
+  // Step 3 — Atomic DB setup inside a Knex transaction.
+  // If any step inside the transaction fails, ALL DB writes are rolled back automatically.
+  // After the rollback, we delete the Supabase auth user (if it was freshly created)
+  // so the email is free and the registration can be retried cleanly.
+  let userRow: Record<string, unknown>;
+  let referredById: string | null = null;
+
   try {
-    // 3. Resolve referrer
-    let referredById: string | null = null;
-    if (input.referral_code) {
-      const referrer = await db("users")
-        .where({ referral_code: input.referral_code })
-        .whereNull("deleted_at")
-        .first("id");
-      referredById = referrer?.id ?? null;
-    }
+    await db.transaction(async (trx) => {
 
-    // 4. Create local users row
-    logger.info("register_step", { step: "insert_user", authId, traceId });
-    const [user] = await db("users")
-      .insert({
-        auth_id:           authId,
-        email:             input.email,
-        phone:             input.phone ?? null,
-        password_hash:     await bcrypt.hash(input.password, env.BCRYPT_ROUNDS),
-        referral_code:     generateReferralCode(),
-        referred_by_id:    referredById,
-        status:            "active",
-        kyc_level:         "none",
-        is_email_verified: true,
-        is_phone_verified: false,
-        metadata:          JSON.stringify({}),
-      })
-      .returning("*");
-    logger.info("register_step", { step: "insert_user_ok", userId: user.id as string, traceId });
+      // 3a. Referrer lookup (read-only, inside trx for snapshot consistency)
+      if (input.referral_code) {
+        const referrer = await trx("users")
+          .where({ referral_code: input.referral_code })
+          .whereNull("deleted_at")
+          .first("id");
+        referredById = referrer?.id ?? null;
+      }
 
-    // 5. Create profile skeleton
-    logger.info("register_step", { step: "insert_profile", userId: user.id as string, traceId });
-    await db("user_profiles").insert({
-      user_id:      user.id,
-      first_name:   input.first_name ?? null,
-      last_name:    input.last_name  ?? null,
-      display_name: [input.first_name, input.last_name].filter(Boolean).join(" ") || null,
-    });
+      // 3b. Insert users row
+      logger.info("register_step", { step: "profile_create", substep: "users_insert", traceId });
+      const passwordHash = await bcrypt.hash(input.password, env.BCRYPT_ROUNDS);
+      const [u] = await trx("users")
+        .insert({
+          auth_id:           authId,
+          email:             input.email,
+          phone:             input.phone ?? null,
+          password_hash:     passwordHash,
+          referral_code:     generateReferralCode(),
+          referred_by_id:    referredById,
+          status:            "active",
+          kyc_level:         "none",
+          is_email_verified: true,
+          is_phone_verified: false,
+          metadata:          JSON.stringify({}),
+        })
+        .returning("*");
+      userRow = u;
+      logger.info("register_step", { step: "profile_create", substep: "users_insert_ok", userId: u.id as string, traceId });
 
-    // 5b. Provision default NGN wallet
-    logger.info("register_step", { step: "create_wallet", userId: user.id as string, traceId });
-    const walletSvc = new WalletService(db);
-    await walletSvc.createWallet({
-      user_id:     user.id as string,
-      wallet_type: "user",
-      currency:    "NGN",
-      is_default:  true,
-      label:       "Main Wallet",
-    });
-    logger.info("register_step", { step: "create_wallet_ok", userId: user.id as string, traceId });
-
-    // 6. Assign default 'customer' role
-    logger.info("register_step", { step: "assign_role", userId: user.id as string, traceId });
-    await assignRole(db, user.id as string, "customer");
-    logger.info("register_step", { step: "assign_role_ok", userId: user.id as string, traceId });
-
-    // 7. Resolve RBAC context
-    const rbac = await resolveUserRbac(db, user.id as string);
-
-    // 8. Obtain Supabase tokens (reuse sign-in from recovery path if available)
-    logger.info("register_step", { step: "supabase_signin", traceId });
-    const supabaseSession = recoveredSession ?? await supabaseSignIn(input.email, input.password);
-    const tokens          = supabaseSessionToTokenPair(supabaseSession);
-    logger.info("register_step", { step: "supabase_signin_ok", traceId });
-
-    // 9. Device tracking
-    let deviceId: string | null = null;
-    const fingerprint = input.device_fingerprint ?? req.deviceFingerprint;
-    if (fingerprint) {
-      deviceId = await upsertDevice(db, {
-        userId:            user.id as string,
-        deviceFingerprint: fingerprint,
-        deviceName:        input.device_name,
-        userAgent:         req.headers["user-agent"] ?? null,
-        ipAddress:         extractIp(req),
+      // 3c. Insert user_profiles row
+      logger.info("register_step", { step: "profile_create", substep: "profiles_insert", userId: u.id as string, traceId });
+      await trx("user_profiles").insert({
+        user_id:      u.id,
+        first_name:   input.first_name   ?? null,
+        last_name:    input.last_name    ?? null,
+        display_name: [input.first_name, input.last_name].filter(Boolean).join(" ") || null,
       });
+      logger.info("register_step", { step: "profile_create", substep: "profiles_insert_ok", traceId });
+
+      // 3d. Provision default NGN wallet
+      logger.info("register_step", { step: "wallet_create", userId: u.id as string, traceId });
+      await new WalletService(trx).createWallet({
+        user_id:     u.id  as string,
+        wallet_type: "user",
+        currency:    "NGN",
+        is_default:  true,
+        label:       "Main Wallet",
+      });
+      logger.info("register_step", { step: "wallet_create_ok", traceId });
+
+      // 3e. Assign 'customer' role
+      logger.info("register_step", { step: "assign_role", userId: u.id as string, traceId });
+      await assignRole(trx, u.id as string, "customer");
+      logger.info("register_step", { step: "assign_role_ok", traceId });
+    });
+
+  } catch (txErr) {
+    // Transaction fully rolled back — no partial DB state remains.
+    // Delete the Supabase auth user (if freshly created) so the email is free for retry.
+    const errMsg = txErr instanceof Error ? txErr.message : String(txErr);
+    logger.error("register_transaction_failed", { authId, traceId, error: errMsg });
+
+    if (!isOrphanedRecovery) {
+      try {
+        await supabaseDeleteUser(authId);
+        logger.info("register_step", { step: "auth_cleanup", status: "ok", traceId });
+      } catch (cleanupErr) {
+        logger.error("register_step", {
+          step:  "auth_cleanup",
+          status: "failed",
+          traceId,
+          error: (cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)),
+        });
+      }
     }
 
-    // 10. Create session record
-    const sessionId = await createSession(db, {
-      userId:       user.id as string,
+    // Surface a meaningful error so the caller knows which step failed
+    if (errMsg.toLowerCase().includes("user_profiles") || errMsg.toLowerCase().includes("profiles")) {
+      throw new AuthAppError(500, "REGISTRATION_FAILED", "profile_create step failed — see server logs for details");
+    }
+    if (errMsg.toLowerCase().includes("wallet")) {
+      throw new AuthAppError(500, "REGISTRATION_FAILED", "wallet_create step failed — see server logs for details");
+    }
+    if (errMsg.toLowerCase().includes("user_roles") || errMsg.toLowerCase().includes("role")) {
+      throw new AuthAppError(500, "REGISTRATION_FAILED", "assign_role step failed — see server logs for details");
+    }
+    if (errMsg.toLowerCase().includes("users")) {
+      throw new AuthAppError(500, "REGISTRATION_FAILED", "users_insert step failed — see server logs for details");
+    }
+    throw new AuthAppError(500, "REGISTRATION_FAILED", `DB setup failed (${errMsg.slice(0, 120)})`);
+  }
+
+  // Step 4 — RBAC resolution (read-only, after committed transaction)
+  const userId = userRow!.id as string;
+  const rbac   = await resolveUserRbac(db, userId);
+
+  // Step 5 — Obtain Supabase session (reuse if we already signed in during recovery)
+  logger.info("register_step", { step: "auth_login", traceId });
+  let supabaseSession: Awaited<ReturnType<typeof supabaseSignIn>>;
+  try {
+    supabaseSession = recoveredSession ?? await supabaseSignIn(input.email, input.password);
+  } catch (signinErr) {
+    // Shouldn't happen — auth user was just created with this password.
+    // Account is fully set up; user can log in manually.
+    logger.error("register_step", {
+      step: "auth_login", status: "failed", traceId,
+      error: (signinErr instanceof Error ? signinErr.message : String(signinErr)),
+    });
+    throw new AuthAppError(
+      500,
+      "REGISTRATION_FAILED",
+      "auth_login step failed — account created but sign-in failed. Please log in manually."
+    );
+  }
+  const tokens = supabaseSessionToTokenPair(supabaseSession);
+  logger.info("register_step", { step: "auth_login", status: "ok", traceId });
+
+  // Step 6 — Device tracking
+  let deviceId: string | null = null;
+  const fingerprint = input.device_fingerprint ?? req.deviceFingerprint;
+  if (fingerprint) {
+    deviceId = await upsertDevice(db, {
+      userId:            userId,
+      deviceFingerprint: fingerprint,
+      deviceName:        input.device_name,
+      userAgent:         req.headers["user-agent"] ?? null,
+      ipAddress:         extractIp(req),
+    });
+  }
+
+  // Step 7 — Create session record
+  logger.info("register_step", { step: "session_create", traceId });
+  let sessionId: string;
+  try {
+    sessionId = await createSession(db, {
+      userId:       userId,
       accessToken:  tokens.access_token,
       refreshToken: tokens.refresh_token,
       deviceId,
@@ -240,52 +301,33 @@ export async function register(
       userAgent:    req.headers["user-agent"] ?? null,
       expiresAt:    tokens.refresh_token_expires_at,
     });
-
-    // 11. Audit log (fire-and-forget)
-    writeAuditLog(db, req, {
-      actorId:      user.id as string,
-      action:       "register",
-      outcome:      "success",
-      resourceType: "user",
-      resourceId:   user.id as string,
+  } catch (sessionErr) {
+    logger.error("register_step", {
+      step: "session_create", status: "failed", traceId,
+      error: (sessionErr instanceof Error ? sessionErr.message : String(sessionErr)),
     });
-
-    // 12. Signup referral reward (fire-and-forget — never blocks registration)
-    if (referredById) {
-      processReferralReward("signup", user.id as string).catch((err) =>
-        logger.warn("referral_signup_failed", {
-          user_id: user.id,
-          error:   (err as Error).message,
-        })
-      );
-    }
-
-    logger.info("register_complete", { userId: user.id as string, traceId });
-    return { user: coerceUser(user), tokens, sessionId, rbac };
-
-  } catch (setupErr) {
-    // Cleanup: delete the Supabase auth user we just created so the email can be retried.
-    // Skip cleanup if we're in orphan-recovery mode (auth user pre-existed).
-    if (!isOrphanedRecovery) {
-      logger.warn("register_setup_failed", {
-        authId,
-        traceId,
-        error: (setupErr instanceof Error ? setupErr.message : String(setupErr)),
-      });
-      try {
-        await supabaseDeleteUser(authId);
-        logger.info("register_supabase_cleanup_ok", { authId, traceId });
-      } catch (cleanupErr) {
-        logger.error("register_supabase_cleanup_failed", {
-          authId,
-          traceId,
-          error: (cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)),
-        });
-      }
-    }
-    // Re-throw so the error handler returns the right response
-    throw setupErr;
+    throw new AuthAppError(500, "REGISTRATION_FAILED", "session_create step failed — see server logs");
   }
+  logger.info("register_step", { step: "session_create", status: "ok", traceId });
+
+  // Audit log (fire-and-forget)
+  writeAuditLog(db, req, {
+    actorId:      userId,
+    action:       "register",
+    outcome:      "success",
+    resourceType: "user",
+    resourceId:   userId,
+  });
+
+  // Referral reward (fire-and-forget — never blocks registration)
+  if (referredById) {
+    processReferralReward("signup", userId).catch((err) =>
+      logger.warn("referral_signup_failed", { user_id: userId, error: (err as Error).message })
+    );
+  }
+
+  logger.info("register_complete", { userId, traceId });
+  return { user: coerceUser(userRow!), tokens, sessionId, rbac };
 }
 
 // ── Login ──────────────────────────────────────────────────────
