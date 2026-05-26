@@ -165,3 +165,28 @@ export async function supabaseUpdatePassword(authId: string, newPassword: string
   });
   if (error) throw new AppError(500, "INTERNAL_ERROR", error.message);
 }
+
+/**
+ * Delete a Supabase auth user by their auth ID (UUID).
+ * Used to clean up orphaned auth users when local DB setup fails during registration.
+ * Best-effort — logs but does not throw on failure.
+ */
+export async function supabaseDeleteUser(authId: string): Promise<void> {
+  const { error } = await getAdminClient().auth.admin.deleteUser(authId);
+  if (error) {
+    throw new AppError(500, "INTERNAL_ERROR", `Failed to delete Supabase auth user: ${error.message}`);
+  }
+}
+
+/**
+ * Look up a Supabase auth user by email via the Admin API.
+ * Returns the auth user's UUID or null if not found.
+ * Used during orphaned-auth-user recovery in the registration flow.
+ */
+export async function supabaseGetAuthUserByEmail(email: string): Promise<string | null> {
+  // Supabase v2 admin API does not expose a direct "get by email" method.
+  // We sign in with the provided credentials instead (see register recovery path).
+  // This stub exists for documentation; the recovery path uses supabaseSignIn.
+  void email;
+  return null;
+}

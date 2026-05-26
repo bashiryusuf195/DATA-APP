@@ -11,6 +11,7 @@ import { config }      from "../../../config";
 import {
   supabaseSignIn,
   supabaseSignUp,
+  supabaseDeleteUser,
   supabaseRefreshSession,
   supabaseSignOut,
   supabaseUpdatePassword,
@@ -96,114 +97,195 @@ export async function register(
   req:   Request,
   input: RegisterInput
 ): Promise<{ user: AuthUser; tokens: TokenPair; sessionId: string; rbac: RbacContext }> {
+  const traceId = req.traceId ?? "no-trace";
+
   // 1. Email uniqueness — fail fast before hitting Supabase
-  const existing = await db("users").where({ email: input.email }).first("id");
-  if (existing) {
+  const existingLocal = await db("users").where({ email: input.email }).whereNull("deleted_at").first("id");
+  if (existingLocal) {
+    logger.warn("register_email_taken", { email: input.email, traceId });
     throw new AuthAppError(409, "EMAIL_TAKEN", "An account with this email already exists");
   }
 
-  // 2. Create Supabase auth user
-  const authId = await supabaseSignUp(input.email, input.password, input.phone);
+  logger.info("register_start", { email: input.email, traceId });
 
-  // 3. Create local users row
-  // Resolve referrer from provided referral_code (if any)
-  let referredById: string | null = null;
-  if (input.referral_code) {
-    const referrer = await db("users")
-      .where({ referral_code: input.referral_code })
-      .whereNull("deleted_at")
-      .first("id");
-    referredById = referrer?.id ?? null;
+  // 2. Create Supabase auth user.
+  // If Supabase already has this email (orphaned auth user from a failed previous attempt),
+  // we recover by signing in to verify identity and re-use the existing auth user ID.
+  let authId: string;
+  let recoveredSession: Awaited<ReturnType<typeof supabaseSignIn>> | null = null;
+  let isOrphanedRecovery = false;
+
+  try {
+    authId = await supabaseSignUp(input.email, input.password, input.phone);
+    logger.info("register_supabase_signup_ok", { authId, traceId });
+  } catch (signupErr) {
+    // EMAIL_TAKEN from Supabase but no local users row → orphaned auth user.
+    // Recover by signing in to confirm identity and get the existing auth user ID.
+    if (signupErr instanceof AuthAppError && signupErr.code === "EMAIL_TAKEN") {
+      logger.warn("register_orphaned_auth_user_detected", { email: input.email, traceId });
+      try {
+        recoveredSession = await supabaseSignIn(input.email, input.password);
+        // Supabase Session includes the auth user object with its UUID
+        const sessionUser = (recoveredSession as unknown as { user?: { id?: string } }).user;
+        authId = sessionUser?.id ?? "";
+        if (!authId) {
+          throw new AuthAppError(500, "INTERNAL_ERROR", "Recovered Supabase session missing user ID");
+        }
+        isOrphanedRecovery = true;
+        logger.info("register_orphan_recovery_ok", { authId, traceId });
+      } catch (signinErr) {
+        if (signinErr instanceof AuthAppError && signinErr.code === "INVALID_CREDENTIALS") {
+          // Different password — email is truly taken by someone else
+          throw new AuthAppError(
+            409,
+            "EMAIL_TAKEN",
+            "An account with this email already exists. Please log in or reset your password."
+          );
+        }
+        throw signinErr;
+      }
+    } else {
+      throw signupErr;
+    }
   }
 
-  const [user] = await db("users")
-    .insert({
-      auth_id:           authId,
-      email:             input.email,
-      phone:             input.phone ?? null,
-      password_hash:     await bcrypt.hash(input.password, env.BCRYPT_ROUNDS),
-      referral_code:     generateReferralCode(),
-      referred_by_id:    referredById,
-      status:            "active",
-      kyc_level:         "none",
-      is_email_verified: true,
-      is_phone_verified: false,
-      metadata:          JSON.stringify({}),
-    })
-    .returning("*");
+  // 3–11: Complete local DB setup.
+  // On any failure, clean up a freshly-created Supabase auth user so the email can be retried.
+  // We do NOT delete the auth user if we're in orphan-recovery mode (it pre-existed).
+  try {
+    // 3. Resolve referrer
+    let referredById: string | null = null;
+    if (input.referral_code) {
+      const referrer = await db("users")
+        .where({ referral_code: input.referral_code })
+        .whereNull("deleted_at")
+        .first("id");
+      referredById = referrer?.id ?? null;
+    }
 
-  // 4. Create profile skeleton
-  await db("user_profiles").insert({
-    user_id:      user.id,
-    first_name:   input.first_name ?? null,
-    last_name:    input.last_name  ?? null,
-    display_name: [input.first_name, input.last_name].filter(Boolean).join(" ") || null,
-  });
-
-  // 4b. Provision default NGN wallet
-  const walletSvc = new WalletService(db);
-  await walletSvc.createWallet({
-    user_id:     user.id as string,
-    wallet_type: "user",
-    currency:    "NGN",
-    is_default:  true,
-    label:       "Main Wallet",
-  });
-
-  // 5. Assign default 'user' role
-  await assignRole(db, user.id as string, "user");
-
-  // 6. Resolve RBAC context
-  const rbac = await resolveUserRbac(db, user.id as string);
-
-  // 7. Obtain Supabase tokens
-  const supabaseSession = await supabaseSignIn(input.email, input.password);
-  const tokens           = supabaseSessionToTokenPair(supabaseSession);
-
-  // 8. Device tracking
-  let deviceId: string | null = null;
-  const fingerprint = input.device_fingerprint ?? req.deviceFingerprint;
-  if (fingerprint) {
-    deviceId = await upsertDevice(db, {
-      userId:            user.id as string,
-      deviceFingerprint: fingerprint,
-      deviceName:        input.device_name,
-      userAgent:         req.headers["user-agent"] ?? null,
-      ipAddress:         extractIp(req),
-    });
-  }
-
-  // 9. Create session record
-  const sessionId = await createSession(db, {
-    userId:       user.id as string,
-    accessToken:  tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    deviceId,
-    ipAddress:    extractIp(req),
-    userAgent:    req.headers["user-agent"] ?? null,
-    expiresAt:    tokens.refresh_token_expires_at,
-  });
-
-  // 10. Audit log (fire-and-forget)
-  writeAuditLog(db, req, {
-    actorId:      user.id as string,
-    action:       "register",
-    outcome:      "success",
-    resourceType: "user",
-    resourceId:   user.id as string,
-  });
-
-  // 11. Signup referral reward (fire-and-forget — never blocks registration)
-  if (referredById) {
-    processReferralReward("signup", user.id as string).catch((err) =>
-      logger.warn("referral_signup_failed", {
-        user_id: user.id,
-        error:   (err as Error).message,
+    // 4. Create local users row
+    logger.info("register_step", { step: "insert_user", authId, traceId });
+    const [user] = await db("users")
+      .insert({
+        auth_id:           authId,
+        email:             input.email,
+        phone:             input.phone ?? null,
+        password_hash:     await bcrypt.hash(input.password, env.BCRYPT_ROUNDS),
+        referral_code:     generateReferralCode(),
+        referred_by_id:    referredById,
+        status:            "active",
+        kyc_level:         "none",
+        is_email_verified: true,
+        is_phone_verified: false,
+        metadata:          JSON.stringify({}),
       })
-    );
-  }
+      .returning("*");
+    logger.info("register_step", { step: "insert_user_ok", userId: user.id as string, traceId });
 
-  return { user: coerceUser(user), tokens, sessionId, rbac };
+    // 5. Create profile skeleton
+    logger.info("register_step", { step: "insert_profile", userId: user.id as string, traceId });
+    await db("user_profiles").insert({
+      user_id:      user.id,
+      first_name:   input.first_name ?? null,
+      last_name:    input.last_name  ?? null,
+      display_name: [input.first_name, input.last_name].filter(Boolean).join(" ") || null,
+    });
+
+    // 5b. Provision default NGN wallet
+    logger.info("register_step", { step: "create_wallet", userId: user.id as string, traceId });
+    const walletSvc = new WalletService(db);
+    await walletSvc.createWallet({
+      user_id:     user.id as string,
+      wallet_type: "user",
+      currency:    "NGN",
+      is_default:  true,
+      label:       "Main Wallet",
+    });
+    logger.info("register_step", { step: "create_wallet_ok", userId: user.id as string, traceId });
+
+    // 6. Assign default 'customer' role
+    logger.info("register_step", { step: "assign_role", userId: user.id as string, traceId });
+    await assignRole(db, user.id as string, "customer");
+    logger.info("register_step", { step: "assign_role_ok", userId: user.id as string, traceId });
+
+    // 7. Resolve RBAC context
+    const rbac = await resolveUserRbac(db, user.id as string);
+
+    // 8. Obtain Supabase tokens (reuse sign-in from recovery path if available)
+    logger.info("register_step", { step: "supabase_signin", traceId });
+    const supabaseSession = recoveredSession ?? await supabaseSignIn(input.email, input.password);
+    const tokens          = supabaseSessionToTokenPair(supabaseSession);
+    logger.info("register_step", { step: "supabase_signin_ok", traceId });
+
+    // 9. Device tracking
+    let deviceId: string | null = null;
+    const fingerprint = input.device_fingerprint ?? req.deviceFingerprint;
+    if (fingerprint) {
+      deviceId = await upsertDevice(db, {
+        userId:            user.id as string,
+        deviceFingerprint: fingerprint,
+        deviceName:        input.device_name,
+        userAgent:         req.headers["user-agent"] ?? null,
+        ipAddress:         extractIp(req),
+      });
+    }
+
+    // 10. Create session record
+    const sessionId = await createSession(db, {
+      userId:       user.id as string,
+      accessToken:  tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      deviceId,
+      ipAddress:    extractIp(req),
+      userAgent:    req.headers["user-agent"] ?? null,
+      expiresAt:    tokens.refresh_token_expires_at,
+    });
+
+    // 11. Audit log (fire-and-forget)
+    writeAuditLog(db, req, {
+      actorId:      user.id as string,
+      action:       "register",
+      outcome:      "success",
+      resourceType: "user",
+      resourceId:   user.id as string,
+    });
+
+    // 12. Signup referral reward (fire-and-forget — never blocks registration)
+    if (referredById) {
+      processReferralReward("signup", user.id as string).catch((err) =>
+        logger.warn("referral_signup_failed", {
+          user_id: user.id,
+          error:   (err as Error).message,
+        })
+      );
+    }
+
+    logger.info("register_complete", { userId: user.id as string, traceId });
+    return { user: coerceUser(user), tokens, sessionId, rbac };
+
+  } catch (setupErr) {
+    // Cleanup: delete the Supabase auth user we just created so the email can be retried.
+    // Skip cleanup if we're in orphan-recovery mode (auth user pre-existed).
+    if (!isOrphanedRecovery) {
+      logger.warn("register_setup_failed", {
+        authId,
+        traceId,
+        error: (setupErr instanceof Error ? setupErr.message : String(setupErr)),
+      });
+      try {
+        await supabaseDeleteUser(authId);
+        logger.info("register_supabase_cleanup_ok", { authId, traceId });
+      } catch (cleanupErr) {
+        logger.error("register_supabase_cleanup_failed", {
+          authId,
+          traceId,
+          error: (cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)),
+        });
+      }
+    }
+    // Re-throw so the error handler returns the right response
+    throw setupErr;
+  }
 }
 
 // ── Login ──────────────────────────────────────────────────────
@@ -216,21 +298,22 @@ export async function login(
   | { requires_2fa: true;  challenge_id: string }
   | { requires_2fa: false; user: AuthUser; tokens: TokenPair; sessionId: string; rbac: RbacContext }
 > {
+  const traceId = req.traceId ?? "no-trace";
+
   // 1. Load user
   const user = await db("users")
     .where({ email: input.email })
     .whereNull("deleted_at")
     .first();
 
-  if (config.isDev) {
-    logger.debug("login_attempt", {
-      email:           input.email,
-      password_present: !!input.password,
-      user_found:       !!user,
-      user_status:      user?.status ?? null,
-      locked_until:     user?.locked_until ?? null,
-    });
-  }
+  logger.info("login_attempt", {
+    email:            input.email,
+    password_present: !!input.password,
+    user_found:       !!user,
+    user_status:      user?.status ?? null,
+    locked_until:     user?.locked_until ?? null,
+    traceId,
+  });
 
   if (!user) {
     // Avoid email enumeration
@@ -255,10 +338,12 @@ export async function login(
   }
 
   // 4. Authenticate via Supabase
+  logger.info("login_supabase_signin", { userId: user.id as string, traceId });
   let supabaseSession: Awaited<ReturnType<typeof supabaseSignIn>>;
   try {
     supabaseSession = await supabaseSignIn(input.email, input.password);
-  } catch {
+    logger.info("login_supabase_signin_ok", { userId: user.id as string, traceId });
+  } catch (signinErr) {
     // Increment failed attempts
     const attempts = ((user.failed_login_attempts as number) ?? 0) + 1;
     const update: Record<string, unknown> = { failed_login_attempts: attempts };
@@ -266,6 +351,13 @@ export async function login(
       update.locked_until = new Date(Date.now() + env.LOCKOUT_MINUTES * 60_000);
     }
     await db("users").where({ id: user.id }).update(update);
+
+    logger.warn("login_supabase_signin_failed", {
+      userId: user.id as string,
+      attempts,
+      traceId,
+      error: (signinErr instanceof Error ? signinErr.message : String(signinErr)),
+    });
 
     writeAuditLog(db, req, {
       actorId:  user.id as string,
