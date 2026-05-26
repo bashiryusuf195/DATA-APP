@@ -16,6 +16,7 @@ import { webhookRouter }      from '../modules/webhooks/routes/webhook.routes';
 import { userReferralRouter } from '../modules/referral/routes/user-referral.routes';
 import { customerKycRouter }  from '../modules/compliance/routes/customer-kyc.routes';
 import { adminRouter }        from './admin.routes';
+import { publicRouter }       from '../modules/public/routes/public.routes';
 
 export const rootRouter = Router();
 
@@ -29,3 +30,4 @@ rootRouter.use('/webhooks',      webhookRouter);
 rootRouter.use('/referrals',     userReferralRouter);
 rootRouter.use('/kyc',           customerKycRouter);
 rootRouter.use('/admin',         adminRouter);
+rootRouter.use('/public',        publicRouter);

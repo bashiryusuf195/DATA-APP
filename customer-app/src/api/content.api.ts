@@ -53,7 +53,24 @@ export interface AppContent {
   support: SupportContent | null
 }
 
+// Returned whenever the /public/content endpoint is unavailable (404, network
+// error, etc.).  Individual pages supply their own UI-level defaults on top of
+// this so the app always renders correctly.
+export const DEFAULT_APP_CONTENT: AppContent = {
+  landing:    null,
+  onboarding: [],
+  support:    null,
+}
+
 export const contentApi = {
-  getAppContent: (): Promise<AppContent> =>
-    apiClient.get('/public/content').then((r) => r.data),
+  // Never throws — returns DEFAULT_APP_CONTENT on any error so pages always
+  // receive a value from React Query and can fall back to their local defaults.
+  getAppContent: async (): Promise<AppContent> => {
+    try {
+      const res = await apiClient.get<AppContent>('/public/content')
+      return res.data ?? DEFAULT_APP_CONTENT
+    } catch {
+      return DEFAULT_APP_CONTENT
+    }
+  },
 }
