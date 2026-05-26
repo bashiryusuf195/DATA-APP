@@ -100,6 +100,9 @@ export const vtuPurchaseWorker = createWorker(
         network_operator:        planNetworkOperator,
         customer_name:           data.customer_name,
         reference:               data.reference,
+        // id_number forwarded in metadata so providers other than SecureIDVerify
+        // are not affected by this identity-verification-specific field.
+        ...(data.id_number && { metadata: { id_number: data.id_number } }),
       },
       transaction_reference: data.reference,
       transaction: {

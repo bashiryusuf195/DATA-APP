@@ -5,6 +5,7 @@ import { VTPassProvider } from "./vtpass.provider";
 import { SmshikaProvider } from "./smshika.provider";
 import { ClubkonnectProvider } from "./clubkonnect.provider";
 import { LegitDataWayProvider } from "./legitdataway.provider";
+import { SecureIDVerifyProvider } from "./secureidverify.provider";
 import { config } from "../../../config";
 
 class ProviderRegistryService {
@@ -46,6 +47,10 @@ class ProviderRegistryService {
     // LegitDataWay — token-based auth; username+password read from DB at call time.
     this.register(new LegitDataWayProvider());
     console.log("[PROVIDER REGISTRY] LegitDataWay registered (credentials loaded from DB at call time)");
+
+    // SecureIDVerify — NIN/BVN identity verification; credentials loaded from DB at call time.
+    this.register(new SecureIDVerifyProvider());
+    console.log("[PROVIDER REGISTRY] SecureIDVerify registered (credentials loaded from DB at call time)");
   }
 
   register(provider: VTUProvider) {

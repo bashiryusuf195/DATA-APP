@@ -103,12 +103,16 @@ export const ExamPinPurchaseSchema = z.object({
 });
 
 // Identity verification: amount comes from DB plan.
+// id_number: the NIN (11 digits) or BVN (11 digits) of the subject.
+// phone:     Nigerian phone number — valid alternative identifier for NIN-by-phone
+//            lookups; not accepted for BVN (provider only supports BVN-by-number).
+// At least one of id_number or phone is required.
 export const IdentityVerificationSchema = z
   .object({
+    id_number:      z.string().regex(/^\d{10,11}$/, "NIN/BVN must be 10–11 digits").optional(),
     phone:          nigerianPhone.optional(),
-    customer_name:  customerName.optional(),
     variation_code: variationCode,
   })
-  .refine((d) => d.phone ?? d.customer_name, {
-    message: "Either phone or customer_name is required",
+  .refine((d) => d.id_number ?? d.phone, {
+    message: "NIN/BVN number or phone number is required",
   });

@@ -210,6 +210,11 @@ export interface ExamPinPurchaseInput {
 }
 
 export interface IdentityVerificationInput {
+  /** NIN (11 digits) or BVN (11 digits) of the subject. Required for BVN; optional
+   *  for NIN when phone is provided instead (nin-phone lookup). */
+  id_number?: string
+  /** Nigerian phone number — used as an alternative identifier for NIN-by-phone.
+   *  Not accepted for BVN (provider only supports BVN-by-number). */
   phone?: string
   amount: number
   variation_code: string

@@ -49,6 +49,8 @@ export interface VtuPurchaseInput {
   variation_code?: string;
   customer_name?: string;
   verified_customer_name?: string;
+  /** NIN or BVN number for identity_verification purchases. */
+  id_number?: string;
   plan?: VtuPlanMeta;
 }
 
@@ -96,6 +98,7 @@ export async function initializeVtuPurchase(
       meter_number: input.meter_number,
       variation_code: input.variation_code,
       customer_name: input.customer_name,
+      ...(input.id_number          && { id_number: input.id_number }),
       ...(input.verified_customer_name && { verified_customer_name: input.verified_customer_name }),
       ...(input.plan && {
         plan_id: input.plan.plan_id,

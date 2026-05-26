@@ -390,28 +390,29 @@ export async function identityVerificationController(
 ): Promise<void> {
   try {
     const input = IdentityVerificationSchema.parse(req.body);
-    const plan = await requirePlan("identity_verification", input.variation_code);
+    const plan  = await requirePlan("identity_verification", input.variation_code);
     const amount = planChargeAmount(plan)!;
 
     const result = await initializeVtuPurchase(req.user!.id, {
-      service_type: "identity_verification",
+      service_type:   "identity_verification",
       amount,
-      phone: input.phone,
-      customer_name: input.customer_name,
+      phone:          input.phone,
+      id_number:      input.id_number,
       variation_code: input.variation_code,
-      description: `Identity verification (${input.variation_code.toUpperCase()}) for ${input.phone ?? input.customer_name}`,
-      plan: buildPlanMeta(plan),
+      // slip_type is carried by plan_category on the DB plan row — not sent to provider.
+      description:    `Identity verification — ${plan.name}`,
+      plan:           buildPlanMeta(plan),
     });
 
     await vtuPurchaseQueue.add(
       "purchase",
       {
-        user_id: req.user!.id,
-        reference: result.reference,
-        service_type: "identity_verification",
+        user_id:        req.user!.id,
+        reference:      result.reference,
+        service_type:   "identity_verification",
         amount,
-        phone: input.phone,
-        customer_name: input.customer_name,
+        phone:          input.phone,
+        id_number:      input.id_number,
         variation_code: input.variation_code,
       },
       { ...defaultJobOptions, jobId: result.reference }

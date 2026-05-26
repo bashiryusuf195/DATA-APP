@@ -78,7 +78,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
         db.raw("COUNT(*) FILTER (WHERE status = 'suspended')::int        AS suspended"),
         db.raw("COUNT(*) FILTER (WHERE created_at >= ?)::int             AS new_today", [todayStart]),
       )
-      .first<{ total: unknown; active: unknown; suspended: unknown; new_today: unknown }>(),
+      .first<{ total: unknown; active: unknown; suspended: unknown; new_today: unknown }>()
+      .catch(() => ({ total: 0, active: 0, suspended: 0, new_today: 0 })),
 
     // ── Wallets (user wallets only, balance from v_wallet_balances view) ───────
     db("v_wallet_balances")
@@ -105,7 +106,11 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       .first<{
         total: unknown; successful: unknown; failed: unknown; pending: unknown;
         total_volume: unknown; purchase_volume: unknown; recent_failed: unknown;
-      }>(),
+      }>()
+      .catch(() => ({
+        total: 0, successful: 0, failed: 0, pending: 0,
+        total_volume: 0, purchase_volume: 0, recent_failed: 0,
+      })),
 
     // ── Transactions (today only) ─────────────────────────────────────────────
     db("transactions")
@@ -114,7 +119,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
         db.raw("COUNT(*)::int                                                      AS today_count"),
         db.raw("COALESCE(SUM(amount) FILTER (WHERE status = 'successful'), 0)     AS today_volume"),
       )
-      .first<{ today_count: unknown; today_volume: unknown }>(),
+      .first<{ today_count: unknown; today_volume: unknown }>()
+      .catch(() => ({ today_count: 0, today_volume: 0 })),
 
     // ── Funding transactions ──────────────────────────────────────────────────
     db("funding_transactions")

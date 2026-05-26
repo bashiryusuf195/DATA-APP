@@ -10,4 +10,6 @@ export interface VtuPurchaseJobPayload {
   meter_number?: string;
   variation_code?: string;
   customer_name?: string;
+  /** NIN or BVN number — forwarded to provider for identity_verification jobs. */
+  id_number?: string;
 }
