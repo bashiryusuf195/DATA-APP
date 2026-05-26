@@ -25,6 +25,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Versioned API prefix — matches deployed frontend where VITE_API_BASE_URL
+      // ends with /api/v1, making calls land at /api/v1/admin/*, /api/v1/auth/*, etc.
+      '/api/v1':        { target: 'http://localhost:3000', changeOrigin: true, bypass: spaBypass },
+      // Unversioned aliases — matches local dev where VITE_API_BASE_URL is empty.
       '/auth':          { target: 'http://localhost:3000', changeOrigin: true, bypass: spaBypass },
       '/admin':         { target: 'http://localhost:3000', changeOrigin: true, bypass: spaBypass },
       '/transactions':  { target: 'http://localhost:3000', changeOrigin: true, bypass: spaBypass },

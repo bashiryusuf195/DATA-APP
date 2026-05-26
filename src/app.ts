@@ -26,36 +26,9 @@ import { authRouter }                      from "./modules/auth/routes/auth.rout
 import { walletRouter } from "./modules/wallet/routes/wallet.routes";
 import { transactionRouter } from "./modules/transactions/routes/transaction.routes";
 import { catalogRouter } from "./modules/catalog/routes/catalog.routes";
-import { adminCatalogRouter } from "./modules/catalog/routes/admin-catalog.routes";
-import { adminAvailabilityRouter } from "./modules/catalog/routes/admin-availability.routes";
-import { adminQueueRouter } from "./modules/queue/routes/admin-queue.routes";
 import { webhookRouter } from "./modules/webhooks/routes/webhook.routes";
-import { adminWebhookRouter } from "./modules/webhooks/routes/admin-webhook.routes";
-import { adminReconciliationRouter } from "./modules/reconciliation/routes/admin-reconciliation.routes";
 import { notificationsRouter }       from "./modules/notifications/routes/notifications.routes";
-import { adminNotificationsRouter }  from "./modules/notifications/routes/admin-notifications.routes";
-import { adminProvidersRouter }        from "./modules/providers/routes/admin-providers.routes";
-import { adminProviderWalletsRouter }  from "./modules/providers/routes/admin-provider-wallets.routes";
-import { adminRoutingRulesRouter }     from "./modules/providers/routes/admin-routing-rules.routes";
-import { adminProviderAttemptsRouter } from "./modules/providers/routes/admin-provider-attempts.routes";
-import { adminHealthMetricsRouter }    from "./modules/providers/routes/admin-health-metrics.routes";
-import { adminWalletRouter }           from "./modules/wallet/routes/admin-wallet.routes";
-import { adminWalletOpsRouter }        from "./modules/wallet/routes/admin-wallet-ops.routes";
-import { adminUsersRouter }            from "./modules/auth/routes/admin-users.routes";
-import { adminAuditRouter }            from "./modules/audit/routes/admin-audit.routes";
-import { adminRolesRouter }            from "./modules/auth/routes/admin-roles.routes";
-import { adminSettingsRouter }         from "./modules/settings/routes/admin-settings.routes";
-import { adminDashboardRouter }        from "./modules/dashboard/routes/admin-dashboard.routes";
-import { adminSupportRouter }          from "./modules/support/routes/admin-support.routes";
-import { adminFinanceRouter }          from "./modules/finance/routes/admin-finance.routes";
-import { adminComplianceRouter }       from "./modules/compliance/routes/admin-compliance.routes";
-import { adminPaymentGatewaysRouter }  from "./modules/payment-gateways/routes/admin-payment-gateways.routes";
-import { adminSystemHealthRouter }     from "./modules/system/routes/admin-system-health.routes";
-import { adminBackupRouter }           from "./modules/backup/routes/admin-backup.routes";
-import { adminIntegrityRouter }        from "./modules/backup/routes/admin-integrity.routes";
-import { adminReferralRouter }         from "./modules/referral/routes/admin-referral.routes";
-import { adminTransactionsRouter }     from "./modules/transactions/routes/admin-transactions.routes";
-import { adminAuditMiddleware }        from "./middleware/adminAudit";
+import { adminRouter }               from "./routes/admin.routes";
 import { publicAuditMiddleware }       from "./middleware/publicAudit";
 import { publicRouter }               from "./modules/public/routes/public.routes";
 import "./modules/queue";
@@ -125,46 +98,20 @@ app.use(requestLogger);
 app.use(standardLimiter);
 
 // ── 6. Routes ─────────────────────────────────────────────────────────────────
-// Audit middlewares fire on res.on("finish") — register before routes so every
-// request passes through before dispatch.
+// publicAuditMiddleware fires on res.on("finish") for every request.
+// adminAuditMiddleware is embedded inside adminRouter so it covers both
+// /admin/* and the /api/v1/admin/* alias registered in rootRouter.
 app.use(publicAuditMiddleware);
-app.use('/admin', adminAuditMiddleware);
 
-app.use('/api/v1', rootRouter);
-app.use("/auth", authRouter);
-app.use("/wallet", walletRouter);
+app.use('/api/v1', rootRouter);       // versioned API — includes /api/v1/admin/*
+app.use("/admin",  adminRouter);      // unversioned alias — dev proxy + direct access
+app.use("/auth",         authRouter);
+app.use("/wallet",       walletRouter);
 app.use("/transactions", transactionRouter);
-app.use("/services", catalogRouter);
-app.use("/admin", adminDashboardRouter);
-app.use("/admin", adminCatalogRouter);
-app.use("/admin", adminAvailabilityRouter);
-app.use("/admin", adminQueueRouter);
-app.use("/admin", adminWebhookRouter);
-app.use("/admin", adminReconciliationRouter);
-app.use("/admin", adminNotificationsRouter);
-app.use("/admin", adminProvidersRouter);
-app.use("/admin", adminProviderWalletsRouter);
-app.use("/admin", adminRoutingRulesRouter);
-app.use("/admin", adminProviderAttemptsRouter);
-app.use("/admin", adminHealthMetricsRouter);
-app.use("/admin", adminWalletRouter);
-app.use("/admin", adminWalletOpsRouter);
-app.use("/admin", adminUsersRouter);
-app.use("/admin", adminRolesRouter);
-app.use("/admin", adminSettingsRouter);
-app.use("/admin", adminSupportRouter);
-app.use("/admin", adminFinanceRouter);
-app.use("/admin", adminComplianceRouter);
-app.use("/admin", adminPaymentGatewaysRouter);
-app.use("/admin", adminAuditRouter);
-app.use("/admin", adminReferralRouter);
-app.use("/admin", adminTransactionsRouter);
-app.use("/admin", adminSystemHealthRouter);
-app.use("/admin", adminBackupRouter);
-app.use("/admin", adminIntegrityRouter);
+app.use("/services",     catalogRouter);
 app.use("/notifications", notificationsRouter);
-app.use("/webhooks", webhookRouter);
-app.use("/public", publicRouter);
+app.use("/webhooks",     webhookRouter);
+app.use("/public",       publicRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.

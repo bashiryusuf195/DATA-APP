@@ -3,6 +3,7 @@
 // Master router — mounts every sub-router under /api/v1.
 // All public routes are available at both their direct paths (e.g. /auth/login)
 // and their versioned aliases (e.g. /api/v1/auth/login).
+// Admin routes live at /api/v1/admin/* via adminRouter (also at /admin/* in app.ts).
 
 import { Router } from 'express';
 import { healthRouter }       from './health.routes';
@@ -14,6 +15,7 @@ import { notificationsRouter } from '../modules/notifications/routes/notificatio
 import { webhookRouter }      from '../modules/webhooks/routes/webhook.routes';
 import { userReferralRouter } from '../modules/referral/routes/user-referral.routes';
 import { customerKycRouter }  from '../modules/compliance/routes/customer-kyc.routes';
+import { adminRouter }        from './admin.routes';
 
 export const rootRouter = Router();
 
@@ -26,3 +28,4 @@ rootRouter.use('/notifications', notificationsRouter);
 rootRouter.use('/webhooks',      webhookRouter);
 rootRouter.use('/referrals',     userReferralRouter);
 rootRouter.use('/kyc',           customerKycRouter);
+rootRouter.use('/admin',         adminRouter);
