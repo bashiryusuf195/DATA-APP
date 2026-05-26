@@ -7,7 +7,7 @@ import {
   getProviderCredentials,
 } from "../services/provider-credentials.service";
 import {
-  createProviderConfig,
+  upsertProviderConfig,
   updateProviderConfig,
   disableProviderConfig,
 } from "../services/provider-config.service";
@@ -38,11 +38,11 @@ export async function createProviderController(
 ): Promise<void> {
   try {
     const input = CreateProviderSchema.parse(req.body);
-    const row = await createProviderConfig({
+    const { row, created } = await upsertProviderConfig({
       ...input,
       supported_services: input.supported_services as ProviderServiceType[] | undefined,
     });
-    res.status(201).json({ success: true, data: row });
+    res.status(created ? 201 : 200).json({ success: true, data: row });
   } catch (err) {
     next(err);
   }

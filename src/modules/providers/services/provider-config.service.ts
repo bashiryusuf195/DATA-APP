@@ -31,11 +31,21 @@ export interface CreateProviderConfigInput {
 
 export type UpdateProviderConfigInput = Partial<Omit<CreateProviderConfigInput, "provider_code">>;
 
-// ── Create ────────────────────────────────────────────────────────────────────
+// ── Create / Upsert ───────────────────────────────────────────────────────────
+//
+// Uses INSERT … ON CONFLICT (provider_code) DO UPDATE so that creating a
+// provider that was already seeded by a migration succeeds instead of crashing
+// with a UNIQUE constraint violation.  The id and created_at of the original
+// row are preserved; all other fields are replaced with the new values.
 
-export async function createProviderConfig(
+export interface UpsertProviderConfigResult {
+  row:     ProviderConfigRow;
+  created: boolean;
+}
+
+export async function upsertProviderConfig(
   input: CreateProviderConfigInput
-): Promise<ProviderConfigRow> {
+): Promise<UpsertProviderConfigResult> {
   const now = new Date();
   const [row] = await db("provider_configs")
     .insert({
@@ -51,8 +61,22 @@ export async function createProviderConfig(
       created_at:         now,
       updated_at:         now,
     })
+    .onConflict("provider_code")
+    .merge(["name", "is_active", "priority", "supported_services", "health_status", "notes", "metadata", "updated_at"])
     .returning("*");
-  return row as ProviderConfigRow;
+
+  const typedRow = row as ProviderConfigRow;
+  // On fresh insert both timestamps equal `now`; on conflict update created_at
+  // retains its original value and will differ from the new updated_at.
+  const created = typedRow.created_at.getTime() === typedRow.updated_at.getTime();
+  return { row: typedRow, created };
+}
+
+/** @deprecated Use upsertProviderConfig — kept so existing callers compile. */
+export async function createProviderConfig(
+  input: CreateProviderConfigInput
+): Promise<ProviderConfigRow> {
+  return (await upsertProviderConfig(input)).row;
 }
 
 // ── Update (partial) ──────────────────────────────────────────────────────────
