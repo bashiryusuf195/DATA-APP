@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search
 import { useNavigate } from 'react-router-dom'
 import { useState, useCallback } from 'react'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
+import { useAuthStore } from '@/store/auth.store'
 import type { Transaction } from '@/types'
 
 function CopyButton({ text }: { text: string }) {
@@ -39,6 +40,27 @@ interface ResultModalProps {
 
 export function ResultModal({ open, transaction, isPolling = false, onClose, onRetry }: ResultModalProps) {
   const navigate = useNavigate()
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const handleReportDownload = useCallback(async () => {
+    if (!transaction) return
+    const token = useAuthStore.getState().access_token
+    const base  = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+    const url   = `${base}/api/v1/transactions/identity-verification/${transaction.reference}/report`
+    setIsDownloading(true)
+    try {
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      if (!resp.ok) throw new Error('Download failed')
+      const blob   = await resp.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a      = document.createElement('a')
+      a.href       = objUrl
+      a.download   = `verification-${transaction.reference}.pdf`
+      a.click()
+      URL.revokeObjectURL(objUrl)
+    } catch { /* silently ignore — user can retry */ }
+    finally  { setIsDownloading(false) }
+  }, [transaction])
 
   const uiStatus  = normalizeTransactionStatus(transaction?.status)
   const isSuccess = uiStatus === 'success'
@@ -227,8 +249,6 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
             const fullName   = [firstName, middleName, lastName].filter(Boolean).join(' ')
             const idType     = (s(rd.id_type).toUpperCase() || 'ID')
             const idNum      = s(rd.id_number ?? pd.nin ?? pd.bvn)
-            const reportUrl  = `/api/v1/transactions/identity-verification/${transaction.reference}/report`
-
             return (
               <div className="w-full mb-4 space-y-3">
                 <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 text-left space-y-2">
@@ -261,15 +281,16 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
                     </div>
                   )}
                 </div>
-                <a
-                  href={reportUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50 transition-colors"
+                <button
+                  onClick={handleReportDownload}
+                  disabled={isDownloading}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Download className="h-4 w-4" />
-                  Download Report
-                </a>
+                  {isDownloading
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Download className="h-4 w-4" />}
+                  {isDownloading ? 'Downloading…' : 'Download Report'}
+                </button>
               </div>
             )
           }
