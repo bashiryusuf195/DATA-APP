@@ -622,6 +622,10 @@ class ProviderExecutionEngine {
       metadata: {
         provider_response: result.raw_response ?? null,
         execution:         executionMeta,
+        // report_data is populated by identity verification providers only.
+        // It contains unmasked fields (incl. photo) needed for PDF generation
+        // and is never included in raw_response or logs.
+        ...(result.report_data ? { report_data: result.report_data } : {}),
       },
     });
 

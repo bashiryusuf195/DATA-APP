@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck, ArrowLeft } from 'lucide-react'
-import { Button, Input, Card, Skeleton } from '@/components/ui'
+import {
+  ShieldCheck, ArrowLeft, ChevronRight, ChevronLeft,
+  CreditCard, Phone, FileText, Check,
+} from 'lucide-react'
+import { Button, Input, Card } from '@/components/ui'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { ResultModal } from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
@@ -12,235 +15,414 @@ import { fmtCurrency } from '@/utils/format'
 import type { IdentityVerificationInput, ServicePlan } from '@/types'
 import { cn } from '@/utils/cn'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-const PLAN_DESCRIPTIONS: Record<string, string> = {
-  'nin-information': 'Name, date of birth, gender',
-  'nin-standard':    'NIN details + address + photo',
-  'nin-premium':     'Full NIN record with downloadable PDF',
-  'bvn-basic':       'Name, date of birth, linked bank details',
+type Category = 'nin' | 'bvn'
+type Method   = 'number' | 'phone'
+type Step     = 1 | 2 | 3 | 4 | 5
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const SLIP_DESCRIPTIONS: Record<string, string> = {
+  'nin-information': 'Basic info — name, date of birth, gender',
+  'nin-standard':    'Standard — NIN details, address',
+  'nin-premium':     'Premium — full record with photo',
+  'bvn-basic':       'Basic — name, date of birth, linked bank details',
 }
 
-function isNin(plan: ServicePlan | undefined) {
-  return plan?.network_operator === 'nin'
-}
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-function isBvn(plan: ServicePlan | undefined) {
-  return plan?.network_operator === 'bvn'
-}
-
-// ── PlanGroup ─────────────────────────────────────────────────────────────────
-
-function PlanGroup({
-  label, plans, selectedId, onSelect,
-}: {
-  label:      string
-  plans:      ServicePlan[]
-  selectedId: string
-  onSelect:   (id: string) => void
-}) {
-  if (!plans.length) return null
+function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
-    <div>
-      <p className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-2">{label}</p>
-      <div className="space-y-2">
-        {plans.map((plan) => (
-          <button
-            key={plan.id}
-            type="button"
-            onClick={() => onSelect(plan.id)}
-            className={cn(
-              'w-full p-3 rounded-xl border-2 flex items-center justify-between transition-all text-left',
-              selectedId === plan.id
-                ? 'border-brand-600 bg-brand-50'
-                : 'border-border hover:border-brand-300',
-            )}
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-ink">{plan.name}</p>
-              {PLAN_DESCRIPTIONS[plan.variation_code] && (
-                <p className="text-xs text-ink-muted mt-0.5">
-                  {PLAN_DESCRIPTIONS[plan.variation_code]}
-                </p>
-              )}
-            </div>
-            <p className="text-sm font-bold text-brand-600 shrink-0 ml-3">
-              {fmtCurrency(plan.selling_price)}
-            </p>
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center gap-1.5 mb-6">
+      {Array.from({ length: total }, (_, i) => (
+        <div
+          key={i}
+          className={cn(
+            'h-1.5 flex-1 rounded-full transition-all duration-300',
+            i + 1 <= step ? 'bg-brand-600' : 'bg-surface-elevated',
+          )}
+        />
+      ))}
     </div>
+  )
+}
+
+function OptionCard({
+  label, description, icon, selected, onClick,
+}: {
+  label:       string
+  description: string
+  icon:        React.ReactNode
+  selected:    boolean
+  onClick:     () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all',
+        selected
+          ? 'border-brand-600 bg-brand-50 dark:bg-brand-950/30'
+          : 'border-border hover:border-brand-300 bg-surface',
+      )}
+    >
+      <div className={cn(
+        'h-11 w-11 rounded-xl flex items-center justify-center shrink-0',
+        selected ? 'bg-brand-600 text-white' : 'bg-surface-elevated text-ink-muted',
+      )}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={cn('text-sm font-semibold', selected ? 'text-brand-700' : 'text-ink')}>{label}</p>
+        <p className="text-xs text-ink-muted mt-0.5">{description}</p>
+      </div>
+      {selected && <Check className="h-5 w-5 text-brand-600 shrink-0" />}
+    </button>
+  )
+}
+
+function PlanCard({
+  plan, selected, onClick,
+}: {
+  plan:     ServicePlan
+  selected: boolean
+  onClick:  () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all',
+        selected
+          ? 'border-brand-600 bg-brand-50 dark:bg-brand-950/30'
+          : 'border-border hover:border-brand-300 bg-surface',
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className={cn('text-sm font-semibold', selected ? 'text-brand-700' : 'text-ink')}>
+            {plan.name}
+          </p>
+          {selected && <Check className="h-4 w-4 text-brand-600" />}
+        </div>
+        <p className="text-xs text-ink-muted mt-0.5">
+          {SLIP_DESCRIPTIONS[plan.variation_code] ?? plan.description ?? ''}
+        </p>
+      </div>
+      <p className="text-sm font-bold text-brand-600 shrink-0 ml-4">
+        {fmtCurrency(plan.selling_price)}
+      </p>
+    </button>
   )
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function IdentityPage() {
-  const navigate = useNavigate()
-
-  const [planId,   setPlanId]   = useState('')
-  const [idNumber, setIdNumber] = useState('')   // NIN or BVN number
-  const [phone,    setPhone]    = useState('')   // NIN-by-phone alternative (NIN only)
-  const [errors,   setErrors]   = useState<Record<string, string>>({})
+  const navigate   = useNavigate()
+  const [step, setStep]         = useState<Step>(1)
+  const [category, setCategory] = useState<Category | null>(null)
+  const [method, setMethod]     = useState<Method>('number')
+  const [identifier, setIdentifier] = useState('')
+  const [planId, setPlanId]     = useState('')
+  const [consent, setConsent]   = useState(false)
+  const [errors, setErrors]     = useState<Record<string, string>>({})
 
   const { data: balance }                        = useWalletBalance()
   const { data: plans, isLoading: plansLoading } = useServicePlans('identity_verification', true)
   const purchase = useServicePurchase<IdentityVerificationInput>(transactionsApi.verifyIdentity)
 
-  const selectedPlan = plans?.find((p) => p.id === planId)
-  const ninPlans     = plans?.filter((p) => p.network_operator === 'nin') ?? []
-  const bvnPlans     = plans?.filter((p) => p.network_operator === 'bvn') ?? []
-  const otherPlans   = plans?.filter(
-    (p) => p.network_operator !== 'nin' && p.network_operator !== 'bvn'
-  ) ?? []
+  const ninPlans = (plans ?? []).filter((p) => p.network_operator === 'nin' && p.selling_price > 0)
+  const bvnPlans = (plans ?? []).filter((p) => p.network_operator === 'bvn' && p.selling_price > 0)
 
-  function handleSelectPlan(id: string) {
-    setPlanId(id)
-    // Clear identifier fields when plan type changes to avoid cross-contamination.
-    setIdNumber('')
-    setPhone('')
+  const selectedPlan = (plans ?? []).find((p) => p.id === planId) ?? null
+  const isBvn        = category === 'bvn'
+  const isNin        = category === 'nin'
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  function goNext() {
+    const errs: Record<string, string> = {}
+
+    if (step === 1) {
+      if (!category) { errs.category = 'Select a verification category'; setErrors(errs); return }
+      // BVN has only one method — skip step 2
+      if (isBvn) { setMethod('number'); setStep(3); return }
+      setStep(2); setErrors({}); return
+    }
+
+    if (step === 2) {
+      setStep(3); setErrors({}); return
+    }
+
+    if (step === 3) {
+      if (isBvn || method === 'number') {
+        if (!/^\d{10,11}$/.test(identifier.trim())) {
+          errs.identifier = `Enter a valid 11-digit ${isBvn ? 'BVN' : 'NIN'} number`
+          setErrors(errs); return
+        }
+      } else {
+        // NIN by phone
+        if (!/^(\+?234|0)[789]\d{8}$/.test(identifier.trim())) {
+          errs.identifier = 'Enter a valid Nigerian phone number (e.g. 08012345678)'
+          setErrors(errs); return
+        }
+      }
+      // Auto-select single BVN plan
+      if (isBvn && bvnPlans.length === 1 && !planId) setPlanId(bvnPlans[0].id)
+      setStep(4); setErrors({}); return
+    }
+
+    if (step === 4) {
+      if (!planId) { errs.plan = 'Select a verification type'; setErrors(errs); return }
+      if (balance && selectedPlan && selectedPlan.selling_price > balance.balance) {
+        errs.plan = 'Insufficient wallet balance'
+        setErrors(errs); return
+      }
+      setStep(5); setErrors({}); return
+    }
+  }
+
+  function goBack() {
+    if (step === 3 && isBvn) { setStep(1); return }
+    if (step > 1) setStep((s) => (s - 1) as Step)
+  }
+
+  function clearAndReset(newCategory: Category) {
+    setCategory(newCategory)
+    setMethod('number')
+    setIdentifier('')
+    setPlanId('')
+    setConsent(false)
     setErrors({})
   }
 
-  function validate(): boolean {
-    const errs: Record<string, string> = {}
+  // ── Submit ────────────────────────────────────────────────────────────────
 
-    if (!planId) {
-      errs.plan = 'Select a verification type'
-    } else if (selectedPlan && balance && selectedPlan.selling_price > balance.balance) {
-      errs.plan = 'Insufficient balance'
-    }
+  const handleSubmit = () => {
+    if (!consent) { setErrors({ consent: 'You must confirm consent to proceed' }); return }
+    if (!selectedPlan) return
 
-    if (isBvn(selectedPlan)) {
-      // BVN: must supply the 11-digit BVN number; phone lookup not supported.
-      if (!idNumber || !/^\d{10,11}$/.test(idNumber)) {
-        errs.id_number = 'Enter your valid 11-digit BVN number'
-      }
-    } else if (isNin(selectedPlan)) {
-      // NIN: either the 11-digit NIN number or a registered phone number is required.
-      const hasNin   = idNumber && /^\d{10,11}$/.test(idNumber)
-      const hasPhone = phone && /^(\+?234|0)[789]\d{8}$/.test(phone)
-      if (!hasNin && !hasPhone) {
-        errs.id_number = 'Enter your NIN number or registered phone number'
-      }
-    }
-
-    setErrors(errs)
-    return Object.keys(errs).length === 0
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validate() || !selectedPlan) return
-
+    const byPhone = isNin && method === 'phone'
     purchase.requestConfirm({
-      id_number:      idNumber || undefined,
-      phone:          phone    || undefined,
+      id_number:      byPhone ? undefined : identifier.trim() || undefined,
+      phone:          byPhone ? identifier.trim() || undefined : undefined,
       amount:         selectedPlan.selling_price,
       variation_code: selectedPlan.variation_code,
       description:    `${selectedPlan.name} verification`,
     })
   }
 
-  // Labels adapt to selected plan type.
-  const idFieldLabel = isBvn(selectedPlan)
-    ? 'BVN Number'
-    : isNin(selectedPlan)
-    ? 'NIN Number'
-    : 'NIN / BVN Number'
+  // ── Confirm modal rows ────────────────────────────────────────────────────
 
-  const idFieldHint = isBvn(selectedPlan)
-    ? '11-digit Bank Verification Number'
-    : 'Your 11-digit National Identification Number'
-
-  const idFieldPlaceholder = '12345678901'
+  const idLabel = isBvn ? 'BVN' : method === 'phone' ? 'Phone' : 'NIN'
+  const maskedId = identifier.length >= 5
+    ? `${identifier.slice(0, 3)}${'*'.repeat(Math.max(0, identifier.length - 5))}${identifier.slice(-2)}`
+    : identifier
 
   const confirmRows = [
     { label: 'Service', value: selectedPlan?.name ?? '' },
     { label: 'Amount',  value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
-    // Never show raw NIN/BVN in the confirm modal — show masked version.
-    ...(idNumber ? [{ label: isBvn(selectedPlan) ? 'BVN' : 'NIN', value: `${idNumber.slice(0, 3)}****${idNumber.slice(-2)}` }] : []),
-    ...(phone    ? [{ label: 'Phone', value: phone }] : []),
+    { label: idLabel,   value: maskedId },
   ]
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const totalSteps = category === 'bvn' ? 4 : 5  // BVN skips method step
 
   return (
     <div className="space-y-4 pt-2">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => (step === 1 ? navigate(-1) : goBack())}
         className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink"
       >
-        <ArrowLeft className="h-4 w-4" /> Services
+        <ArrowLeft className="h-4 w-4" />
+        {step === 1 ? 'Services' : 'Back'}
       </button>
 
       <Card>
-        <div className="flex items-center gap-2.5 mb-5">
-          <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center">
-            <ShieldCheck className="h-5 w-5 text-indigo-600" />
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center shrink-0">
+            <ShieldCheck className="h-6 w-6 text-indigo-600" />
           </div>
           <div>
-            <p className="text-base font-semibold text-ink">Identity Verification</p>
+            <p className="text-base font-bold text-ink">Identity Verification</p>
             {balance && (
               <p className="text-xs text-ink-muted">Balance: {fmtCurrency(balance.balance)}</p>
             )}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Plan selection */}
+        <ProgressBar step={stepIndex(step, isBvn)} total={totalSteps} />
+
+        {/* ── Step 1: Category ─────────────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-ink mb-4">Select verification category</p>
+            <OptionCard
+              label="NIN Verification"
+              description="Verify using National Identification Number"
+              icon={<ShieldCheck className="h-5 w-5" />}
+              selected={category === 'nin'}
+              onClick={() => clearAndReset('nin')}
+            />
+            <OptionCard
+              label="BVN Verification"
+              description="Verify using Bank Verification Number"
+              icon={<CreditCard className="h-5 w-5" />}
+              selected={category === 'bvn'}
+              onClick={() => clearAndReset('bvn')}
+            />
+            {errors.category && <p className="text-xs text-danger mt-1">{errors.category}</p>}
+          </div>
+        )}
+
+        {/* ── Step 2: Method (NIN only) ─────────────────────────────────────── */}
+        {step === 2 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-ink mb-4">How would you like to verify?</p>
+            <OptionCard
+              label="NIN Number"
+              description="Enter your 11-digit National Identification Number"
+              icon={<FileText className="h-5 w-5" />}
+              selected={method === 'number'}
+              onClick={() => { setMethod('number'); setIdentifier('') }}
+            />
+            <OptionCard
+              label="Phone Number"
+              description="Use the phone number registered with NIMC"
+              icon={<Phone className="h-5 w-5" />}
+              selected={method === 'phone'}
+              onClick={() => { setMethod('phone'); setIdentifier('') }}
+            />
+          </div>
+        )}
+
+        {/* ── Step 3: Identifier input ──────────────────────────────────────── */}
+        {step === 3 && (
           <div>
-            <p className="text-sm font-medium text-ink mb-3">Select Verification Type</p>
+            <p className="text-sm font-semibold text-ink mb-4">
+              {isBvn
+                ? 'Enter your BVN number'
+                : method === 'phone'
+                  ? 'Enter your registered phone number'
+                  : 'Enter your NIN number'}
+            </p>
+            <Input
+              label={isBvn ? 'BVN Number' : method === 'phone' ? 'Phone Number' : 'NIN Number'}
+              type="text"
+              inputMode="numeric"
+              value={identifier}
+              onChange={(e) => { setIdentifier(e.target.value); setErrors({}) }}
+              placeholder={method === 'phone' ? '08012345678' : '12345678901'}
+              maxLength={method === 'phone' ? 14 : 11}
+              hint={
+                isBvn         ? '11-digit Bank Verification Number' :
+                method === 'phone' ? 'Nigerian phone number (e.g. 08012345678)' :
+                '11-digit National Identification Number'
+              }
+              error={errors.identifier}
+            />
+          </div>
+        )}
+
+        {/* ── Step 4: Slip / plan selection ─────────────────────────────────── */}
+        {step === 4 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-ink mb-4">
+              {isBvn ? 'Verification type' : 'Select report type'}
+            </p>
             {plansLoading ? (
               <div className="space-y-2">
-                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
-              </div>
-            ) : plans?.length ? (
-              <div className="space-y-4">
-                <PlanGroup label="NIN Verification" plans={ninPlans} selectedId={planId} onSelect={handleSelectPlan} />
-                <PlanGroup label="BVN Verification" plans={bvnPlans} selectedId={planId} onSelect={handleSelectPlan} />
-                <PlanGroup label="Other"             plans={otherPlans} selectedId={planId} onSelect={handleSelectPlan} />
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-16 rounded-2xl bg-surface-elevated animate-pulse" />
+                ))}
               </div>
             ) : (
-              <p className="text-sm text-ink-muted text-center py-4">No verification services available.</p>
-            )}
-            {errors.plan && <p className="mt-1.5 text-xs text-danger">{errors.plan}</p>}
-          </div>
-
-          {/* Identifier fields — only shown once a plan is selected */}
-          {selectedPlan && (
-            <>
-              <Input
-                label={idFieldLabel}
-                type="text"
-                inputMode="numeric"
-                value={idNumber}
-                onChange={(e) => { setIdNumber(e.target.value); setErrors((p) => ({ ...p, id_number: '' })) }}
-                placeholder={idFieldPlaceholder}
-                maxLength={11}
-                hint={idFieldHint}
-                error={errors.id_number}
-              />
-
-              {/* Phone alternative — NIN only; not shown for BVN */}
-              {isNin(selectedPlan) && (
-                <Input
-                  label="Phone Number (alternative)"
-                  type="tel"
-                  inputMode="numeric"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="08012345678"
-                  maxLength={11}
-                  hint="If you don't have your NIN handy, enter the phone number registered with NIMC"
+              (isNin ? ninPlans : bvnPlans).map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  selected={planId === plan.id}
+                  onClick={() => { setPlanId(plan.id); setErrors({}) }}
                 />
-              )}
-            </>
+              ))
+            )}
+            {errors.plan && <p className="text-xs text-danger mt-1">{errors.plan}</p>}
+          </div>
+        )}
+
+        {/* ── Step 5: Consent + review ──────────────────────────────────────── */}
+        {step === 5 && (
+          <div className="space-y-5">
+            <p className="text-sm font-semibold text-ink">Review & confirm</p>
+
+            {/* Summary card */}
+            <div className="rounded-2xl bg-surface-elevated p-4 space-y-2.5">
+              <SummaryRow label="Category"    value={category?.toUpperCase() ?? ''} />
+              <SummaryRow label="Method"      value={method === 'phone' ? 'Phone number' : `${isBvn ? 'BVN' : 'NIN'} number`} />
+              <SummaryRow label="Identifier"  value={maskedId} />
+              <SummaryRow label="Report type" value={selectedPlan?.name ?? '—'} />
+              <SummaryRow label="Amount"      value={fmtCurrency(selectedPlan?.selling_price ?? 0)} highlight />
+            </div>
+
+            {/* Consent checkbox */}
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <div className="relative mt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: '' })) }}
+                  className="sr-only"
+                />
+                <div className={cn(
+                  'h-5 w-5 rounded border-2 flex items-center justify-center transition-all',
+                  consent ? 'bg-brand-600 border-brand-600' : 'border-border bg-surface',
+                )}>
+                  {consent && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                </div>
+              </div>
+              <p className="text-sm text-ink-muted leading-relaxed">
+                I confirm that I have the identity owner's consent to perform this
+                verification, and I accept the terms of this service.
+              </p>
+            </label>
+            {errors.consent && <p className="text-xs text-danger -mt-3">{errors.consent}</p>}
+          </div>
+        )}
+
+        {/* ── Navigation buttons ─────────────────────────────────────────────── */}
+        <div className="mt-6 flex gap-3">
+          {step > 1 && (
+            <Button variant="outline" onClick={goBack} icon={<ChevronLeft className="h-4 w-4" />}>
+              Back
+            </Button>
           )}
 
-          <Button type="submit" fullWidth size="lg" disabled={!planId}>
-            Continue
-          </Button>
-        </form>
+          {step < 5 ? (
+            <Button
+              fullWidth
+              onClick={goNext}
+              disabled={step === 1 && !category}
+            >
+              {step === 4 ? 'Review' : 'Continue'}
+              <ChevronRight className="h-4 w-4 ml-1 inline" />
+            </Button>
+          ) : (
+            <Button
+              fullWidth
+              onClick={handleSubmit}
+              disabled={!consent}
+              icon={<ShieldCheck className="h-4 w-4" />}
+            >
+              Proceed to Payment
+            </Button>
+          )}
+        </div>
       </Card>
 
       <ConfirmModal
@@ -259,4 +441,27 @@ export function IdentityPage() {
       />
     </div>
   )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className={cn('text-sm font-medium', highlight ? 'text-brand-600 font-bold' : 'text-ink')}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+/** Maps the wizard step number to a visual progress step (BVN skips method step). */
+function stepIndex(step: Step, isBvn: boolean): number {
+  if (!isBvn) return step
+  // BVN: step 1→1, step 3→2, step 4→3, step 5→4
+  if (step === 1) return 1
+  if (step === 3) return 2
+  if (step === 4) return 3
+  return 4
 }

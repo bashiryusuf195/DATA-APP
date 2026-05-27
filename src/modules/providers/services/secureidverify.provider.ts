@@ -246,6 +246,15 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       message:            raw.message ?? (isSuccess ? "NIN verification successful" : "NIN verification failed"),
       status:             isSuccess ? "successful" : "failed",
       raw_response:       safeResponse,
+      // Unmasked data for PDF generation — not stored in raw_response.
+      // Spread all raw.data fields so slip-specific fields (tracking_id,
+      // residence_state, birth_state, etc.) flow through to the report controller.
+      report_data: isSuccess && raw.data ? {
+        id_type: "nin",
+        ...raw.data,            // all fields from provider (unmasked)
+        id_number: raw.data.nin, // normalised alias
+        photo:     raw.data.photo, // base64 — excluded from raw_response above
+      } : undefined,
     };
   }
 
@@ -327,6 +336,12 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       message:            raw.message ?? (isSuccess ? "BVN verification successful" : "BVN verification failed"),
       status:             isSuccess ? "successful" : "failed",
       raw_response:       safeResponse,
+      // Unmasked data for PDF generation — not stored in raw_response.
+      report_data: isSuccess && raw.data ? {
+        id_type:  "bvn",
+        ...raw.data,
+        id_number: raw.data.bvn,
+      } : undefined,
     };
   }
 

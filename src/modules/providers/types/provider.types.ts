@@ -53,6 +53,25 @@ export interface ProviderPurchaseResult {
   status: "successful" | "processing" | "failed";
 
   raw_response?: unknown;
+
+  /**
+   * Unmasked data for PDF report generation — populated only by identity
+   * verification providers. This field is NEVER persisted to DB directly;
+   * the execution engine stores it under metadata.report_data and the photo
+   * is never written to raw_response or logs.
+   */
+  report_data?: {
+    id_type?:       "nin" | "bvn";
+    id_number?:     string;       // unmasked NIN or BVN
+    first_name?:    string;
+    last_name?:     string;
+    middle_name?:   string;
+    date_of_birth?: string;
+    gender?:        string;
+    address?:       string;
+    phone?:         string;       // unmasked
+    photo?:         string;       // base64 image (excluded from DB raw_response)
+  };
 }
 
 export interface VerifyTransactionResult {

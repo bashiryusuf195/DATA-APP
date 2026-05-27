@@ -23,6 +23,7 @@ import {
   listTransactionsController,
   getTransactionController,
 } from "../controllers/transaction-history.controller";
+import { identityReportController } from "../controllers/identity-report.controller";
 
 const router = Router();
 
@@ -74,5 +75,9 @@ router.post("/exam-pin",
 router.post("/identity-verification",
   authenticate, purchaseRateLimiter, idempotency,
   identityVerificationController);
+
+router.get("/identity-verification/:reference/report",
+  authenticate,
+  identityReportController);
 
 export { router as transactionRouter };

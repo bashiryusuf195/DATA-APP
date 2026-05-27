@@ -1,5 +1,5 @@
 import { Modal, Button } from '@/components/ui'
-import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search, Copy, Check } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search, Copy, Check, Download, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useState, useCallback } from 'react'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
@@ -209,6 +209,67 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
                     <CopyButton text={jambProfileCode} />
                   </div>
                 )}
+              </div>
+            )
+          }
+
+          // Identity verification result
+          if (transaction?.type === 'identity_verification') {
+            const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+            const txMeta     = (transaction.metadata ?? {}) as Record<string, unknown>
+            const rd         = (txMeta.report_data ?? {}) as Record<string, unknown>
+            const pd         = ((provResp as Record<string, unknown> | undefined)?.data ?? {}) as Record<string, unknown>
+            const firstName  = s(rd.first_name  ?? pd.first_name)
+            const lastName   = s(rd.last_name   ?? pd.last_name)
+            const middleName = s(rd.middle_name ?? pd.middle_name)
+            const dob        = s(rd.date_of_birth ?? pd.date_of_birth)
+            const gender     = s(rd.gender ?? pd.gender)
+            const fullName   = [firstName, middleName, lastName].filter(Boolean).join(' ')
+            const idType     = (s(rd.id_type).toUpperCase() || 'ID')
+            const idNum      = s(rd.id_number ?? pd.nin ?? pd.bvn)
+            const reportUrl  = `/api/v1/transactions/identity-verification/${transaction.reference}/report`
+
+            return (
+              <div className="w-full mb-4 space-y-3">
+                <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 text-left space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                    <p className="text-xs font-semibold text-indigo-700">Verification Result</p>
+                  </div>
+                  {fullName && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-indigo-600 font-medium">Full Name</span>
+                      <span className="text-indigo-900 font-semibold">{fullName}</span>
+                    </div>
+                  )}
+                  {dob && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-indigo-600 font-medium">Date of Birth</span>
+                      <span className="text-indigo-900">{dob}</span>
+                    </div>
+                  )}
+                  {gender && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-indigo-600 font-medium">Gender</span>
+                      <span className="text-indigo-900 capitalize">{gender}</span>
+                    </div>
+                  )}
+                  {idNum && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-indigo-600 font-medium">{idType || 'ID'}</span>
+                      <span className="text-indigo-900 font-mono">{idNum}</span>
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={reportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50 transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  Download Report
+                </a>
               </div>
             )
           }
