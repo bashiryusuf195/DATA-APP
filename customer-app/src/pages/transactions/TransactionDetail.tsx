@@ -6,7 +6,8 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { Skeleton, Card } from '@/components/ui'
 import { fmtCurrency, fmtDateTime, normalizeTransactionStatus } from '@/utils/format'
-import { useAuthStore } from '@/store/auth.store'
+import { apiClient } from '@/api/client'
+import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 
 export function TransactionDetailPage() {
@@ -16,26 +17,25 @@ export function TransactionDetailPage() {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const handleReportDownload = useCallback(async (ref: string) => {
-    const token = useAuthStore.getState().access_token
-    const base  = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
-    const url   = `${base}/api/v1/transactions/identity-verification/${ref}/report`
     setIsDownloading(true)
     try {
-      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      if (resp.status === 422) {
-        toast.error('Report is not available yet. Please try again later.')
-        return
-      }
-      if (!resp.ok) throw new Error('Download failed')
-      const blob   = await resp.blob()
+      const resp = await apiClient.get(
+        `/transactions/identity-verification/${ref}/report`,
+        { responseType: 'blob' },
+      )
+      const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
       const objUrl = URL.createObjectURL(blob)
       const a      = document.createElement('a')
       a.href       = objUrl
       a.download   = `verification-${ref}.pdf`
       a.click()
       URL.revokeObjectURL(objUrl)
-    } catch {
-      toast.error('Report is not available yet. Please try again later.')
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 422) {
+        toast.error('Report is not available yet. Please try again later.')
+      } else {
+        toast.error('Could not download report. Please try again.')
+      }
     } finally {
       setIsDownloading(false)
     }

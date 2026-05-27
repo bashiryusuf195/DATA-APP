@@ -3,7 +3,8 @@ import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search
 import { useNavigate } from 'react-router-dom'
 import { useState, useCallback } from 'react'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
-import { useAuthStore } from '@/store/auth.store'
+import { apiClient } from '@/api/client'
+import { isAxiosError } from 'axios'
 import type { Transaction } from '@/types'
 
 function CopyButton({ text }: { text: string }) {
@@ -44,22 +45,26 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
 
   const handleReportDownload = useCallback(async () => {
     if (!transaction) return
-    const token = useAuthStore.getState().access_token
-    const base  = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
-    const url   = `${base}/api/v1/transactions/identity-verification/${transaction.reference}/report`
     setIsDownloading(true)
     try {
-      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      if (!resp.ok) throw new Error('Download failed')
-      const blob   = await resp.blob()
+      const resp = await apiClient.get(
+        `/transactions/identity-verification/${transaction.reference}/report`,
+        { responseType: 'blob' },
+      )
+      const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
       const objUrl = URL.createObjectURL(blob)
       const a      = document.createElement('a')
       a.href       = objUrl
       a.download   = `verification-${transaction.reference}.pdf`
       a.click()
       URL.revokeObjectURL(objUrl)
-    } catch { /* silently ignore — user can retry */ }
-    finally  { setIsDownloading(false) }
+    } catch (err) {
+      // 422 = not ready yet; other errors are transient — both silently swallowed
+      // so the modal stays open and the user can retry.
+      if (!isAxiosError(err)) console.error('Report download error', err)
+    } finally {
+      setIsDownloading(false)
+    }
   }, [transaction])
 
   const uiStatus  = normalizeTransactionStatus(transaction?.status)
