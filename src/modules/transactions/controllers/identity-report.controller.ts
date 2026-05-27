@@ -2,8 +2,12 @@ import type { Request, Response, NextFunction } from "express";
 import PDFDocument from "pdfkit";
 import { getDbInstance } from "../../../db/knex";
 import { AppError } from "../../../lib/errors";
+import { logger } from "../../../lib/logger";
 
 const db = getDbInstance();
+
+// Statuses that are considered "verified" — covers legacy aliases.
+const SUCCESS_STATUSES = new Set(["successful", "success", "completed"]);
 
 // ── GET /transactions/identity-verification/:reference/report ─────────────────
 
@@ -17,12 +21,21 @@ export async function identityReportController(
     const userId = req.user!.id;
 
     const tx = await db("transactions")
-      .where({ reference, user_id: userId, type: "identity_verification" })
+      .where({ reference, user_id: userId })
+      .whereIn("type", ["identity_verification"])
       .first();
 
-    if (!tx) throw new AppError("Report not found", "NOT_FOUND", 404);
+    if (!tx) {
+      logger.warn("report_not_found", { reference, user_id: userId });
+      throw new AppError("Report not found", "NOT_FOUND", 404);
+    }
 
-    if (tx.status !== "successful") {
+    if (!SUCCESS_STATUSES.has(tx.status)) {
+      logger.warn("report_not_ready", {
+        reference,
+        user_id: userId,
+        status:  tx.status,
+      });
       throw new AppError(
         "Report is only available for successful verifications. Check Transaction History for status.",
         "REPORT_NOT_READY",
@@ -30,21 +43,74 @@ export async function identityReportController(
       );
     }
 
-    const meta     = (tx.metadata ?? {}) as Record<string, unknown>;
-    const rd       = (meta.report_data ?? {}) as Record<string, unknown>;
-    // Fallback 1: metadata.provider_response.data (masked, top-level)
+    // ── Metadata extraction (layered fallbacks for legacy records) ───────────
+    //
+    // New records (post-PDF deployment):
+    //   metadata.report_data          — unmasked provider fields + photo
+    //
+    // Legacy records (pre-PDF deployment):
+    //   metadata.provider_response.data       — masked NIN/BVN/phone but has names, DOB, gender
+    //   metadata.execution.provider_response.data — same data via alternate path
+    //
+    // We try all three in order and merge, so any field present in any source is used.
+
+    const meta = (tx.metadata ?? {}) as Record<string, unknown>;
+
+    // Source 1 – unmasked report_data (preferred; set by identity providers post-deployment)
+    const rd = (meta.report_data ?? {}) as Record<string, unknown>;
+
+    // Source 2 – metadata.provider_response.data (masked; always present for successful txns)
     const provResp = (meta.provider_response ?? {}) as Record<string, unknown>;
     const pd       = (provResp.data ?? {}) as Record<string, unknown>;
-    // Fallback 2: metadata.execution.provider_response.data
-    const execMeta  = (meta.execution ?? {}) as Record<string, unknown>;
-    const execResp  = (execMeta.provider_response ?? {}) as Record<string, unknown>;
-    const pd2       = (execResp.data ?? {}) as Record<string, unknown>;
 
-    // Prefer unmasked report_data; fall back through known provider_response paths
-    const g = (key: string) => s(rd[key] ?? pd[key] ?? pd2[key]);
+    // Source 3 – metadata.execution.provider_response.data (alternate storage path)
+    const execMeta = (meta.execution ?? {}) as Record<string, unknown>;
+    const execResp = (execMeta.provider_response ?? {}) as Record<string, unknown>;
+    const pd2      = (execResp.data ?? {}) as Record<string, unknown>;
+
+    // Source 4 – metadata.provider_response itself (some old integrations store fields directly)
+    const pd3 = (typeof provResp === "object" && !provResp.data) ? provResp : {};
+
+    // Getter: prefers unmasked report_data, then each fallback in order.
+    const g = (key: string): string =>
+      s(rd[key] ?? pd[key] ?? pd2[key] ?? pd3[key]);
+
     const variationCode = s(meta.variation_code ?? "");
-    const idType        = s(rd.id_type ?? "nin");
 
+    // idType: prefer report_data.id_type, then infer from variation_code.
+    // This ensures BVN transactions that pre-date report_data are routed correctly.
+    const idTypeRaw = s(rd.id_type);
+    const idType = idTypeRaw || (variationCode.startsWith("bvn-") ? "bvn" : "nin");
+
+    // ── Logging ──────────────────────────────────────────────────────────────
+    const hasReportData    = Object.keys(rd).length > 0;
+    const hasProviderData  = Object.keys(pd).length > 0 || Object.keys(pd2).length > 0;
+    const dataSource       = hasReportData ? "report_data" : hasProviderData ? "provider_response" : "none";
+
+    if (dataSource === "report_data") {
+      logger.info("report_generated", {
+        reference,
+        variation_code: variationCode,
+        id_type:        idType,
+        source:         "report_data",
+      });
+    } else if (dataSource === "provider_response") {
+      logger.info("report_restored", {
+        reference,
+        variation_code: variationCode,
+        id_type:        idType,
+        source:         "provider_response",
+        note:           "legacy transaction — report_data absent; using masked fallback",
+      });
+    } else {
+      logger.warn("report_missing_data", {
+        reference,
+        variation_code: variationCode,
+        note:           "no verification data found in any metadata path; generating minimal slip",
+      });
+    }
+
+    // ── PDF generation ───────────────────────────────────────────────────────
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: true });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -53,14 +119,19 @@ export async function identityReportController(
     );
     doc.pipe(res);
 
+    // Dispatch: variation_code is the primary signal.
+    // idType is the secondary signal for records where variation_code was not stored.
+    // Any variation_code starting with "bvn-" routes to the BVN slip builder so
+    // future BVN product variants are handled automatically.
     if (variationCode === "nin-standard") {
       buildNinStandardSlip(doc, g, reference);
     } else if (variationCode === "nin-premium") {
       buildNinPremiumSlip(doc, g, tx, reference);
-    } else if (idType === "bvn" || variationCode === "bvn-basic") {
+    } else if (variationCode.startsWith("bvn-") || idType === "bvn") {
       buildBvnSlip(doc, g, reference);
     } else {
-      // nin-information (default for NIN)
+      // Covers nin-information, any future nin-* variants, and records
+      // where variation_code was not stored (defaults to NIN information slip).
       buildNinInformationSlip(doc, g, reference);
     }
 
