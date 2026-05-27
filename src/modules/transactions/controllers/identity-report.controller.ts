@@ -32,11 +32,16 @@ export async function identityReportController(
 
     const meta     = (tx.metadata ?? {}) as Record<string, unknown>;
     const rd       = (meta.report_data ?? {}) as Record<string, unknown>;
+    // Fallback 1: metadata.provider_response.data (masked, top-level)
     const provResp = (meta.provider_response ?? {}) as Record<string, unknown>;
     const pd       = (provResp.data ?? {}) as Record<string, unknown>;
+    // Fallback 2: metadata.execution.provider_response.data
+    const execMeta  = (meta.execution ?? {}) as Record<string, unknown>;
+    const execResp  = (execMeta.provider_response ?? {}) as Record<string, unknown>;
+    const pd2       = (execResp.data ?? {}) as Record<string, unknown>;
 
-    // Prefer unmasked report_data; fall back to masked provider_response.data
-    const g = (key: string) => s(rd[key] ?? pd[key]);
+    // Prefer unmasked report_data; fall back through known provider_response paths
+    const g = (key: string) => s(rd[key] ?? pd[key] ?? pd2[key]);
     const variationCode = s(meta.variation_code ?? "");
     const idType        = s(rd.id_type ?? "nin");
 

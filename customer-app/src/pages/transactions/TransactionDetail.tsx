@@ -1,16 +1,45 @@
 import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Copy, Check, Zap } from 'lucide-react'
+import { ArrowLeft, Copy, Check, Zap, Download, Loader2, ShieldCheck } from 'lucide-react'
 import { useTransaction } from '@/hooks/useTransactions'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { Skeleton, Card } from '@/components/ui'
-import { fmtCurrency, fmtDateTime } from '@/utils/format'
+import { fmtCurrency, fmtDateTime, normalizeTransactionStatus } from '@/utils/format'
+import { useAuthStore } from '@/store/auth.store'
+import toast from 'react-hot-toast'
 
 export function TransactionDetailPage() {
   const { reference } = useParams<{ reference: string }>()
   const navigate = useNavigate()
   const { data: tx, isLoading, error, refetch } = useTransaction(reference ?? '')
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const handleReportDownload = useCallback(async (ref: string) => {
+    const token = useAuthStore.getState().access_token
+    const base  = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+    const url   = `${base}/api/v1/transactions/identity-verification/${ref}/report`
+    setIsDownloading(true)
+    try {
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      if (resp.status === 422) {
+        toast.error('Report is not available yet. Please try again later.')
+        return
+      }
+      if (!resp.ok) throw new Error('Download failed')
+      const blob   = await resp.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a      = document.createElement('a')
+      a.href       = objUrl
+      a.download   = `verification-${ref}.pdf`
+      a.click()
+      URL.revokeObjectURL(objUrl)
+    } catch {
+      toast.error('Report is not available yet. Please try again later.')
+    } finally {
+      setIsDownloading(false)
+    }
+  }, [])
 
   return (
     <div className="space-y-4 pt-2">
@@ -51,6 +80,14 @@ export function TransactionDetailPage() {
           </Card>
 
           <ElectricityTokenCard metadata={tx.metadata} />
+
+          {tx.type === 'identity_verification' && normalizeTransactionStatus(tx.status) === 'success' && (
+            <IdentityReportCard
+              reference={tx.reference}
+              isDownloading={isDownloading}
+              onDownload={handleReportDownload}
+            />
+          )}
         </>
       ) : null}
     </div>
@@ -144,6 +181,37 @@ function ElectricityTokenCard({ metadata }: { metadata?: Record<string, unknown>
           )}
         </div>
       )}
+    </Card>
+  )
+}
+
+function IdentityReportCard({
+  reference,
+  isDownloading,
+  onDownload,
+}: {
+  reference: string
+  isDownloading: boolean
+  onDownload: (ref: string) => void
+}) {
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+          <ShieldCheck className="h-4 w-4 text-indigo-600" />
+        </div>
+        <p className="text-sm font-semibold text-ink">Identity Verification Report</p>
+      </div>
+      <button
+        onClick={() => onDownload(reference)}
+        disabled={isDownloading}
+        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border-2 border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isDownloading
+          ? <Loader2 className="h-4 w-4 animate-spin" />
+          : <Download className="h-4 w-4" />}
+        {isDownloading ? 'Downloading…' : 'Download Report'}
+      </button>
     </Card>
   )
 }

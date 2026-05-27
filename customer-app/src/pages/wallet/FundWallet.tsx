@@ -244,7 +244,7 @@ export function FundWalletPage() {
               </div>
             ) : (
               <p className="text-sm text-ink-muted text-center py-4">
-                Dedicated account not available. Please use Card / USSD funding.
+                Complete your profile (name &amp; phone) to activate your dedicated bank account.
               </p>
             )}
           </div>

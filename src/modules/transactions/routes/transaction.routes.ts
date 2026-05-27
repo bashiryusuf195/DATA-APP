@@ -28,6 +28,10 @@ import { identityReportController } from "../controllers/identity-report.control
 const router = Router();
 
 router.get("/", authenticate, listTransactionsController);
+// Specific sub-paths must come BEFORE the /:reference wildcard
+router.get("/identity-verification/:reference/report",
+  authenticate,
+  identityReportController);
 router.get("/:reference", authenticate, getTransactionController);
 
 // ── Purchase endpoints ─────────────────────────────────────────────────────────
@@ -75,9 +79,5 @@ router.post("/exam-pin",
 router.post("/identity-verification",
   authenticate, purchaseRateLimiter, idempotency,
   identityVerificationController);
-
-router.get("/identity-verification/:reference/report",
-  authenticate,
-  identityReportController);
 
 export { router as transactionRouter };

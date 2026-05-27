@@ -85,8 +85,8 @@ export const walletApi = {
       .post<ApiResponse<FundingVerifyResponse>>(`/wallet/fund/verify/${reference}`)
       .then((r) => r.data.data),
 
-  getDedicatedAccount: (): Promise<DedicatedAccount> =>
+  getDedicatedAccount: (): Promise<DedicatedAccount | null> =>
     apiClient
-      .get<ApiResponse<DedicatedAccount>>('/wallet/account')
-      .then((r) => r.data.data),
+      .get<ApiResponse<DedicatedAccount | null>>('/wallet/account')
+      .then((r) => r.data.data ?? null),
 }

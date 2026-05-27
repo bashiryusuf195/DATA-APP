@@ -22,7 +22,24 @@ export async function getDedicatedAccountController(
       return;
     }
 
-    const account = await getOrCreateDedicatedAccount(userId);
+    let account;
+    try {
+      account = await getOrCreateDedicatedAccount(userId);
+    } catch (err) {
+      // Profile incomplete is an expected state (user hasn't filled in name/phone yet).
+      // Return 200 with null data so the frontend treats it as "no account yet",
+      // not as a network/server error that triggers React Query retries.
+      if (err instanceof AppError && err.code === "PROFILE_INCOMPLETE") {
+        res.status(200).json({
+          success: true,
+          data:    null,
+          code:    "PROFILE_INCOMPLETE",
+          message: err.message,
+        });
+        return;
+      }
+      throw err;
+    }
 
     logger.info("dva_fetched", { user_id: userId, account_number: account.account_number });
 
@@ -36,11 +53,6 @@ export async function getDedicatedAccountController(
       },
     });
   } catch (err) {
-    // Profile incomplete — surface clean message without a 500.
-    if (err instanceof AppError && err.code === "PROFILE_INCOMPLETE") {
-      res.status(422).json({ success: false, code: "PROFILE_INCOMPLETE", error: err.message });
-      return;
-    }
 
     // Paystack plan doesn't have DVA enabled.
     const msg = (err as Error).message ?? "";
