@@ -1,5 +1,4 @@
 import type { Request, Response, NextFunction } from "express";
-import PDFDocument from "pdfkit";
 import { getDbInstance } from "../../../db/knex";
 import { AppError } from "../../../lib/errors";
 import { logger } from "../../../lib/logger";
@@ -9,7 +8,6 @@ import {
   renderNinPremiumSlip,
   renderBvnSlip,
   s,
-  fmtDate,
 } from "../pdf/slip-renderers";
 
 const db = getDbInstance();
@@ -49,22 +47,21 @@ export async function identityReportController(
 
     // ── Metadata extraction (layered fallbacks for legacy records) ───────────
     //
-    // Source 1: metadata.report_data — unmasked fields + photo (post-deploy records)
-    // Source 2: metadata.provider_response.data — masked but has name/DOB/gender
-    // Source 3: metadata.execution.provider_response.data — alternate storage path
-    // Source 4: metadata.provider_response directly (older integrations)
-    //
-    // g() merges all sources, preferring Source 1.
+    // Source 1: metadata.report_data         — unmasked fields + photo (preferred)
+    // Source 2: metadata.provider_response.data — masked (name/dob/gender unmasked)
+    // Source 3: metadata.execution.provider_response.data — alternate path
+    // Source 4: metadata.provider_response directly — older integrations
 
-    const meta    = (tx.metadata ?? {}) as Record<string, unknown>;
-    const rd      = (meta.report_data ?? {}) as Record<string, unknown>;
+    const meta     = (tx.metadata ?? {}) as Record<string, unknown>;
+    const rd       = (meta.report_data     ?? {}) as Record<string, unknown>;
     const provResp = (meta.provider_response ?? {}) as Record<string, unknown>;
-    const pd       = (provResp.data ?? {}) as Record<string, unknown>;
-    const execMeta = (meta.execution ?? {}) as Record<string, unknown>;
+    const pd       = (provResp.data ?? {})         as Record<string, unknown>;
+    const execMeta = (meta.execution       ?? {}) as Record<string, unknown>;
     const execResp = (execMeta.provider_response ?? {}) as Record<string, unknown>;
-    const pd2      = (execResp.data ?? {}) as Record<string, unknown>;
+    const pd2      = (execResp.data ?? {})         as Record<string, unknown>;
     const pd3      = (typeof provResp === "object" && !provResp.data) ? provResp : {};
 
+    // Getter: tries unmasked report_data first, then each fallback in order.
     const g = (key: string): string =>
       s(rd[key] ?? pd[key] ?? pd2[key] ?? pd3[key]);
 
@@ -74,48 +71,37 @@ export async function identityReportController(
 
     // ── Logging ──────────────────────────────────────────────────────────────
     const dataSource =
-      Object.keys(rd).length > 0   ? "report_data"      :
-      Object.keys(pd).length > 0 ||
-      Object.keys(pd2).length > 0  ? "provider_response" : "none";
+      Object.keys(rd).length  > 0 ? "report_data"       :
+      Object.keys(pd).length  > 0 ||
+      Object.keys(pd2).length > 0 ? "provider_response"  : "none";
 
-    if (dataSource === "report_data") {
-      logger.info("report_generated", { reference, variation_code: variationCode, id_type: idType, source: "report_data" });
-    } else if (dataSource === "provider_response") {
-      logger.info("report_restored", {
-        reference, variation_code: variationCode, id_type: idType,
-        source: "provider_response",
-        note:   "legacy transaction — report_data absent; using masked fallback",
-      });
-    } else {
-      logger.warn("report_missing_data", {
-        reference, variation_code: variationCode,
-        note: "no verification data in any metadata path; generating minimal slip",
-      });
-    }
+    logger.info(
+      dataSource === "report_data"       ? "report_generated"     :
+      dataSource === "provider_response" ? "report_restored"      : "report_missing_data",
+      { reference, variation_code: variationCode, id_type: idType, source: dataSource },
+    );
 
-    // ── Stream PDF ───────────────────────────────────────────────────────────
-    const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: true });
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="verification-${reference}.pdf"`);
-    doc.pipe(res);
+    // ── Generate PDF from template ───────────────────────────────────────────
+    let pdfBuffer: Buffer;
 
     if (variationCode === "nin-standard") {
-      await renderNinStandardSlip(doc, g, reference);
+      pdfBuffer = await renderNinStandardSlip(g, reference);
     } else if (variationCode === "nin-premium") {
-      await renderNinPremiumSlip(doc, g, tx, reference);
+      pdfBuffer = await renderNinPremiumSlip(g, tx, reference);
     } else if (variationCode.startsWith("bvn-") || idType === "bvn") {
-      await renderBvnSlip(doc, g, reference);
+      pdfBuffer = await renderBvnSlip(g, reference);
     } else {
       // Covers nin-information, any future nin-* variants, and records where
       // variation_code was not stored (defaults to NIN information slip).
-      await renderNinInformationSlip(doc, g, reference);
+      pdfBuffer = await renderNinInformationSlip(g, reference);
     }
 
-    doc.end();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="verification-${reference}.pdf"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    res.end(pdfBuffer);
+
   } catch (err) {
     next(err);
   }
 }
-
-// Re-export helpers so they're accessible for testing without re-importing
-export { s as stringHelper, fmtDate as formatDate };
