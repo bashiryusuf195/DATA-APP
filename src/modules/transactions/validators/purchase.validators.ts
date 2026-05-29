@@ -7,7 +7,7 @@ import { z } from "zod";
 const nigerianPhone = z
   .string()
   .regex(
-    /^(\+?234|0)[789]\d{8}$/,
+    /^(\+?234|0)[789]\d{9}$/,
     "Phone must be a valid Nigerian number (e.g. 08012345678 or +2348012345678)",
   );
 
