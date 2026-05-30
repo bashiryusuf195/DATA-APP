@@ -17,11 +17,22 @@
 //   npm run dev    (development — tsx watch, hot reload)
 //   npm start      (production  — compiled JS, node dist/server.js)
 
+import fs   from 'fs';
+import path from 'path';
 import { app }    from './app';
 import { config } from './config';
 import { db }     from './config/database';
 import { redis, isRedisQuotaExceeded } from './config/redis';
 import { logger } from './lib/logger';
+
+// ── PDF template preflight ────────────────────────────────────────────────────
+// Runs synchronously at module load so missing templates surface immediately
+// in Railway deployment logs before any request is served.
+const PDF_TEMPLATES_DIR = path.resolve(__dirname, 'modules/transactions/pdf/templates');
+for (const tpl of ['NIN Information.png', 'NIN Standard.png', 'NIN Premium.png', 'BVN.png']) {
+  const tplPath = path.join(PDF_TEMPLATES_DIR, tpl);
+  console.log(`[STARTUP] Template ${fs.existsSync(tplPath) ? 'OK' : 'MISSING'}: ${tplPath}`);
+}
 
 // Top-level process safety nets — registered before any async work so nothing
 // can slip through before startServer() even runs.

@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc --project tsconfig.json",
+    "build": "tsc --project tsconfig.json && node scripts/copy-assets.js",
     "test:slips": "npx tsx tests/slip-safety.test.ts",
     "start": "node dist/server.js",
     "start:prod": "node dist/server.js",
