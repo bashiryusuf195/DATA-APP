@@ -2,6 +2,12 @@ import { z } from "zod";
 
 // ── Shared field validators ────────────────────────────────────────────────────
 
+// Transaction PIN: exactly 4 or 6 numeric digits.
+// Format is validated here; correctness is enforced by the requirePin middleware.
+const transactionPin = z
+  .string()
+  .regex(/^\d{4}$|^\d{6}$/, "transaction_pin must be exactly 4 or 6 digits");
+
 // Nigerian phone numbers: 080/081/070/090/091/etc. local format or +234/234 prefix.
 // Accepts: 08012345678, +2348012345678, 2348012345678
 const nigerianPhone = z
@@ -55,15 +61,17 @@ const customerName = z
 // variation_code carries the network prefix (e.g. "mtn-airtime") and is
 // forwarded to the queue so providers can resolve the operator.
 export const AirtimePurchaseSchema = z.object({
-  phone:          nigerianPhone,
-  amount:         z.number().positive().int().max(50_000),
-  variation_code: variationCode.optional(),
+  phone:           nigerianPhone,
+  amount:          z.number().positive().int().max(50_000),
+  variation_code:  variationCode.optional(),
+  transaction_pin: transactionPin,
 });
 
 // Data: amount comes from DB plan; only variation_code is needed.
 export const DataPurchaseSchema = z.object({
-  phone:          nigerianPhone,
-  variation_code: variationCode,
+  phone:           nigerianPhone,
+  variation_code:  variationCode,
+  transaction_pin: transactionPin,
 });
 
 // Electricity verify: resolves disco + meter type from plan (no wallet debit).
@@ -80,6 +88,7 @@ export const ElectricityPurchaseSchema = z.object({
   variation_code:         variationCode,
   phone:                  nigerianPhone.optional(),
   verified_customer_name: z.string().max(150).optional(),
+  transaction_pin:        transactionPin,
 });
 
 // Cable TV verify: resolves biller from plan (no wallet debit).
@@ -94,12 +103,14 @@ export const CableTvPurchaseSchema = z.object({
   variation_code:         variationCode,
   phone:                  nigerianPhone.optional(),
   verified_customer_name: z.string().max(150).optional(),
+  transaction_pin:        transactionPin,
 });
 
 // Exam PIN: amount comes from DB plan.
 export const ExamPinPurchaseSchema = z.object({
-  phone:          nigerianPhone,
-  variation_code: variationCode,
+  phone:           nigerianPhone,
+  variation_code:  variationCode,
+  transaction_pin: transactionPin,
 });
 
 // Identity verification: amount comes from DB plan.
@@ -109,9 +120,10 @@ export const ExamPinPurchaseSchema = z.object({
 // At least one of id_number or phone is required.
 export const IdentityVerificationSchema = z
   .object({
-    id_number:      z.string().regex(/^\d{10,11}$/, "NIN/BVN must be 10–11 digits").optional(),
-    phone:          nigerianPhone.optional(),
-    variation_code: variationCode,
+    id_number:       z.string().regex(/^\d{10,11}$/, "NIN/BVN must be 10–11 digits").optional(),
+    phone:           nigerianPhone.optional(),
+    variation_code:  variationCode,
+    transaction_pin: transactionPin,
   })
   .refine((d) => d.id_number ?? d.phone, {
     message: "NIN/BVN number or phone number is required",

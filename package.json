@@ -20,7 +20,8 @@
     "test:routing": "npx tsx tests/provider-routing.regression.ts",
     "clear:rate-limits": "npx tsx scripts/clear-rate-limits.ts",
     "reset-admin-password": "npx tsx scripts/reset-admin-password.ts",
-    "clear-mock-data": "npx tsx scripts/clear-mock-seed-data.ts"
+    "clear-mock-data": "npx tsx scripts/clear-mock-seed-data.ts",
+    "test:pin": "npx tsx tests/transaction-pin.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

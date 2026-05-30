@@ -70,6 +70,12 @@ export class InvalidPinError extends AppError {
   }
 }
 
+export class InvalidTransactionPinError extends AppError {
+  constructor() {
+    super('Incorrect transaction PIN.', 'INVALID_TRANSACTION_PIN', 401);
+  }
+}
+
 // ── 403 Forbidden ─────────────────────────────────────────────────────────────
 export class ForbiddenError extends AppError {
   constructor(requiredPermission?: string) {
@@ -121,6 +127,26 @@ export class DuplicateRequestError extends AppError {
 }
 
 // ── 422 Unprocessable ─────────────────────────────────────────────────────────
+export class TransactionPinRequiredError extends AppError {
+  constructor() {
+    super(
+      'A transaction PIN is required to complete this action.',
+      'TRANSACTION_PIN_REQUIRED',
+      422,
+    );
+  }
+}
+
+export class TransactionPinNotSetError extends AppError {
+  constructor() {
+    super(
+      'You have not set up a transaction PIN. Visit Security → Transaction PIN to set one before making purchases.',
+      'TRANSACTION_PIN_NOT_SET',
+      422,
+    );
+  }
+}
+
 export class InsufficientBalanceError extends AppError {
   constructor() {
     super(
@@ -156,6 +182,17 @@ export class DailyLimitExceededError extends AppError {
 export class RateLimitError extends AppError {
   constructor() {
     super('Too many requests. Please slow down.', 'RATE_LIMIT_EXCEEDED', 429);
+  }
+}
+
+export class TransactionPinLockedError extends AppError {
+  constructor(retryAfterSeconds: number) {
+    super(
+      `Too many incorrect PIN attempts. Try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).`,
+      'TRANSACTION_PIN_LOCKED',
+      429,
+      { retry_after_seconds: retryAfterSeconds },
+    );
   }
 }
 

@@ -6,6 +6,7 @@ import {
   fundingRateLimiter,
   purchaseRateLimiter,
 } from "../../../middleware/rateLimiter.redis";
+import { requirePin } from "../../../middleware/requirePin";
 import { idempotency } from "../../idempotency/middleware/idempotency.middleware";
 
 import {
@@ -30,6 +31,6 @@ router.post("/fund/initialize",       authenticate, fundingRateLimiter, idempote
 router.post("/fund/verify/:reference", authenticate, fundingRateLimiter, verifyFundingController);
 
 router.post("/fund-test", authenticate, fundTestController);
-router.post("/transfer",  authenticate, purchaseRateLimiter, transferController);
+router.post("/transfer",  authenticate, purchaseRateLimiter, requirePin, transferController);
 
 export { router as walletRouter };

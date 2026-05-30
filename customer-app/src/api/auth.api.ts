@@ -31,18 +31,19 @@ function primaryRole(roles: string[] = []): User['role'] {
 
 function mapUser(raw: Record<string, unknown>): User {
   return {
-    id:                raw.id as string,
-    email:             raw.email as string,
-    phone:             raw.phone as string | null,
-    first_name:        raw.first_name as string | null,
-    last_name:         raw.last_name as string | null,
-    username:          raw.username as string | null,
-    role:              primaryRole(raw.roles as string[]),
-    status:            raw.status as User['status'],
-    kyc_level:         (raw.kyc_level as number) ?? 0,
-    is_email_verified: (raw.is_email_verified as boolean) ?? false,
-    referral_code:     raw.referral_code as string | null,
-    created_at:        raw.created_at as string,
+    id:                  raw.id as string,
+    email:               raw.email as string,
+    phone:               raw.phone as string | null,
+    first_name:          raw.first_name as string | null,
+    last_name:           raw.last_name as string | null,
+    username:            raw.username as string | null,
+    role:                primaryRole(raw.roles as string[]),
+    status:              raw.status as User['status'],
+    kyc_level:           (raw.kyc_level as number) ?? 0,
+    is_email_verified:   (raw.is_email_verified as boolean) ?? false,
+    has_transaction_pin: (raw.has_transaction_pin as boolean) ?? false,
+    referral_code:       raw.referral_code as string | null,
+    created_at:          raw.created_at as string,
   }
 }
 

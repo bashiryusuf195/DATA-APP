@@ -5,8 +5,9 @@ import {
   CreditCard, Phone, FileText, Check,
 } from 'lucide-react'
 import { Button, Input, Card } from '@/components/ui'
-import { ConfirmModal } from '@/components/shared/ConfirmModal'
-import { ResultModal } from '@/components/shared/ResultModal'
+import { ConfirmModal }  from '@/components/shared/ConfirmModal'
+import { PinEntryModal } from '@/components/shared/PinEntryModal'
+import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
@@ -426,11 +427,18 @@ export function IdentityPage() {
       </Card>
 
       <ConfirmModal
-        open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
+        open={purchase.phase === 'confirm'}
         rows={confirmRows}
-        onConfirm={purchase.confirm}
+        onConfirm={purchase.goToPin}
         onCancel={purchase.cancel}
-        loading={purchase.isLoading}
+        confirmLabel="Enter PIN"
+      />
+      <PinEntryModal
+        open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
+        loading={purchase.phase === 'submitting'}
+        error={purchase.pinError}
+        onSubmit={purchase.confirmWithPin}
+        onCancel={purchase.backToConfirm}
       />
       <ResultModal
         open={purchase.phase === 'done'}

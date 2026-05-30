@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card, Skeleton } from '@/components/ui'
-import { ConfirmModal } from '@/components/shared/ConfirmModal'
-import { ResultModal } from '@/components/shared/ResultModal'
+import { ConfirmModal }  from '@/components/shared/ConfirmModal'
+import { PinEntryModal } from '@/components/shared/PinEntryModal'
+import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
@@ -86,13 +87,23 @@ export function ExamPinPage() {
         </form>
       </Card>
 
-      <ConfirmModal open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
+      <ConfirmModal
+        open={purchase.phase === 'confirm'}
         rows={[
           { label: 'Exam',   value: selectedPlan?.name ?? '' },
           { label: 'Phone',  value: phone },
           { label: 'Amount', value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
         ]}
-        onConfirm={purchase.confirm} onCancel={purchase.cancel} loading={purchase.isLoading}
+        onConfirm={purchase.goToPin}
+        onCancel={purchase.cancel}
+        confirmLabel="Enter PIN"
+      />
+      <PinEntryModal
+        open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
+        loading={purchase.phase === 'submitting'}
+        error={purchase.pinError}
+        onSubmit={purchase.confirmWithPin}
+        onCancel={purchase.backToConfirm}
       />
       <ResultModal open={purchase.phase === 'done'} transaction={purchase.result} isPolling={purchase.isPolling} onClose={purchase.reset} onRetry={purchase.reset} />
     </div>

@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wifi, Phone, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card, Skeleton } from '@/components/ui'
-import { ConfirmModal } from '@/components/shared/ConfirmModal'
-import { ResultModal } from '@/components/shared/ResultModal'
+import { ConfirmModal }  from '@/components/shared/ConfirmModal'
+import { PinEntryModal } from '@/components/shared/PinEntryModal'
+import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
@@ -259,7 +260,7 @@ export function DataPage() {
       </Card>
 
       <ConfirmModal
-        open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
+        open={purchase.phase === 'confirm'}
         rows={[
           { label: 'Network',   value: networkLabel(operator) },
           { label: 'Plan Type', value: fmtCategory(category) },
@@ -267,9 +268,17 @@ export function DataPage() {
           { label: 'Phone',     value: phone },
           { label: 'Amount',    value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
         ]}
-        onConfirm={purchase.confirm}
+        onConfirm={purchase.goToPin}
         onCancel={purchase.cancel}
-        loading={purchase.isLoading}
+        confirmLabel="Enter PIN"
+      />
+
+      <PinEntryModal
+        open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
+        loading={purchase.phase === 'submitting'}
+        error={purchase.pinError}
+        onSubmit={purchase.confirmWithPin}
+        onCancel={purchase.backToConfirm}
       />
 
       <ResultModal

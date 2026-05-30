@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Phone, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card } from '@/components/ui'
 import { AmountInput } from '@/components/shared/AmountInput'
-import { ConfirmModal } from '@/components/shared/ConfirmModal'
-import { ResultModal } from '@/components/shared/ResultModal'
+import { ConfirmModal }    from '@/components/shared/ConfirmModal'
+import { PinEntryModal }   from '@/components/shared/PinEntryModal'
+import { ResultModal }     from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { transactionsApi } from '@/api/transactions.api'
@@ -114,15 +115,23 @@ export function AirtimePage() {
       </Card>
 
       <ConfirmModal
-        open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
+        open={purchase.phase === 'confirm'}
         rows={[
           { label: 'Network',  value: OPERATORS.find((o) => o.code === operator)?.label ?? operator },
           { label: 'Phone',    value: phone },
           { label: 'Amount',   value: fmtCurrency(parseFloat(amount) || 0) },
         ]}
-        onConfirm={purchase.confirm}
+        onConfirm={purchase.goToPin}
         onCancel={purchase.cancel}
-        loading={purchase.isLoading}
+        confirmLabel="Enter PIN"
+      />
+
+      <PinEntryModal
+        open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
+        loading={purchase.phase === 'submitting'}
+        error={purchase.pinError}
+        onSubmit={purchase.confirmWithPin}
+        onCancel={purchase.backToConfirm}
       />
 
       <ResultModal

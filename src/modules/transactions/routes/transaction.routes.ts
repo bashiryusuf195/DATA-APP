@@ -7,6 +7,7 @@ import {
   verificationRateLimiter,
 } from "../../../middleware/rateLimiter.redis";
 import { duplicatePurchaseGuard } from "../../../middleware/duplicate-purchase.guard";
+import { requirePin } from "../../../middleware/requirePin";
 
 import {
   purchaseAirtimeController,
@@ -42,23 +43,31 @@ router.get("/:reference", authenticate, getTransactionController);
 //   4. duplicatePurchaseGuard — 30s dedup for same service/recipient/amount
 //   5. controller
 
+// Middleware order for purchase routes:
+//   authenticate → purchaseRateLimiter → idempotency (early-return on replay)
+//   → requirePin → duplicatePurchaseGuard → controller
+// requirePin sits after idempotency so replayed requests skip PIN re-verification.
+
 router.post("/airtime",
   authenticate, purchaseRateLimiter, idempotency,
+  requirePin,
   duplicatePurchaseGuard("airtime"),
   purchaseAirtimeController);
 
 router.post("/data",
   authenticate, purchaseRateLimiter, idempotency,
+  requirePin,
   duplicatePurchaseGuard("data"),
   purchaseDataController);
 
-// Verify endpoints: no idempotency (read-only), stricter rate limit, no dedup guard
+// Verify endpoints: read-only lookups — no PIN, no idempotency, stricter rate limit.
 router.post("/electricity/verify",
   authenticate, verificationRateLimiter,
   verifyMeterController);
 
 router.post("/electricity",
   authenticate, purchaseRateLimiter, idempotency,
+  requirePin,
   duplicatePurchaseGuard("electricity"),
   purchaseElectricityController);
 
@@ -68,16 +77,19 @@ router.post("/cable-tv/verify",
 
 router.post("/cable-tv",
   authenticate, purchaseRateLimiter, idempotency,
+  requirePin,
   duplicatePurchaseGuard("cable_tv"),
   purchaseCableTvController);
 
 router.post("/exam-pin",
   authenticate, purchaseRateLimiter, idempotency,
+  requirePin,
   duplicatePurchaseGuard("exam_pin"),
   purchaseExamPinController);
 
 router.post("/identity-verification",
   authenticate, purchaseRateLimiter, idempotency,
+  requirePin,
   identityVerificationController);
 
 export { router as transactionRouter };

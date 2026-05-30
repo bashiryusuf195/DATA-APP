@@ -1,9 +1,25 @@
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Sidebar } from './Sidebar'
-import { BottomNav } from './BottomNav'
-import { AppHeader } from './AppHeader'
+import { Sidebar }       from './Sidebar'
+import { BottomNav }     from './BottomNav'
+import { AppHeader }     from './AppHeader'
+import { PinSetupModal } from '@/components/shared/PinSetupModal'
+import { useAuthStore }  from '@/store/auth.store'
 
 export function AppLayout() {
+  const user    = useAuthStore((s) => s.user)
+  const setUser = useAuthStore((s) => s.setUser)
+
+  // Show setup modal once per session if no PIN is configured.
+  // "Set up later" hides it for this session; the API will still reject
+  // purchases until a PIN is created.
+  const [dismissed, setDismissed] = useState(false)
+  const showSetup = !!user && !user.has_transaction_pin && !dismissed
+
+  const handlePinSetupSuccess = () => {
+    if (user) setUser({ ...user, has_transaction_pin: true })
+  }
+
   return (
     <div className="flex min-h-screen bg-surface-0">
       {/* Desktop sidebar */}
@@ -22,6 +38,14 @@ export function AppLayout() {
 
       {/* Mobile bottom nav */}
       <BottomNav />
+
+      {/* Mandatory PIN setup — shown once per session until PIN is created */}
+      {showSetup && (
+        <PinSetupModal
+          onSuccess={handlePinSetupSuccess}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
     </div>
   )
 }

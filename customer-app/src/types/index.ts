@@ -11,6 +11,7 @@ export interface User {
   status: 'active' | 'suspended' | 'pending'
   kyc_level: number
   is_email_verified: boolean
+  has_transaction_pin: boolean
   referral_code?: string | null
   created_at?: string
 }
@@ -149,6 +150,7 @@ export interface AirtimePurchaseInput {
   variation_code: string
   description: string
   plan?: PlanMeta
+  transaction_pin: string
 }
 
 export interface DataPurchaseInput {
@@ -157,6 +159,7 @@ export interface DataPurchaseInput {
   variation_code: string
   description: string
   plan?: PlanMeta
+  transaction_pin: string
 }
 
 export interface ElectricityVerifyInput {
@@ -178,6 +181,7 @@ export interface ElectricityPurchaseInput {
   variation_code:         string
   phone?:                 string
   verified_customer_name?: string
+  transaction_pin:        string
 }
 
 export interface CableTvVerifyInput {
@@ -199,6 +203,7 @@ export interface CableTvPurchaseInput {
   variation_code:         string
   phone?:                 string
   verified_customer_name?: string
+  transaction_pin:        string
 }
 
 export interface ExamPinPurchaseInput {
@@ -207,19 +212,17 @@ export interface ExamPinPurchaseInput {
   variation_code: string
   description: string
   plan?: PlanMeta
+  transaction_pin: string
 }
 
 export interface IdentityVerificationInput {
-  /** NIN (11 digits) or BVN (11 digits) of the subject. Required for BVN; optional
-   *  for NIN when phone is provided instead (nin-phone lookup). */
   id_number?: string
-  /** Nigerian phone number — used as an alternative identifier for NIN-by-phone.
-   *  Not accepted for BVN (provider only supports BVN-by-number). */
   phone?: string
   amount: number
   variation_code: string
   description: string
   plan?: PlanMeta
+  transaction_pin: string
 }
 
 // ── Services / Plans ──────────────────────────────────────────────────────────

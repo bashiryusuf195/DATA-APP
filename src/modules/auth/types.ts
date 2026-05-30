@@ -40,9 +40,10 @@ export interface UserProfile {
 }
 
 export interface AuthUserWithProfile extends AuthUser {
-  profile: UserProfile | null;
-  roles:   string[];
-  permissions: string[];
+  profile:              UserProfile | null;
+  roles:                string[];
+  permissions:          string[];
+  has_transaction_pin:  boolean;
 }
 
 // ── Token types ────────────────────────────────────────────────

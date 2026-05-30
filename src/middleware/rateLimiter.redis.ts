@@ -291,3 +291,13 @@ export const adminSensitiveLimiter = makeRedisLimiter({
   keyGenerator: (req) => req.user?.id ?? getClientIp(req),
   logKey:       "admin_sensitive",
 });
+
+/** Transaction PIN management (setup, change, reset, verify):
+ *  10 per 15 min per authenticated user — brute-force guard for PIN operations. */
+export const pinRateLimiter = makeRedisLimiter({
+  prefix:       "pin_ops",
+  windowMs:     15 * 60 * 1000,
+  max:          10,
+  keyGenerator: (req) => req.user?.id ?? getClientIp(req),
+  logKey:       "pin_ops",
+});

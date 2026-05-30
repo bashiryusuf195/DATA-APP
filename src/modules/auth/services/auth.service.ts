@@ -567,6 +567,7 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
       "u.last_login_at", "u.login_count", "u.created_at",
       "p.first_name", "p.last_name", "p.display_name",
       "p.avatar_url", "p.country", "p.city",
+      db.raw("u.transaction_pin_hash IS NOT NULL AS has_transaction_pin"),
     ]);
 
   if (!row) throw new AuthAppError(404, "NOT_FOUND", "User not found");
@@ -595,8 +596,9 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
       country:      (row.country      as string | null) ?? null,
       city:         (row.city         as string | null) ?? null,
     },
-    roles:       rbac.roles,
-    permissions: rbac.permissions,
+    roles:               rbac.roles,
+    permissions:         rbac.permissions,
+    has_transaction_pin: (row.has_transaction_pin as boolean) ?? false,
   };
 }
 

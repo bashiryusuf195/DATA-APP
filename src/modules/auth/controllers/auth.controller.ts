@@ -245,11 +245,12 @@ export async function getMeController(
         kyc_level:         data.kyc_level,
         is_email_verified: data.is_email_verified,
         is_phone_verified: data.is_phone_verified,
-        last_login_at:     data.last_login_at,
-        created_at:        data.created_at,
-        profile:           data.profile,
-        roles:             data.roles,
-        permissions:       data.permissions,
+        last_login_at:        data.last_login_at,
+        created_at:           data.created_at,
+        profile:              data.profile,
+        roles:                data.roles,
+        permissions:          data.permissions,
+        has_transaction_pin:  data.has_transaction_pin,
       },
     });
   } catch (err) { next(err); }

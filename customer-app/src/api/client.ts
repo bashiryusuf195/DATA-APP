@@ -83,6 +83,12 @@ apiClient.interceptors.response.use(
       error.message = error.response?.data?.message ?? error.message
     }
 
+    // Attach machine-readable code so PIN-specific handlers can branch on it
+    const backendCode = error.response?.data?.code as string | undefined
+    if (backendCode) {
+      (error as Record<string, unknown>).code = backendCode
+    }
+
     return Promise.reject(error)
   }
 )

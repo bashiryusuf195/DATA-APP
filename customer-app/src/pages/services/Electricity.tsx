@@ -4,8 +4,9 @@ import { useMutation } from '@tanstack/react-query'
 import { Zap, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
 import { Button, Input, Skeleton } from '@/components/ui'
 import { AmountInput } from '@/components/shared/AmountInput'
-import { ConfirmModal } from '@/components/shared/ConfirmModal'
-import { ResultModal } from '@/components/shared/ResultModal'
+import { ConfirmModal }  from '@/components/shared/ConfirmModal'
+import { PinEntryModal } from '@/components/shared/PinEntryModal'
+import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
@@ -234,7 +235,7 @@ export function ElectricityPage() {
       </form>
 
       <ConfirmModal
-        open={purchase.phase === 'confirm' || purchase.phase === 'submitting'}
+        open={purchase.phase === 'confirm'}
         rows={[
           { label: 'Plan',     value: selectedPlan?.name ?? '—' },
           { label: 'Customer', value: verifyResult?.customer_name || 'Customer name unavailable' },
@@ -242,9 +243,17 @@ export function ElectricityPage() {
           ...(phone.trim() ? [{ label: 'Phone', value: phone.trim() }] : []),
           { label: 'Amount',   value: fmtCurrency(parseFloat(amount) || 0) },
         ]}
-        onConfirm={purchase.confirm}
+        onConfirm={purchase.goToPin}
         onCancel={purchase.cancel}
-        loading={purchase.isLoading}
+        confirmLabel="Enter PIN"
+      />
+
+      <PinEntryModal
+        open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
+        loading={purchase.phase === 'submitting'}
+        error={purchase.pinError}
+        onSubmit={purchase.confirmWithPin}
+        onCancel={purchase.backToConfirm}
       />
 
       <ResultModal
