@@ -281,6 +281,21 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       reference: input.reference,
     });
 
+    // ── [PHOTO-PROVIDER-RAW] point 1 ─────────────────────────────────────────
+    {
+      const d = (raw.data ?? {}) as Record<string, unknown>;
+      const altKeys = ["image","passport","passportPhoto","photograph","picture","profilePhoto","base64Image"];
+      console.log("[PHOTO-PROVIDER-RAW]", JSON.stringify({
+        verification_type:      "nin",
+        keys:                   Object.keys(d),
+        photo_exists:           "photo" in d,
+        photo_type:             typeof d.photo,
+        photo_length:           typeof d.photo === "string" ? d.photo.length : 0,
+        photo_prefix:           typeof d.photo === "string" ? d.photo.slice(0, 100) : null,
+        alternative_keys_found: altKeys.filter(k => k in d),
+      }, null, 2));
+    }
+
     // Redact photo (may be a base64 blob) and mask PII before DB storage.
     const safeResponse: Record<string, unknown> = {
       status:    raw.status,
@@ -300,13 +315,25 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       ? normalizeNinReportData(raw.data as Record<string, unknown>)
       : null;
 
-    console.log("[SECUREIDVERIFY] NIN photo field", {
-      reference:     input.reference,
-      photo_present: ninNormalized?.photo !== undefined,
-      photo_type:    typeof ninNormalized?.photo,
-      photo_length:  typeof ninNormalized?.photo === "string" ? ninNormalized.photo.length : 0,
-      photo_prefix:  typeof ninNormalized?.photo === "string" ? ninNormalized.photo.slice(0, 40) : null,
-    });
+    // ── [PHOTO-NORMALIZED] point 2 ───────────────────────────────────────────
+    if (ninNormalized) {
+      console.log("[PHOTO-NORMALIZED]", JSON.stringify({
+        keys:         Object.keys(ninNormalized),
+        photo_exists: ninNormalized.photo !== undefined,
+        photo_type:   typeof ninNormalized.photo,
+        photo_length: typeof ninNormalized.photo === "string" ? ninNormalized.photo.length : 0,
+        photo_prefix: typeof ninNormalized.photo === "string" ? ninNormalized.photo.slice(0, 100) : null,
+      }, null, 2));
+    }
+
+    const ninReportData = ninNormalized ? { id_type: "nin" as const, ...ninNormalized } : undefined;
+
+    // ── [PHOTO-BEFORE-SAVE] point 3 ──────────────────────────────────────────
+    console.log("[PHOTO-BEFORE-SAVE]", JSON.stringify({
+      report_data_keys: ninReportData ? Object.keys(ninReportData) : [],
+      photo_exists:     ninReportData ? ("photo" in ninReportData && ninReportData.photo !== undefined) : false,
+      photo_length:     ninReportData && typeof ninReportData.photo === "string" ? ninReportData.photo.length : 0,
+    }, null, 2));
 
     return {
       success:            isSuccess,
@@ -318,7 +345,7 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       // Unmasked data for PDF generation — not stored in raw_response.
       // Normalised to snake_case so PDFs render correctly regardless of whether
       // the API returns snake_case or camelCase field names.
-      report_data: ninNormalized ? { id_type: "nin", ...ninNormalized } : undefined,
+      report_data: ninReportData,
     };
   }
 
@@ -379,6 +406,21 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       reference: input.reference,
     });
 
+    // ── [PHOTO-PROVIDER-RAW] point 1 ─────────────────────────────────────────
+    {
+      const d = (raw.data ?? {}) as Record<string, unknown>;
+      const altKeys = ["image","passport","passportPhoto","photograph","picture","profilePhoto","base64Image"];
+      console.log("[PHOTO-PROVIDER-RAW]", JSON.stringify({
+        verification_type:      "bvn",
+        keys:                   Object.keys(d),
+        photo_exists:           "photo" in d,
+        photo_type:             typeof d.photo,
+        photo_length:           typeof d.photo === "string" ? d.photo.length : 0,
+        photo_prefix:           typeof d.photo === "string" ? d.photo.slice(0, 100) : null,
+        alternative_keys_found: altKeys.filter(k => k in d),
+      }, null, 2));
+    }
+
     // Mask BVN and phone before DB storage.
     const safeResponse: Record<string, unknown> = {
       status:    raw.status,
@@ -397,13 +439,25 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       ? normalizeBvnReportData(raw.data as Record<string, unknown>)
       : null;
 
-    console.log("[SECUREIDVERIFY] BVN photo field", {
-      reference:     input.reference,
-      photo_present: bvnNormalized?.photo !== undefined,
-      photo_type:    typeof bvnNormalized?.photo,
-      photo_length:  typeof bvnNormalized?.photo === "string" ? bvnNormalized.photo.length : 0,
-      photo_prefix:  typeof bvnNormalized?.photo === "string" ? bvnNormalized.photo.slice(0, 40) : null,
-    });
+    // ── [PHOTO-NORMALIZED] point 2 ───────────────────────────────────────────
+    if (bvnNormalized) {
+      console.log("[PHOTO-NORMALIZED]", JSON.stringify({
+        keys:         Object.keys(bvnNormalized),
+        photo_exists: bvnNormalized.photo !== undefined,
+        photo_type:   typeof bvnNormalized.photo,
+        photo_length: typeof bvnNormalized.photo === "string" ? bvnNormalized.photo.length : 0,
+        photo_prefix: typeof bvnNormalized.photo === "string" ? bvnNormalized.photo.slice(0, 100) : null,
+      }, null, 2));
+    }
+
+    const bvnReportData = bvnNormalized ? { id_type: "bvn" as const, ...bvnNormalized } : undefined;
+
+    // ── [PHOTO-BEFORE-SAVE] point 3 ──────────────────────────────────────────
+    console.log("[PHOTO-BEFORE-SAVE]", JSON.stringify({
+      report_data_keys: bvnReportData ? Object.keys(bvnReportData) : [],
+      photo_exists:     bvnReportData ? ("photo" in bvnReportData && bvnReportData.photo !== undefined) : false,
+      photo_length:     bvnReportData && typeof bvnReportData.photo === "string" ? bvnReportData.photo.length : 0,
+    }, null, 2));
 
     return {
       success:            isSuccess,
@@ -415,7 +469,7 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       // Unmasked data for PDF generation — not stored in raw_response.
       // Normalised to snake_case so PDFs render correctly regardless of whether
       // the API returns snake_case or camelCase field names.
-      report_data: bvnNormalized ? { id_type: "bvn", ...bvnNormalized } : undefined,
+      report_data: bvnReportData,
     };
   }
 

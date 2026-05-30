@@ -74,38 +74,48 @@ function splitLines(text: string, maxPt: number, sizePt: number): string[] {
 async function embedPhotoImage(pdfDoc: PDFDocument, photo: string) {
   if (!photo || photo === "[photo_redacted]") return null;
 
-  console.log("[PDF][photo] embedPhotoImage called", {
-    length:    photo.length,
-    prefix:    photo.slice(0, 40),
-    is_data_uri: photo.startsWith("data:"),
-  });
+  // ── [PHOTO-EMBED] point 7 ────────────────────────────────────────────────
+  const dataUriMatch = photo.match(/^data:image\/([^;]+);base64,(.+)$/s);
+  const detected_data_uri = !!dataUriMatch;
+  const mime_type         = dataUriMatch ? `image/${dataUriMatch[1]}` : null;
+  const raw               = dataUriMatch ? dataUriMatch[2] : photo;
+  const buf               = Buffer.from(raw, "base64");
+  const first_bytes_hex   = buf.slice(0, 16).toString("hex");
 
-  // Strip "data:image/<type>;base64," prefix when the provider includes it.
-  // Buffer.from(<full data URI>, "base64") decodes the prefix as noise and
-  // produces garbage bytes, causing embedJpg/embedPng to throw silently.
-  let raw = photo;
-  const dataUriMatch = photo.match(/^data:image\/[^;]+;base64,(.+)$/s);
-  if (dataUriMatch) {
-    raw = dataUriMatch[1];
-    console.log("[PDF][photo] data URI prefix stripped", { raw_length: raw.length });
-  }
-
-  const buf    = Buffer.from(raw, "base64");
-  const isJpeg = raw.startsWith("/9j/") || !raw.startsWith("iVBOR");
-
-  console.log("[PDF][photo] decoded buffer", { buf_length: buf.length, is_jpeg: isJpeg });
+  let jpg_success  = false;
+  let png_success  = false;
+  let jpg_error:   string | null = null;
+  let png_error:   string | null = null;
+  let embedResult: Awaited<ReturnType<typeof pdfDoc.embedJpg>> | null = null;
 
   try {
-    const img = isJpeg ? await pdfDoc.embedJpg(buf) : await pdfDoc.embedPng(buf);
-    console.log("[PDF][photo] embed success", { is_jpeg: isJpeg });
-    return img;
-  } catch (firstErr) {
-    console.warn("[PDF][photo] primary embed failed", { error: (firstErr as Error).message, is_jpeg: isJpeg });
-    try { const img = await pdfDoc.embedJpg(buf); console.log("[PDF][photo] fallback jpeg success"); return img; } catch { /* */ }
-    try { const img = await pdfDoc.embedPng(buf); console.log("[PDF][photo] fallback png success");  return img; } catch { /* */ }
-    console.error("[PDF][photo] all embed attempts failed — photo will be blank");
-    return null;
+    embedResult = await pdfDoc.embedJpg(buf);
+    jpg_success = true;
+  } catch (jpgErr) {
+    jpg_error = (jpgErr as Error).message;
+    try {
+      embedResult = await pdfDoc.embedPng(buf);
+      png_success = true;
+    } catch (pngErr) {
+      png_error = (pngErr as Error).message;
+    }
   }
+
+  console.log("[PHOTO-EMBED]", JSON.stringify({
+    original_length:       photo.length,
+    detected_data_uri,
+    mime_type,
+    stripped_base64_length: raw.length,
+    decoded_bytes:          buf.length,
+    first_bytes_hex,
+    jpg_success,
+    png_success,
+    error: jpg_success || png_success
+      ? null
+      : `JPG: ${jpg_error} | PNG: ${png_error}`,
+  }, null, 2));
+
+  return embedResult;
 }
 
 // ── QR code ───────────────────────────────────────────────────────────────────
@@ -120,6 +130,14 @@ async function renderFromTemplate(
   photoB64:    string | undefined,
   qrContent:   string | undefined,
 ): Promise<Buffer> {
+  // ── [PHOTO-BEFORE-RENDER] point 5 ─────────────────────────────────────────
+  console.log("[PHOTO-BEFORE-RENDER]", JSON.stringify({
+    template_type: key,
+    photo_exists:  !!photoB64,
+    photo_type:    typeof photoB64,
+    photo_length:  photoB64 ? photoB64.length : 0,
+  }, null, 2));
+
   const map = FIELD_MAP[key as keyof typeof FIELD_MAP];
   const { W, H, templateFile } = map;
 
@@ -176,12 +194,12 @@ async function renderFromTemplate(
   }
 
   // Photo overlay
-  console.log("[PDF][photo] renderer photo check", {
-    key,
+  // ── [PHOTO-RENDERER] point 6 ──────────────────────────────────────────────
+  console.log("[PHOTO-RENDERER]", JSON.stringify({
     has_photo_zone: !!map.photo,
-    photoB64_length: photoB64 ? photoB64.length : 0,
-    photoB64_truthy: !!photoB64,
-  });
+    photo_exists:   !!photoB64,
+    photo_length:   photoB64 ? photoB64.length : 0,
+  }, null, 2));
   if (map.photo && photoB64) {
     const img = await embedPhotoImage(doc, photoB64);
     if (img) {
