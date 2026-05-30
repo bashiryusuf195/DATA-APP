@@ -58,13 +58,14 @@ export async function registerController(
       success: true,
       data: {
         user: {
-          id:                user.id,
-          email:             user.email,
-          status:            user.status,
-          kyc_level:         user.kyc_level,
-          is_email_verified: user.is_email_verified,
-          roles:             rbac.roles,
-          permissions:       rbac.permissions,
+          id:                  user.id,
+          email:               user.email,
+          status:              user.status,
+          kyc_level:           user.kyc_level,
+          is_email_verified:   user.is_email_verified,
+          roles:               rbac.roles,
+          permissions:         rbac.permissions,
+          has_transaction_pin: false,
         },
         tokens: {
           access_token:             tokens.access_token,
@@ -150,13 +151,14 @@ export async function loginController(
       success: true,
       data: {
         user: {
-          id:                user.id,
-          email:             user.email,
-          status:            user.status,
-          kyc_level:         user.kyc_level,
-          is_email_verified: user.is_email_verified,
-          roles:             rbac.roles,
-          permissions:       rbac.permissions,
+          id:                  user.id,
+          email:               user.email,
+          status:              user.status,
+          kyc_level:           user.kyc_level,
+          is_email_verified:   user.is_email_verified,
+          roles:               rbac.roles,
+          permissions:         rbac.permissions,
+          has_transaction_pin: !!((user as unknown as Record<string, unknown>).transaction_pin_hash),
         },
         tokens: {
           access_token:             tokens.access_token,

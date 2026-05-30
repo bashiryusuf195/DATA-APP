@@ -41,14 +41,25 @@ apiClient.interceptors.response.use(
     const status: number | undefined = error.response?.status
 
     if (status === 401) {
-      const url: string = error.config?.url ?? ''
+      const url: string  = error.config?.url ?? ''
+      const code: string = error.response?.data?.code ?? ''
+
       const isAuthEndpoint =
         url.includes('/auth/login') ||
         url.includes('/auth/register') ||
         url.includes('/auth/refresh') ||
         url.includes('/auth/2fa/')
 
-      if (!isAuthEndpoint) {
+      // PIN errors use 401 on older deployments — never treat them as session expiry.
+      // (Current backend uses 422 for INVALID_TRANSACTION_PIN, but this guard handles
+      // any deployment that may not yet have that fix.)
+      const isPinError =
+        code === 'INVALID_TRANSACTION_PIN' ||
+        code === 'TRANSACTION_PIN_LOCKED'  ||
+        code === 'TRANSACTION_PIN_NOT_SET' ||
+        code === 'TRANSACTION_PIN_REQUIRED'
+
+      if (!isAuthEndpoint && !isPinError) {
         // Friendly message first — if any component briefly renders before
         // navigation completes, it sees clean text instead of raw JSON.
         error.message = 'Session expired. Please log in again.'
@@ -59,7 +70,7 @@ apiClient.interceptors.response.use(
         return new Promise(() => {})
       }
 
-      // Auth endpoints: let the form handle the error normally.
+      // Auth endpoints and PIN errors: let the caller handle the error normally.
       error.message = error.response?.data?.message ?? 'Invalid credentials.'
       return Promise.reject(error)
     }

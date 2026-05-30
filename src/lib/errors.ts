@@ -72,7 +72,7 @@ export class InvalidPinError extends AppError {
 
 export class InvalidTransactionPinError extends AppError {
   constructor() {
-    super('Incorrect transaction PIN.', 'INVALID_TRANSACTION_PIN', 401);
+    super('Incorrect transaction PIN.', 'INVALID_TRANSACTION_PIN', 422);
   }
 }
 
