@@ -73,13 +73,37 @@ function splitLines(text: string, maxPt: number, sizePt: number): string[] {
 // ── Photo embedding ───────────────────────────────────────────────────────────
 async function embedPhotoImage(pdfDoc: PDFDocument, photo: string) {
   if (!photo || photo === "[photo_redacted]") return null;
-  const buf    = Buffer.from(photo, "base64");
-  const isJpeg = photo.startsWith("/9j/") || !photo.startsWith("iVBOR");
+
+  console.log("[PDF][photo] embedPhotoImage called", {
+    length:    photo.length,
+    prefix:    photo.slice(0, 40),
+    is_data_uri: photo.startsWith("data:"),
+  });
+
+  // Strip "data:image/<type>;base64," prefix when the provider includes it.
+  // Buffer.from(<full data URI>, "base64") decodes the prefix as noise and
+  // produces garbage bytes, causing embedJpg/embedPng to throw silently.
+  let raw = photo;
+  const dataUriMatch = photo.match(/^data:image\/[^;]+;base64,(.+)$/s);
+  if (dataUriMatch) {
+    raw = dataUriMatch[1];
+    console.log("[PDF][photo] data URI prefix stripped", { raw_length: raw.length });
+  }
+
+  const buf    = Buffer.from(raw, "base64");
+  const isJpeg = raw.startsWith("/9j/") || !raw.startsWith("iVBOR");
+
+  console.log("[PDF][photo] decoded buffer", { buf_length: buf.length, is_jpeg: isJpeg });
+
   try {
-    return isJpeg ? await pdfDoc.embedJpg(buf) : await pdfDoc.embedPng(buf);
-  } catch {
-    try { return await pdfDoc.embedJpg(buf); } catch { /* */ }
-    try { return await pdfDoc.embedPng(buf); } catch { /* */ }
+    const img = isJpeg ? await pdfDoc.embedJpg(buf) : await pdfDoc.embedPng(buf);
+    console.log("[PDF][photo] embed success", { is_jpeg: isJpeg });
+    return img;
+  } catch (firstErr) {
+    console.warn("[PDF][photo] primary embed failed", { error: (firstErr as Error).message, is_jpeg: isJpeg });
+    try { const img = await pdfDoc.embedJpg(buf); console.log("[PDF][photo] fallback jpeg success"); return img; } catch { /* */ }
+    try { const img = await pdfDoc.embedPng(buf); console.log("[PDF][photo] fallback png success");  return img; } catch { /* */ }
+    console.error("[PDF][photo] all embed attempts failed — photo will be blank");
     return null;
   }
 }
@@ -152,6 +176,12 @@ async function renderFromTemplate(
   }
 
   // Photo overlay
+  console.log("[PDF][photo] renderer photo check", {
+    key,
+    has_photo_zone: !!map.photo,
+    photoB64_length: photoB64 ? photoB64.length : 0,
+    photoB64_truthy: !!photoB64,
+  });
   if (map.photo && photoB64) {
     const img = await embedPhotoImage(doc, photoB64);
     if (img) {

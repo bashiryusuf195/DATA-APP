@@ -81,6 +81,17 @@ export async function identityReportController(
       { reference, variation_code: variationCode, id_type: idType, source: dataSource },
     );
 
+    // ── Photo diagnostic log ─────────────────────────────────────────────────
+    const photoVal = g("photo");
+    logger.info("report_photo_field", {
+      reference,
+      in_report_data:   "photo" in rd,
+      rd_photo_type:    typeof rd["photo"],
+      photo_length:     photoVal.length,
+      photo_prefix:     photoVal.slice(0, 40) || "(empty)",
+      data_source:      dataSource,
+    });
+
     // ── Generate PDF from template ───────────────────────────────────────────
     let pdfBuffer: Buffer;
 

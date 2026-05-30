@@ -296,6 +296,18 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
         : undefined,
     };
 
+    const ninNormalized = isSuccess && raw.data
+      ? normalizeNinReportData(raw.data as Record<string, unknown>)
+      : null;
+
+    console.log("[SECUREIDVERIFY] NIN photo field", {
+      reference:     input.reference,
+      photo_present: ninNormalized?.photo !== undefined,
+      photo_type:    typeof ninNormalized?.photo,
+      photo_length:  typeof ninNormalized?.photo === "string" ? ninNormalized.photo.length : 0,
+      photo_prefix:  typeof ninNormalized?.photo === "string" ? ninNormalized.photo.slice(0, 40) : null,
+    });
+
     return {
       success:            isSuccess,
       provider_reference: raw.reference ?? input.reference,
@@ -306,10 +318,7 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       // Unmasked data for PDF generation — not stored in raw_response.
       // Normalised to snake_case so PDFs render correctly regardless of whether
       // the API returns snake_case or camelCase field names.
-      report_data: isSuccess && raw.data ? {
-        id_type: "nin",
-        ...normalizeNinReportData(raw.data as Record<string, unknown>),
-      } : undefined,
+      report_data: ninNormalized ? { id_type: "nin", ...ninNormalized } : undefined,
     };
   }
 
@@ -384,6 +393,18 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
         : undefined,
     };
 
+    const bvnNormalized = isSuccess && raw.data
+      ? normalizeBvnReportData(raw.data as Record<string, unknown>)
+      : null;
+
+    console.log("[SECUREIDVERIFY] BVN photo field", {
+      reference:     input.reference,
+      photo_present: bvnNormalized?.photo !== undefined,
+      photo_type:    typeof bvnNormalized?.photo,
+      photo_length:  typeof bvnNormalized?.photo === "string" ? bvnNormalized.photo.length : 0,
+      photo_prefix:  typeof bvnNormalized?.photo === "string" ? bvnNormalized.photo.slice(0, 40) : null,
+    });
+
     return {
       success:            isSuccess,
       provider_reference: raw.reference ?? input.reference,
@@ -394,10 +415,7 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       // Unmasked data for PDF generation — not stored in raw_response.
       // Normalised to snake_case so PDFs render correctly regardless of whether
       // the API returns snake_case or camelCase field names.
-      report_data: isSuccess && raw.data ? {
-        id_type: "bvn",
-        ...normalizeBvnReportData(raw.data as Record<string, unknown>),
-      } : undefined,
+      report_data: bvnNormalized ? { id_type: "bvn", ...bvnNormalized } : undefined,
     };
   }
 
