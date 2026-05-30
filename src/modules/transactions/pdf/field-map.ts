@@ -95,8 +95,8 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
     H: 1008,
     templateFile: "NIN Information.png",
 
-    // Photo box: right column, top-right of page below header
-    photo: { x: 0.689, y: 0.067, w: 0.261, h: 0.198 },
+    // Photo box: right column, blank area above disclaimer text (disclaimer starts y≈0.181)
+    photo: { x: 0.689, y: 0.067, w: 0.261, h: 0.112 },
 
     fields: {
       // ── Personal info rows (value column; labels are on the template) ───
@@ -106,8 +106,8 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
       date_of_birth:   { x: 0.291, y: 0.172, w: 0.375, h: 0.025, size: 10 },
       gender:          { x: 0.291, y: 0.202, w: 0.375, h: 0.025, size: 10 },
 
-      // ── NIN bar — large spaced number on dark green background ─────────
-      id_number:       { x: 0.069, y: 0.267, w: 0.863, h: 0.048, size: 20, bold: true, color: [1, 1, 1] },
+      // ── NIN number — white background, black text ──────────────────────
+      id_number:       { x: 0.069, y: 0.267, w: 0.863, h: 0.048, size: 20, bold: true },
 
       // ── Details grid — left column values ──────────────────────────────
       tracking_id:     { x: 0.270, y: 0.352, w: 0.258, h: 0.022, size: 9 },
@@ -142,10 +142,10 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
 
     fields: {
       // ── Card data fields on near-white card background ─────────────────
-      last_name:     { x: 0.327, y: 0.225, w: 0.595, h: 0.025, size: 11, bold: true },
+      last_name:     { x: 0.327, y: 0.264, w: 0.595, h: 0.025, size: 11, bold: true },
       // given_names = first_name + middle_name, combined by the wrapper
-      given_names:   { x: 0.327, y: 0.263, w: 0.595, h: 0.040, size: 11, bold: true, wrap: true },
-      date_of_birth: { x: 0.327, y: 0.315, w: 0.370, h: 0.025, size: 11, bold: true },
+      given_names:   { x: 0.327, y: 0.310, w: 0.595, h: 0.040, size: 11, bold: true, wrap: true },
+      date_of_birth: { x: 0.327, y: 0.353, w: 0.370, h: 0.025, size: 11, bold: true },
 
       // ── NIN — large number on near-white card area (black text) ────────
       id_number:     { x: 0.059, y: 0.404, w: 0.882, h: 0.042, size: 22, bold: true },
@@ -180,7 +180,7 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
       issued_date:   { x: 0.578, y: 0.248, w: 0.180, h: 0.022, size: 8,  bold: true,  color: [1, 1, 1] },
 
       // ── NIN across full panel width on dark green background ───────────
-      id_number:     { x: 0.084, y: 0.352, w: 0.824, h: 0.045, size: 20, bold: true,  color: [1, 1, 1] },
+      id_number:     { x: 0.084, y: 0.270, w: 0.824, h: 0.045, size: 20, bold: true,  color: [1, 1, 1] },
 
       // ── Footer on white page background ────────────────────────────────
       _reference:    { x: 0.061, y: 0.976, w: 0.882, h: 0.018, size: 7 },
@@ -194,33 +194,33 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
     H: 841.9,
     templateFile: "BVN.png",
 
-    // Photo box: right column
-    photo: { x: 0.723, y: 0.079, w: 0.227, h: 0.202 },
+    // Photo box: center column (PASSPORT PHOTO placeholder)
+    photo: { x: 0.405, y: 0.226, w: 0.140, h: 0.201 },
 
     fields: {
       // ── Personal info rows (value column) ─────────────────────────────
-      first_name:             { x: 0.286, y: 0.093, w: 0.412, h: 0.025, size: 10 },
-      middle_name:            { x: 0.286, y: 0.119, w: 0.412, h: 0.025, size: 10 },
-      last_name:              { x: 0.286, y: 0.143, w: 0.412, h: 0.025, size: 10 },
-      date_of_birth:          { x: 0.286, y: 0.167, w: 0.412, h: 0.025, size: 10 },
-      gender:                 { x: 0.286, y: 0.191, w: 0.412, h: 0.025, size: 10 },
-      marital_status:         { x: 0.286, y: 0.215, w: 0.412, h: 0.025, size: 10 },
+      first_name:             { x: 0.286, y: 0.229, w: 0.412, h: 0.025, size: 10 },
+      middle_name:            { x: 0.286, y: 0.273, w: 0.412, h: 0.025, size: 10 },
+      last_name:              { x: 0.286, y: 0.320, w: 0.412, h: 0.025, size: 10 },
+      date_of_birth:          { x: 0.286, y: 0.367, w: 0.412, h: 0.025, size: 10 },
+      gender:                 { x: 0.286, y: 0.414, w: 0.412, h: 0.025, size: 10 },
+      marital_status:         { x: 0.286, y: 0.461, w: 0.412, h: 0.025, size: 10 },
 
-      // ── BVN bar — large spaced number on dark green background ─────────
-      bvn:                    { x: 0.071, y: 0.281, w: 0.859, h: 0.057, size: 20, bold: true, color: [1, 1, 1] },
+      // ── BVN number — light background, black text ──────────────────────
+      bvn:                    { x: 0.071, y: 0.468, w: 0.859, h: 0.057, size: 20, bold: true },
 
       // ── Details grid ────────────────────────────────────────────────────
-      phone:                  { x: 0.256, y: 0.375, w: 0.315, h: 0.022, size: 9 },
-      nin:                    { x: 0.571, y: 0.375, w: 0.379, h: 0.022, size: 9 },
-      enrollment_institution: { x: 0.261, y: 0.401, w: 0.310, h: 0.022, size: 9 },
-      enrollment_branch:      { x: 0.647, y: 0.401, w: 0.303, h: 0.022, size: 9 },
-      origin_state:           { x: 0.261, y: 0.427, w: 0.310, h: 0.022, size: 9 },
-      origin_lga:             { x: 0.618, y: 0.427, w: 0.332, h: 0.022, size: 9 },
-      residence_state:        { x: 0.274, y: 0.453, w: 0.297, h: 0.022, size: 9 },
-      residence_lga:          { x: 0.618, y: 0.453, w: 0.332, h: 0.022, size: 9 },
+      phone:                  { x: 0.256, y: 0.525, w: 0.315, h: 0.022, size: 9 },
+      nin:                    { x: 0.571, y: 0.525, w: 0.379, h: 0.022, size: 9 },
+      enrollment_institution: { x: 0.261, y: 0.589, w: 0.310, h: 0.022, size: 9 },
+      enrollment_branch:      { x: 0.647, y: 0.589, w: 0.303, h: 0.022, size: 9 },
+      origin_state:           { x: 0.261, y: 0.683, w: 0.310, h: 0.022, size: 9 },
+      origin_lga:             { x: 0.618, y: 0.683, w: 0.332, h: 0.022, size: 9 },
+      residence_state:        { x: 0.274, y: 0.757, w: 0.297, h: 0.022, size: 9 },
+      residence_lga:          { x: 0.618, y: 0.757, w: 0.332, h: 0.022, size: 9 },
 
       // ── Address (wraps to 2 lines) ──────────────────────────────────────
-      address:                { x: 0.202, y: 0.479, w: 0.748, h: 0.040, size: 9, wrap: true },
+      address:                { x: 0.202, y: 0.831, w: 0.748, h: 0.040, size: 9, wrap: true },
 
       // ── Footer ─────────────────────────────────────────────────────────
       _reference:             { x: 0.067, y: 0.976, w: 0.882, h: 0.018, size: 7 },
