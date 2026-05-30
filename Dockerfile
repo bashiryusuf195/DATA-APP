@@ -6,8 +6,10 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig.json knexfile.ts ./
+COPY scripts ./scripts
 COPY src ./src
 RUN npm run build
+RUN find /app/dist/modules/transactions/pdf -type f
 
 # ── Stage 2: Production runner ────────────────────────────────────────────────
 FROM node:22-alpine AS runner

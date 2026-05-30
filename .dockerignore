@@ -11,6 +11,6 @@ README.md
 DEPLOYMENT.md
 admin-dashboard
 tests
-scripts
+scripts/*.ts
 *.md
 .github
