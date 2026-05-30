@@ -3,8 +3,9 @@ import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search
 import { useNavigate } from 'react-router-dom'
 import { useState, useCallback } from 'react'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
-import { apiClient } from '@/api/client'
+import { transactionsApi } from '@/api/transactions.api'
 import { isAxiosError } from 'axios'
+import toast from 'react-hot-toast'
 import type { Transaction } from '@/types'
 
 function CopyButton({ text }: { text: string }) {
@@ -47,21 +48,13 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
     if (!transaction) return
     setIsDownloading(true)
     try {
-      const resp = await apiClient.get(
-        `/transactions/identity-verification/${transaction.reference}/report`,
-        { responseType: 'blob' },
-      )
-      const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
-      const objUrl = URL.createObjectURL(blob)
-      const a      = document.createElement('a')
-      a.href       = objUrl
-      a.download   = `verification-${transaction.reference}.pdf`
-      a.click()
-      URL.revokeObjectURL(objUrl)
+      await transactionsApi.downloadReport(transaction.reference)
     } catch (err) {
-      // 422 = not ready yet; other errors are transient — both silently swallowed
-      // so the modal stays open and the user can retry.
-      if (!isAxiosError(err)) console.error('Report download error', err)
+      if (isAxiosError(err) && err.response?.status === 422) {
+        toast.error('Report not ready yet — please try again in a moment.')
+      } else {
+        toast.error('Could not download report. Please try again.')
+      }
     } finally {
       setIsDownloading(false)
     }

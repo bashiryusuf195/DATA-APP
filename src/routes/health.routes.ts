@@ -8,8 +8,10 @@
 //  GET /api/v1/health/database   — DB latency measurement (public, minimal details)
 //  GET /api/v1/health/queues     — BullMQ queue backlog summary  (admin-only)
 //  GET /api/v1/health/providers  — Provider circuit-breaker summary (admin-only)
+//  GET /api/v1/health/build      — Build/deploy info + FIELD_MAP hash  (admin-only)
 
 import { Router, Request, Response } from 'express';
+import { createHash }                 from 'crypto';
 import { checkDatabaseHealth, db }    from '../config/database';
 import { checkRedisHealth }           from '../config/redis';
 import { config }                     from '../config';
@@ -17,6 +19,7 @@ import { authenticate }               from '../modules/auth/middleware/authentic
 import { requireRole }                from '../modules/auth/middleware/authorize';
 import { logger }                     from '../lib/logger';
 import { errorReporter }              from '../lib/error-reporter';
+import { FIELD_MAP }                  from '../modules/transactions/pdf/field-map';
 
 export const healthRouter = Router();
 
@@ -175,4 +178,65 @@ healthRouter.get('/providers', ...adminGuard, async (_req: Request, res: Respons
     logger.error('health_check_providers_failed', { error: (err as Error).message });
     res.status(503).json({ status: 'error', message: 'Provider health unavailable', timestamp: new Date().toISOString() });
   }
+});
+
+// ── Build / deploy info ───────────────────────────────────────────────────────
+// Admin-only — reveals git commit, FIELD_MAP hash, and key PDF coordinates.
+// Use this to confirm Railway is running the latest calibrated build without
+// needing SSH access.  Compare calibrated: true / field_map_hash across envs.
+healthRouter.get('/build', ...adminGuard, (_req: Request, res: Response) => {
+  const fieldMapHash = createHash('sha256')
+    .update(JSON.stringify(FIELD_MAP))
+    .digest('hex')
+    .slice(0, 16);
+
+  const ninStd = FIELD_MAP['nin_standard'];
+  const ninPrm = FIELD_MAP['nin_premium'];
+  const bvn    = FIELD_MAP['bvn_basic'];
+
+  const calibrated =
+    ninStd.fields['last_name'].y === 0.264 &&
+    bvn.fields['last_name'].y    === 0.320 &&
+    ninPrm.fields['id_number'].y === 0.270;
+
+  // Snapshot the key coords that changed in the calibration commit (ef7f1e9).
+  // Stale build: nin_std_last_name_y=0.225, bvn_last_name_y=0.143
+  // Calibrated : nin_std_last_name_y=0.264, bvn_last_name_y=0.320
+  const coordinates = {
+    nin_standard: {
+      W: ninStd.W, H: ninStd.H,
+      last_name_y:     ninStd.fields['last_name'].y,
+      given_names_y:   ninStd.fields['given_names'].y,
+      date_of_birth_y: ninStd.fields['date_of_birth'].y,
+      id_number_y:     ninStd.fields['id_number'].y,
+      photo:           ninStd.photo,
+    },
+    nin_premium: {
+      W: ninPrm.W, H: ninPrm.H,
+      last_name_y:     ninPrm.fields['last_name'].y,
+      given_names_y:   ninPrm.fields['given_names'].y,
+      date_of_birth_y: ninPrm.fields['date_of_birth'].y,
+      id_number_y:     ninPrm.fields['id_number'].y,
+      photo:           ninPrm.photo,
+    },
+    bvn_basic: {
+      W: bvn.W, H: bvn.H,
+      first_name_y:    bvn.fields['first_name'].y,
+      last_name_y:     bvn.fields['last_name'].y,
+      date_of_birth_y: bvn.fields['date_of_birth'].y,
+      bvn_y:           bvn.fields['bvn'].y,
+      photo:           bvn.photo,
+    },
+  };
+
+  res.json({
+    commit_sha:     process.env['RAILWAY_GIT_COMMIT_SHA'] ?? process.env['COMMIT_SHA'] ?? 'unknown',
+    deployment_id:  process.env['RAILWAY_DEPLOYMENT_ID'] ?? 'unknown',
+    app_version:    config.appVersion,
+    field_map_hash: fieldMapHash,
+    calibrated,
+    templates:      Object.values(FIELD_MAP).map((t) => t.templateFile),
+    coordinates,
+    timestamp:      new Date().toISOString(),
+  });
 });

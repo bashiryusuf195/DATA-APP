@@ -19,11 +19,13 @@
 
 import fs   from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import { app }    from './app';
 import { config } from './config';
 import { db }     from './config/database';
 import { redis, isRedisQuotaExceeded } from './config/redis';
 import { logger } from './lib/logger';
+import { FIELD_MAP } from './modules/transactions/pdf/field-map';
 
 // ── PDF template preflight ────────────────────────────────────────────────────
 // Runs synchronously at module load so missing templates surface immediately
@@ -32,6 +34,37 @@ const PDF_TEMPLATES_DIR = path.resolve(__dirname, 'modules/transactions/pdf/temp
 for (const tpl of ['NIN Information.png', 'NIN Standard.png', 'NIN Premium.png', 'BVN.png']) {
   const tplPath = path.join(PDF_TEMPLATES_DIR, tpl);
   console.log(`[STARTUP] Template ${fs.existsSync(tplPath) ? 'OK' : 'MISSING'}: ${tplPath}`);
+}
+
+// ── FIELD_MAP build verification ──────────────────────────────────────────────
+// Prints a hash + key coordinates so Railway logs confirm which field-map
+// version is loaded. Compare nin_std_last_name_y / bvn_last_name_y against
+// the calibrated values (0.264 / 0.320) to detect a stale build.
+{
+  const _hash = createHash('sha256').update(JSON.stringify(FIELD_MAP)).digest('hex').slice(0, 16);
+  const _path = path.resolve(__dirname, 'modules/transactions/pdf/field-map.js');
+  const _ninStd  = FIELD_MAP['nin_standard'];
+  const _ninPrm  = FIELD_MAP['nin_premium'];
+  const _bvn     = FIELD_MAP['bvn_basic'];
+  const _cal = (
+    _ninStd.fields['last_name'].y === 0.264 &&
+    _bvn.fields['last_name'].y    === 0.320 &&
+    _ninPrm.fields['id_number'].y === 0.270
+  );
+  console.log(`[STARTUP] FIELD_MAP path       : ${_path}`);
+  console.log(`[STARTUP] FIELD_MAP hash       : ${_hash}`);
+  console.log(`[STARTUP] FIELD_MAP calibrated : ${_cal}`);
+  console.log('[STARTUP] FIELD_MAP coords     :', JSON.stringify({
+    nin_std_last_name_y:  _ninStd.fields['last_name'].y,
+    nin_std_dob_y:        _ninStd.fields['date_of_birth'].y,
+    nin_std_id_number_y:  _ninStd.fields['id_number'].y,
+    nin_prm_last_name_y:  _ninPrm.fields['last_name'].y,
+    nin_prm_id_number_y:  _ninPrm.fields['id_number'].y,
+    bvn_last_name_y:      _bvn.fields['last_name'].y,
+    bvn_bvn_y:            _bvn.fields['bvn'].y,
+    bvn_photo_x:          _bvn.photo?.x,
+  }));
+  console.log(`[STARTUP] git commit           : ${process.env['RAILWAY_GIT_COMMIT_SHA'] ?? process.env['COMMIT_SHA'] ?? 'unknown'}`);
 }
 
 // Top-level process safety nets — registered before any async work so nothing

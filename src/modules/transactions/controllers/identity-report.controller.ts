@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { createHash } from "crypto";
 import { getDbInstance } from "../../../db/knex";
 import { AppError } from "../../../lib/errors";
 import { logger } from "../../../lib/logger";
@@ -9,8 +10,15 @@ import {
   renderBvnSlip,
   s,
 } from "../pdf/slip-renderers";
+import { FIELD_MAP } from "../pdf/field-map";
 
 const db = getDbInstance();
+
+// Computed once at module load — stable across requests in the same process.
+const FIELD_MAP_HASH = createHash('sha256')
+  .update(JSON.stringify(FIELD_MAP))
+  .digest('hex')
+  .slice(0, 16);
 
 // Statuses considered verified — covers legacy aliases.
 const SUCCESS_STATUSES = new Set(["successful", "success", "completed"]);
@@ -68,6 +76,26 @@ export async function identityReportController(
     const variationCode = s(meta.variation_code ?? "");
     const idTypeRaw     = s(rd.id_type);
     const idType        = idTypeRaw || (variationCode.startsWith("bvn-") ? "bvn" : "nin");
+
+    // ── [REPORT-REQUEST] ─────────────────────────────────────────────────────
+    console.log("[REPORT-REQUEST]", JSON.stringify({
+      reference,
+      tx_id:                  tx.id,
+      created_at:             tx.created_at,
+      status:                 tx.status,
+      variation_code:         variationCode,
+      id_type:                idType,
+      field_map_hash:         FIELD_MAP_HASH,
+      report_data_keys:       Object.keys(rd),
+      photo_exists:           "photo" in rd && !!rd["photo"],
+      photo_length:           typeof rd["photo"] === "string" ? (rd["photo"] as string).length : 0,
+      provider_reference:     s(meta.provider_reference ?? "") || null,
+      has_raw_response:       "raw_response" in meta,
+      has_provider_response:  Object.keys(provResp).length > 0,
+      data_source_preview:    Object.keys(rd).length > 0
+        ? "report_data"
+        : Object.keys(pd).length > 0 ? "provider_response.data" : "none",
+    }, null, 2));
 
     // ── Logging ──────────────────────────────────────────────────────────────
     const dataSource =

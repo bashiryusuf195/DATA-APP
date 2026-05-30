@@ -6,7 +6,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { Skeleton, Card } from '@/components/ui'
 import { fmtCurrency, fmtDateTime, normalizeTransactionStatus } from '@/utils/format'
-import { apiClient } from '@/api/client'
+import { transactionsApi } from '@/api/transactions.api'
 import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 
@@ -19,17 +19,7 @@ export function TransactionDetailPage() {
   const handleReportDownload = useCallback(async (ref: string) => {
     setIsDownloading(true)
     try {
-      const resp = await apiClient.get(
-        `/transactions/identity-verification/${ref}/report`,
-        { responseType: 'blob' },
-      )
-      const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
-      const objUrl = URL.createObjectURL(blob)
-      const a      = document.createElement('a')
-      a.href       = objUrl
-      a.download   = `verification-${ref}.pdf`
-      a.click()
-      URL.revokeObjectURL(objUrl)
+      await transactionsApi.downloadReport(ref)
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 422) {
         toast.error('Report is not available yet. Please try again later.')
