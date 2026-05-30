@@ -150,7 +150,7 @@ export interface AirtimePurchaseInput {
   variation_code: string
   description: string
   plan?: PlanMeta
-  transaction_pin: string
+  transaction_pin?: string
 }
 
 export interface DataPurchaseInput {
@@ -159,7 +159,7 @@ export interface DataPurchaseInput {
   variation_code: string
   description: string
   plan?: PlanMeta
-  transaction_pin: string
+  transaction_pin?: string
 }
 
 export interface ElectricityVerifyInput {
@@ -176,12 +176,12 @@ export interface MeterVerifyResult {
 }
 
 export interface ElectricityPurchaseInput {
-  meter_number:           string
-  amount:                 number
-  variation_code:         string
-  phone?:                 string
+  meter_number:            string
+  amount:                  number
+  variation_code:          string
+  phone?:                  string
   verified_customer_name?: string
-  transaction_pin:        string
+  transaction_pin?:        string
 }
 
 export interface CableTvVerifyInput {
@@ -199,11 +199,11 @@ export interface CableVerifyResult {
 }
 
 export interface CableTvPurchaseInput {
-  smartcard_number:       string
-  variation_code:         string
-  phone?:                 string
+  smartcard_number:        string
+  variation_code:          string
+  phone?:                  string
   verified_customer_name?: string
-  transaction_pin:        string
+  transaction_pin?:        string
 }
 
 export interface ExamPinPurchaseInput {
@@ -212,7 +212,7 @@ export interface ExamPinPurchaseInput {
   variation_code: string
   description: string
   plan?: PlanMeta
-  transaction_pin: string
+  transaction_pin?: string
 }
 
 export interface IdentityVerificationInput {
@@ -222,7 +222,7 @@ export interface IdentityVerificationInput {
   variation_code: string
   description: string
   plan?: PlanMeta
-  transaction_pin: string
+  transaction_pin?: string
 }
 
 // ── Services / Plans ──────────────────────────────────────────────────────────

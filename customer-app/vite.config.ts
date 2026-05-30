@@ -13,6 +13,10 @@ function spaBypass(req: { headers?: Record<string, string | string[] | undefined
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Replaced at build time with the ISO timestamp of this build
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
