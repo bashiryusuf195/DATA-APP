@@ -5,7 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc --project tsconfig.json && node -e \"require('fs').cpSync('src/modules/transactions/pdf/templates','dist/modules/transactions/pdf/templates',{recursive:true})\"",
+    "build": "tsc --project tsconfig.json",
+    "test:slips": "npx tsx tests/slip-safety.test.ts",
     "start": "node dist/server.js",
     "start:prod": "node dist/server.js",
     "worker": "tsx watch src/workers/index.ts",
