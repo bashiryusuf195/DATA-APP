@@ -42,6 +42,7 @@ interface SecureIDVerifyNINResponse {
   reference?: string;
   data?: {
     nin?:           string;
+    // snake_case names (expected); camelCase variants handled in normalisation below
     first_name?:    string;
     last_name?:     string;
     middle_name?:   string;
@@ -66,7 +67,63 @@ interface SecureIDVerifyBVNResponse {
     date_of_birth?: string;
     gender?:        string;
     phone?:         string;
+    // photo present on some BVN tiers
+    photo?:         string;
     [key: string]:  unknown;
+  };
+}
+
+// ── Field normalisation helpers ───────────────────────────────────────────────
+// SecureIDVerify may return snake_case or camelCase field names depending on the
+// API version.  These helpers map both variants to the snake_case names expected
+// by the slip renderers, so PDFs never show "—" due to a naming mismatch.
+
+function str(v: unknown): string {
+  if (v == null) return "";
+  return typeof v === "string" ? v.trim() : String(v).trim();
+}
+
+function normalizeNinReportData(d: Record<string, unknown>) {
+  return {
+    first_name:      str(d.first_name      ?? d.firstName),
+    middle_name:     str(d.middle_name     ?? d.middleName),
+    last_name:       str(d.last_name       ?? d.lastName),
+    date_of_birth:   str(d.date_of_birth   ?? d.dateOfBirth),
+    gender:          str(d.gender),
+    phone:           str(d.phone),
+    nin:             str(d.nin),
+    id_number:       str(d.nin),
+    // NIN Information detail fields (returned for full-data tiers)
+    tracking_id:     str(d.tracking_id     ?? d.trackingId),
+    residence_state: str(d.residence_state ?? d.residenceState),
+    birth_state:     str(d.birth_state     ?? d.birthState),
+    residence_lga:   str(d.residence_lga   ?? d.residenceLga   ?? d.residence_lga_name),
+    birth_lga:       str(d.birth_lga       ?? d.birthLga),
+    address:         str(d.address         ?? d.residential_address),
+    photo:           typeof d.photo === "string" ? d.photo : undefined,
+  };
+}
+
+function normalizeBvnReportData(d: Record<string, unknown>) {
+  return {
+    first_name:             str(d.first_name             ?? d.firstName),
+    middle_name:            str(d.middle_name            ?? d.middleName),
+    last_name:              str(d.last_name              ?? d.lastName),
+    date_of_birth:          str(d.date_of_birth          ?? d.dateOfBirth),
+    gender:                 str(d.gender),
+    phone:                  str(d.phone),
+    bvn:                    str(d.bvn),
+    id_number:              str(d.bvn),
+    nin:                    str(d.nin),
+    marital_status:         str(d.marital_status         ?? d.maritalStatus),
+    enrollment_institution: str(d.enrollment_institution ?? d.enrollmentInstitution ?? d.enrollmentBank),
+    enrollment_branch:      str(d.enrollment_branch      ?? d.enrollmentBranch      ?? d.branch),
+    origin_state:           str(d.origin_state           ?? d.originState           ?? d.stateOfOrigin),
+    origin_lga:             str(d.origin_lga             ?? d.originLga             ?? d.lgaOfOrigin),
+    residence_state:        str(d.residence_state        ?? d.residenceState        ?? d.stateOfResidence),
+    residence_lga:          str(d.residence_lga          ?? d.residenceLga          ?? d.residence_lga_name),
+    address:                str(d.address                ?? d.residential_address),
+    photo:                  typeof d.photo === "string" ? d.photo : undefined,
   };
 }
 
@@ -247,13 +304,11 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       status:             isSuccess ? "successful" : "failed",
       raw_response:       safeResponse,
       // Unmasked data for PDF generation — not stored in raw_response.
-      // Spread all raw.data fields so slip-specific fields (tracking_id,
-      // residence_state, birth_state, etc.) flow through to the report controller.
+      // Normalised to snake_case so PDFs render correctly regardless of whether
+      // the API returns snake_case or camelCase field names.
       report_data: isSuccess && raw.data ? {
         id_type: "nin",
-        ...raw.data,            // all fields from provider (unmasked)
-        id_number: raw.data.nin, // normalised alias
-        photo:     raw.data.photo, // base64 — excluded from raw_response above
+        ...normalizeNinReportData(raw.data as Record<string, unknown>),
       } : undefined,
     };
   }
@@ -337,10 +392,11 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       status:             isSuccess ? "successful" : "failed",
       raw_response:       safeResponse,
       // Unmasked data for PDF generation — not stored in raw_response.
+      // Normalised to snake_case so PDFs render correctly regardless of whether
+      // the API returns snake_case or camelCase field names.
       report_data: isSuccess && raw.data ? {
-        id_type:  "bvn",
-        ...raw.data,
-        id_number: raw.data.bvn,
+        id_type: "bvn",
+        ...normalizeBvnReportData(raw.data as Record<string, unknown>),
       } : undefined,
     };
   }
