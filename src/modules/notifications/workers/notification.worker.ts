@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { createWorker } from "../../queue/config/queue.config";
 import { getDbInstance } from "../../../db/knex";
 
@@ -60,9 +61,55 @@ export const notificationWorker = createWorker(
         console.log(`[NOTIFICATION WORKER] PUSH → user ${String(notifJob.recipient_id ?? "all")}`);
       }
 
-      if (channel === "in_app" || recipientType === "all") {
-        // Fan out in-app notifications to all users if broadcast
-        console.log(`[NOTIFICATION WORKER] IN_APP broadcast: ${String(notifJob.body).slice(0, 80)}`);
+      // Fan out: write a notifications row per user so the customer app can display it.
+      if (channel === "in_app" || channel === "broadcast") {
+        const title   = String(notifJob.subject ?? "Notification");
+        const message = String(notifJob.body    ?? "");
+        const now     = new Date();
+
+        if (recipientType === "all") {
+          const users = await db("users").where({ is_active: true }).select("id");
+          console.log(`[NOTIFICATION WORKER] Fanning out in_app to ${users.length} users | job=${jobId}`);
+
+          // Batch inserts to avoid huge single statements on large user bases.
+          const BATCH = 500;
+          for (let i = 0; i < users.length; i += BATCH) {
+            await db("notifications").insert(
+              users.slice(i, i + BATCH).map((u: { id: string }) => ({
+                id:         randomUUID(),
+                user_id:    u.id,
+                channel:    "in_app",
+                type:       notification_type,
+                title,
+                message,
+                body:       message,
+                status:     "sent",
+                metadata:   JSON.stringify({ broadcast_job_id: jobId }),
+                sent_at:    now,
+                read_at:    null,
+                created_at: now,
+                updated_at: now,
+              })),
+            );
+          }
+        } else if (recipientType === "user" && notifJob.recipient_id) {
+          await db("notifications").insert({
+            id:         randomUUID(),
+            user_id:    notifJob.recipient_id,
+            channel:    "in_app",
+            type:       notification_type,
+            title,
+            message,
+            body:       message,
+            status:     "sent",
+            metadata:   JSON.stringify({ broadcast_job_id: jobId }),
+            sent_at:    now,
+            read_at:    null,
+            created_at: now,
+            updated_at: now,
+          });
+          console.log(`[NOTIFICATION WORKER] IN_APP → user ${String(notifJob.recipient_id)} | job=${jobId}`);
+        }
       }
 
       await db("notification_jobs").where({ id: jobId }).update({
