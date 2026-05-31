@@ -62,7 +62,10 @@ export async function getSummaryController(
   next: NextFunction
 ): Promise<void> {
   try {
-    const [totals] = await db("referral_rewards")
+    // .first() returns a single row object, not an array.
+    // Aggregate queries on empty tables still return one row (COUNT returns 0,
+    // COALESCE turns NULL sums into 0), but we null-coalesce defensively.
+    const totals = await db("referral_rewards")
       .select(
         db.raw("COUNT(DISTINCT referred_id)::int  AS total_referrals"),
         db.raw("COUNT(DISTINCT referrer_id)::int  AS active_referrers"),
@@ -73,7 +76,12 @@ export async function getSummaryController(
           "COALESCE(SUM(referrer_amount + referred_amount) FILTER (WHERE status = 'processing'), 0)::float AS pending_rewards"
         )
       )
-      .first();
+      .first() ?? {
+        total_referrals:   0,
+        active_referrers:  0,
+        total_rewards_paid: 0,
+        pending_rewards:   0,
+      };
 
     res.status(200).json({ success: true, data: totals });
   } catch (err) {
