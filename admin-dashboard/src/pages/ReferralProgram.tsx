@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { referralApi } from '@/api/referral.api'
 import type { ReferralSettings, ReferralReward } from '@/types'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -63,7 +64,13 @@ export function ReferralProgramPage() {
 
   const updateMutation = useMutation({
     mutationFn: referralApi.updateSettings,
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['referral-settings'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['referral-settings'] })
+      toast.success('Referral settings saved')
+    },
+    onError: (err: Error) => {
+      toast.error(err.message ?? 'Failed to save referral settings')
+    },
   })
 
   if (settingsErr) return <ErrorMessage error={settingsErr} />
