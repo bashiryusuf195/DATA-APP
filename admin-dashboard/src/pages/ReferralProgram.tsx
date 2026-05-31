@@ -229,22 +229,30 @@ export function ReferralProgramPage() {
 // so Zod's z.number() validators never see a string.
 
 function sanitizePayload(f: Partial<ReferralSettings>): Partial<ReferralSettings> {
-  const toNum = (v: unknown): number => {
-    const n = Number(v)
-    return isNaN(n) ? 0 : n
+  // Converts any value to a finite number. Falls back to 0 for null/undefined/NaN.
+  const forceNum = (v: unknown): number => {
+    if (typeof v === 'number' && isFinite(v)) return v
+    const n = parseFloat(String(v ?? ''))
+    return isFinite(n) ? n : 0
   }
-  const toNullNum = (v: unknown): number | null => {
-    if (v === null || v === undefined || String(v).trim() === '') return null
-    const n = Number(v)
-    return isNaN(n) ? null : n
+
+  // Converts any value to a finite number, or null for blank/null/undefined/NaN.
+  // Handles pg NUMERIC strings ("10000.00"), empty inputs (""), and null equally.
+  const forceNullNum = (v: unknown): number | null => {
+    if (v === null || v === undefined) return null
+    if (typeof v === 'string' && v.trim() === '') return null
+    if (typeof v === 'number') return isFinite(v) ? v : null
+    const n = parseFloat(String(v))
+    return isFinite(n) ? n : null
   }
+
   return {
     ...f,
-    reward_value:            toNum(f.reward_value),
-    min_amount:              toNullNum(f.min_amount),
-    max_reward_cap:          toNullNum(f.max_reward_cap),
-    referred_reward_value:   toNullNum(f.referred_reward_value),
-    required_referral_count: toNullNum(f.required_referral_count),
+    reward_value:            forceNum(f.reward_value),
+    min_amount:              forceNullNum(f.min_amount),
+    max_reward_cap:          forceNullNum(f.max_reward_cap),
+    referred_reward_value:   forceNullNum(f.referred_reward_value),
+    required_referral_count: forceNullNum(f.required_referral_count),
   }
 }
 
@@ -453,8 +461,16 @@ function SettingsPanel({
         <div className="flex justify-end pt-2">
           <button
             onClick={() => {
+              // Log raw form values for numeric fields before sanitization
+              console.log('[REFERRAL-RAW-FORM]', JSON.stringify({
+                reward_value:            form.reward_value,            typeof_rv:  typeof form.reward_value,
+                min_amount:              form.min_amount,              typeof_ma:  typeof form.min_amount,
+                max_reward_cap:          form.max_reward_cap,          typeof_mrc: typeof form.max_reward_cap,
+                referred_reward_value:   form.referred_reward_value,   typeof_rrv: typeof form.referred_reward_value,
+                required_referral_count: form.required_referral_count, typeof_rrc: typeof form.required_referral_count,
+              }, null, 2))
               const payload = sanitizePayload(form)
-              console.log('[REFERRAL-SAVE-PAYLOAD]', payload)
+              console.log('[REFERRAL-SAVE-PAYLOAD]', JSON.stringify(payload, null, 2))
               onSave(payload)
             }}
             disabled={saving}
