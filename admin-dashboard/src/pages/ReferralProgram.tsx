@@ -69,7 +69,20 @@ export function ReferralProgramPage() {
       toast.success('Referral settings saved')
     },
     onError: (err: Error) => {
-      toast.error(err.message ?? 'Failed to save referral settings')
+      // Zod validation errors include field-level details in error.response.data.details.
+      // The axios interceptor only surfaces .message, so we pull details separately.
+      const details = (err as Record<string, unknown>).response as
+        | { data?: { details?: Record<string, string[]> } }
+        | undefined
+      const fieldErrors = details?.data?.details
+      if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+        const lines = Object.entries(fieldErrors)
+          .map(([field, msgs]) => `${field}: ${msgs[0]}`)
+          .join('  ·  ')
+        toast.error(`Validation: ${lines}`, { duration: 6000 })
+      } else {
+        toast.error(err.message ?? 'Failed to save referral settings')
+      }
     },
   })
 
@@ -220,17 +233,29 @@ function SettingsPanel({
   saving:   boolean
   onSave:   (patch: Partial<ReferralSettings>) => void
 }) {
+  // The pg driver returns NUMERIC columns as strings ("500.00", "1000.00").
+  // Coerce to JS numbers here so Zod's z.number() validators always pass.
+  const toNum = (v: unknown): number => {
+    const n = Number(v)
+    return isNaN(n) ? 0 : n
+  }
+  const toNullNum = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === '') return null
+    const n = Number(v)
+    return isNaN(n) ? null : n
+  }
+
   const [form, setForm] = useState<Partial<ReferralSettings>>({
     is_enabled:              settings.is_enabled,
     reward_trigger:          settings.reward_trigger,
     reward_type:             settings.reward_type,
-    reward_value:            settings.reward_value,
-    min_amount:              settings.min_amount,
-    max_reward_cap:          settings.max_reward_cap,
+    reward_value:            toNum(settings.reward_value),
+    min_amount:              toNullNum(settings.min_amount),
+    max_reward_cap:          toNullNum(settings.max_reward_cap),
     reward_recipient:        settings.reward_recipient,
-    referred_reward_value:   settings.referred_reward_value,
+    referred_reward_value:   toNullNum(settings.referred_reward_value),
     reward_mode:             settings.reward_mode ?? 'per_referral',
-    required_referral_count: settings.required_referral_count,
+    required_referral_count: settings.required_referral_count ?? null,
   })
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
