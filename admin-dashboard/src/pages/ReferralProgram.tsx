@@ -214,21 +214,24 @@ function SettingsPanel({
   onSave:   (patch: Partial<ReferralSettings>) => void
 }) {
   const [form, setForm] = useState<Partial<ReferralSettings>>({
-    is_enabled:            settings.is_enabled,
-    reward_trigger:        settings.reward_trigger,
-    reward_type:           settings.reward_type,
-    reward_value:          settings.reward_value,
-    min_amount:            settings.min_amount,
-    max_reward_cap:        settings.max_reward_cap,
-    reward_recipient:      settings.reward_recipient,
-    referred_reward_value: settings.referred_reward_value,
+    is_enabled:              settings.is_enabled,
+    reward_trigger:          settings.reward_trigger,
+    reward_type:             settings.reward_type,
+    reward_value:            settings.reward_value,
+    min_amount:              settings.min_amount,
+    max_reward_cap:          settings.max_reward_cap,
+    reward_recipient:        settings.reward_recipient,
+    referred_reward_value:   settings.referred_reward_value,
+    reward_mode:             settings.reward_mode ?? 'per_referral',
+    required_referral_count: settings.required_referral_count,
   })
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }))
 
-  const isPercentage = form.reward_type === 'percentage'
-  const showReferred = form.reward_recipient === 'both'
+  const isPercentage  = form.reward_type    === 'percentage'
+  const showReferred  = form.reward_recipient === 'both'
+  const isMilestone   = form.reward_mode     === 'milestone'
 
   return (
     <div className="rounded-xl border border-border bg-surface-1 overflow-hidden">
@@ -268,6 +271,45 @@ function SettingsPanel({
               <option value="first_purchase">First VTU Purchase</option>
             </select>
           </Field>
+
+          {/* Reward Mode */}
+          <Field label="Reward Mode" hint="How rewards are paid out">
+            <select
+              value={form.reward_mode ?? 'per_referral'}
+              onChange={(e) => {
+                const mode = e.target.value as ReferralSettings['reward_mode']
+                set('reward_mode', mode)
+                if (mode === 'per_referral') set('required_referral_count', null)
+              }}
+              className="field-input"
+            >
+              <option value="per_referral">Per Referral — credit immediately per qualifying referral</option>
+              <option value="milestone">Milestone — pay once after N referrals qualify</option>
+            </select>
+          </Field>
+
+          {/* Required Referral Count — milestone mode only */}
+          {isMilestone && (
+            <Field
+              label="Required Referral Count"
+              hint="Referrals needed to trigger milestone payout"
+            >
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={form.required_referral_count ?? ''}
+                onChange={(e) =>
+                  set(
+                    'required_referral_count',
+                    e.target.value === '' ? null : Math.max(1, Math.floor(Number(e.target.value))),
+                  )
+                }
+                placeholder="e.g. 5"
+                className="field-input"
+              />
+            </Field>
+          )}
 
           {/* Reward Type */}
           <Field label="Reward Type">

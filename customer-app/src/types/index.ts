@@ -276,13 +276,16 @@ export interface NotificationPreferences {
 // ── Referrals ─────────────────────────────────────────────────────────────────
 
 export interface ReferralSummary {
-  referral_code: string
-  total_referrals: number
+  referral_code:        string
+  total_referrals:      number
   successful_referrals: number
-  total_rewards: number
-  pending_rewards: number
-  currency: string
-  rewards: ReferralReward[]
+  total_rewards:        number
+  pending_rewards:      number
+  currency:             string
+  rewards:              ReferralReward[]
+  reward_mode:          'per_referral' | 'milestone'
+  qualified_referrals:  number
+  next_milestone:       number | null
 }
 
 export interface ReferralReward {

@@ -12,8 +12,27 @@ export interface ReferralSettings {
   max_reward_cap: number | null;
   reward_recipient: "referrer" | "both";
   referred_reward_value: number | null;
+  reward_mode: "per_referral" | "milestone";
+  required_referral_count: number | null;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface ReferralMilestoneTier {
+  id: string;
+  count: number;
+  reward_amount: number;
+  is_active: boolean;
+  created_at: Date;
+}
+
+export interface ReferralMilestonePayout {
+  id: string;
+  referrer_id: string;
+  milestone_count: number;
+  reward_amount: number;
+  status: "processing" | "completed" | "failed";
+  created_at: Date;
 }
 
 export type UpdateReferralSettingsInput = Partial<

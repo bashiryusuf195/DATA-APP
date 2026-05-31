@@ -1327,6 +1327,8 @@ export interface ReferralSettings {
   max_reward_cap: number | null
   reward_recipient: 'referrer' | 'both'
   referred_reward_value: number | null
+  reward_mode: 'per_referral' | 'milestone'
+  required_referral_count: number | null
   created_at: string
   updated_at: string
 }

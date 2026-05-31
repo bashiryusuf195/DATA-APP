@@ -26,14 +26,16 @@ export async function getSettingsController(
 // ── PATCH /admin/referrals/settings ──────────────────────────────────────────
 
 const UpdateSettingsSchema = z.object({
-  is_enabled:            z.boolean().optional(),
-  reward_trigger:        z.enum(["signup", "first_funding", "first_purchase"]).optional(),
-  reward_type:           z.enum(["fixed", "percentage"]).optional(),
-  reward_value:          z.number().min(0).optional(),
-  min_amount:            z.number().min(0).nullable().optional(),
-  max_reward_cap:        z.number().min(0).nullable().optional(),
-  reward_recipient:      z.enum(["referrer", "both"]).optional(),
-  referred_reward_value: z.number().min(0).nullable().optional(),
+  is_enabled:              z.boolean().optional(),
+  reward_trigger:          z.enum(["signup", "first_funding", "first_purchase"]).optional(),
+  reward_type:             z.enum(["fixed", "percentage"]).optional(),
+  reward_value:            z.number().min(0).optional(),
+  min_amount:              z.number().min(0).nullable().optional(),
+  max_reward_cap:          z.number().min(0).nullable().optional(),
+  reward_recipient:        z.enum(["referrer", "both"]).optional(),
+  referred_reward_value:   z.number().min(0).nullable().optional(),
+  reward_mode:             z.enum(["per_referral", "milestone"]).optional(),
+  required_referral_count: z.number().int().min(1).nullable().optional(),
 }).refine((d) => Object.keys(d).length > 0, {
   message: "At least one field must be provided",
 });
