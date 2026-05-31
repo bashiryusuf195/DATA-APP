@@ -83,6 +83,9 @@ export const notificationsApi = {
     apiClient.post<{ success: boolean; data: NotificationJob }>(`/admin/notifications/retry/${jobId}`)
       .then((r) => r.data.data),
 
+  deleteJob: (jobId: string): Promise<void> =>
+    apiClient.delete(`/admin/notifications/jobs/${jobId}`).then(() => undefined),
+
   // ── Templates ─────────────────────────────────────────────────────────────────
   listTemplates: (
     params: { type?: string; notification_type?: string; is_active?: boolean; search?: string; page?: number; limit?: number } = {}

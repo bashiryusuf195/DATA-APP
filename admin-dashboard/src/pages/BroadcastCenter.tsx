@@ -13,7 +13,7 @@ import { fmtRelative } from '@/utils/format'
 import type { NotificationJob, NotificationTemplate } from '@/types'
 import {
   Send, Eye, Radio, Users, User, Mail,
-  MessageSquare, Smartphone, Bell, RefreshCw, CheckCircle2,
+  MessageSquare, Smartphone, Bell, RefreshCw, CheckCircle2, Trash2,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -101,7 +101,7 @@ function SendModal({
       }),
     onSuccess: () => {
       toast.success('Notification queued for delivery')
-      void qc.invalidateQueries({ queryKey: ['notification-jobs'] })
+      void qc.invalidateQueries({ queryKey: ['broadcast-jobs'] })
       setForm(BLANK)
       setShowPreview(false)
       onClose()
@@ -324,11 +324,13 @@ function SendModal({
 }
 
 export function BroadcastCenterPage() {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [page, setPage] = useState(1)
+  const qc = useQueryClient()
+  const [modalOpen, setModalOpen]           = useState(false)
+  const [page, setPage]                     = useState(1)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const limit = 10
 
-  const { data: jobsRaw, isLoading: jobsLoading, error: jobsError, refetch } = useQuery({
+  const { data: jobsRaw, isLoading: jobsLoading, isFetching, error: jobsError, refetch } = useQuery({
     queryKey: ['broadcast-jobs', page],
     queryFn: () => notificationsApi.listJobs({ recipient_type: 'all', page, limit }),
     refetchInterval: 15_000,
@@ -337,6 +339,19 @@ export function BroadcastCenterPage() {
   const { data: tmplRaw } = useQuery({
     queryKey: ['notification-templates-all'],
     queryFn: () => notificationsApi.listTemplates({ limit: 100 }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (jobId: string) => notificationsApi.deleteJob(jobId),
+    onSuccess: () => {
+      toast.success('Broadcast job deleted')
+      setConfirmDeleteId(null)
+      void qc.invalidateQueries({ queryKey: ['broadcast-jobs'] })
+    },
+    onError: (err) => {
+      toast.error(errMsg(err, 'Failed to delete job'))
+      setConfirmDeleteId(null)
+    },
   })
 
   const broadcasts  = jobsRaw?.data  ?? []
@@ -385,6 +400,20 @@ export function BroadcastCenterPage() {
         <span className="text-xs text-ink-faint whitespace-nowrap">{fmtRelative(j.created_at)}</span>
       ),
     },
+    {
+      key: 'actions',
+      header: '',
+      render: (j: NotificationJob) => (
+        <button
+          type="button"
+          onClick={() => setConfirmDeleteId(j.id)}
+          className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-red-50 transition-colors"
+          title="Delete job"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      ),
+    },
   ]
 
   if (jobsError) return <ErrorMessage error={jobsError} onRetry={() => void refetch()} endpoint="/admin/notification-jobs" />
@@ -396,8 +425,17 @@ export function BroadcastCenterPage() {
         subtitle="Send system-wide messages and targeted notifications to users"
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />}
-              onClick={() => void refetch()}>Refresh</Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />}
+              onClick={() => {
+                void refetch().catch(() => toast.error('Failed to refresh broadcasts'))
+              }}
+              disabled={isFetching}
+            >
+              {isFetching ? 'Refreshing…' : 'Refresh'}
+            </Button>
             <Button variant="primary" size="sm" icon={<Send className="h-3.5 w-3.5" />}
               onClick={() => setModalOpen(true)}>
               Send Notification
@@ -460,6 +498,40 @@ export function BroadcastCenterPage() {
         onClose={() => setModalOpen(false)}
         templates={templates}
       />
+
+      {/* Delete confirmation */}
+      <Modal
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Delete broadcast job?"
+        subtitle="This removes the job record from the queue log. Customer notifications already delivered are not affected."
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setConfirmDeleteId(null)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              onClick={() => confirmDeleteId && deleteMutation.mutate(confirmDeleteId)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-muted">
+          Are you sure you want to delete this broadcast job? This action cannot be undone.
+        </p>
+      </Modal>
     </div>
   )
 }

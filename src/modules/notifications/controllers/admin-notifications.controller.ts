@@ -5,6 +5,7 @@ import {
   createNotificationJob,
   listNotificationJobs,
   retryNotificationJob,
+  deleteNotificationJob,
 } from "../services/notification-job.service";
 import {
   listTemplates,
@@ -148,6 +149,17 @@ export async function retryNotificationJobController(
     if (!jobId) throw new AppError(400, "MISSING_PARAM", "jobId is required");
     const job = await retryNotificationJob(jobId);
     res.json({ success: true, data: job });
+  } catch (err) { next(err); }
+}
+
+export async function deleteNotificationJobController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!id) throw new AppError(400, "MISSING_PARAM", "id is required");
+    await deleteNotificationJob(id);
+    res.status(204).end();
   } catch (err) { next(err); }
 }
 

@@ -179,6 +179,12 @@ export async function createNotificationJob(input: {
   return job as NotificationJob;
 }
 
+export async function deleteNotificationJob(jobId: string): Promise<void> {
+  const job = await db("notification_jobs").where({ id: jobId }).first();
+  if (!job) throw new AppError(404, "NOT_FOUND", "Notification job not found");
+  await db("notification_jobs").where({ id: jobId }).delete();
+}
+
 export async function retryNotificationJob(jobId: string): Promise<NotificationJob> {
   const job = await db("notification_jobs").where({ id: jobId }).first();
   if (!job) throw new AppError(404, "NOT_FOUND", "Notification job not found");

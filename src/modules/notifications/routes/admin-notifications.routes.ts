@@ -6,6 +6,7 @@ import {
   listAdminNotificationsController,
   sendNotificationController,
   retryNotificationJobController,
+  deleteNotificationJobController,
   listNotificationJobsController,
   listTemplatesController,
   createTemplateController,
@@ -36,6 +37,13 @@ router.post(
   "/notifications/retry/:jobId",
   ...adminGuard, adminRateLimiter,
   retryNotificationJobController,
+);
+
+// Delete a notification job
+router.delete(
+  "/notifications/jobs/:id",
+  ...adminGuard, adminRateLimiter,
+  deleteNotificationJobController,
 );
 
 // Notification jobs queue
