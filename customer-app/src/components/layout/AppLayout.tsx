@@ -16,6 +16,9 @@ export function AppLayout() {
   const [dismissed, setDismissed] = useState(false)
   const showSetup = !!user && !user.has_transaction_pin && !dismissed
 
+  // Temporary: log PIN state on every render so we can confirm the value in DevTools
+  console.log('[PIN-STATE] user.has_transaction_pin =', user?.has_transaction_pin ?? '(no user)')
+
   const handlePinSetupSuccess = () => {
     if (user) setUser({ ...user, has_transaction_pin: true })
   }

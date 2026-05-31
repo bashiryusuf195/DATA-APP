@@ -15,17 +15,18 @@ export type KycLevel = "none" | "tier_1" | "tier_2" | "tier_3";
 // ── Core domain objects ────────────────────────────────────────
 
 export interface AuthUser {
-  id:                string;
-  auth_id:           string | null;
-  email:             string;
-  phone:             string | null;
-  username:          string | null;
-  status:            UserStatus;
-  kyc_level:         KycLevel;
-  is_email_verified: boolean;
-  is_phone_verified: boolean;
-  last_login_at:     Date | null;
-  created_at:        Date;
+  id:                  string;
+  auth_id:             string | null;
+  email:               string;
+  phone:               string | null;
+  username:            string | null;
+  status:              UserStatus;
+  kyc_level:           KycLevel;
+  is_email_verified:   boolean;
+  is_phone_verified:   boolean;
+  last_login_at:       Date | null;
+  created_at:          Date;
+  has_transaction_pin: boolean;
 }
 
 export interface UserProfile {

@@ -158,7 +158,7 @@ export async function loginController(
           is_email_verified:   user.is_email_verified,
           roles:               rbac.roles,
           permissions:         rbac.permissions,
-          has_transaction_pin: !!((user as unknown as Record<string, unknown>).transaction_pin_hash),
+          has_transaction_pin: user.has_transaction_pin,
         },
         tokens: {
           access_token:             tokens.access_token,

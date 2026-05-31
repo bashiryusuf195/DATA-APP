@@ -76,17 +76,18 @@ function supabaseSessionToTokenPair(session: {
 
 function coerceUser(row: Record<string, unknown>): AuthUser {
   return {
-    id:                row.id               as string,
-    auth_id:           (row.auth_id         as string | null) ?? null,
-    email:             row.email            as string,
-    phone:             (row.phone           as string | null) ?? null,
-    username:          (row.username        as string | null) ?? null,
-    status:            row.status           as AuthUser["status"],
-    kyc_level:         row.kyc_level        as AuthUser["kyc_level"],
-    is_email_verified: row.is_email_verified as boolean,
-    is_phone_verified: row.is_phone_verified as boolean,
-    last_login_at:     row.last_login_at ? new Date(row.last_login_at as string) : null,
-    created_at:        new Date(row.created_at as string),
+    id:                  row.id               as string,
+    auth_id:             (row.auth_id         as string | null) ?? null,
+    email:               row.email            as string,
+    phone:               (row.phone           as string | null) ?? null,
+    username:            (row.username        as string | null) ?? null,
+    status:              row.status           as AuthUser["status"],
+    kyc_level:           row.kyc_level        as AuthUser["kyc_level"],
+    is_email_verified:   row.is_email_verified as boolean,
+    is_phone_verified:   row.is_phone_verified as boolean,
+    last_login_at:       row.last_login_at ? new Date(row.last_login_at as string) : null,
+    created_at:          new Date(row.created_at as string),
+    has_transaction_pin: !!(row.transaction_pin_hash),
   };
 }
 
