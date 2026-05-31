@@ -222,6 +222,32 @@ export function ReferralProgramPage() {
   )
 }
 
+// ── Payload sanitization ──────────────────────────────────────────────────────
+// The pg driver returns NUMERIC columns as strings ("1000.00").
+// HTML number inputs may also carry empty-string values when a field is blank.
+// This function coerces every numeric field to a proper JS number (or null)
+// so Zod's z.number() validators never see a string.
+
+function sanitizePayload(f: Partial<ReferralSettings>): Partial<ReferralSettings> {
+  const toNum = (v: unknown): number => {
+    const n = Number(v)
+    return isNaN(n) ? 0 : n
+  }
+  const toNullNum = (v: unknown): number | null => {
+    if (v === null || v === undefined || String(v).trim() === '') return null
+    const n = Number(v)
+    return isNaN(n) ? null : n
+  }
+  return {
+    ...f,
+    reward_value:            toNum(f.reward_value),
+    min_amount:              toNullNum(f.min_amount),
+    max_reward_cap:          toNullNum(f.max_reward_cap),
+    referred_reward_value:   toNullNum(f.referred_reward_value),
+    required_referral_count: toNullNum(f.required_referral_count),
+  }
+}
+
 // ── Settings panel ────────────────────────────────────────────────────────────
 
 function SettingsPanel({
@@ -426,7 +452,11 @@ function SettingsPanel({
 
         <div className="flex justify-end pt-2">
           <button
-            onClick={() => onSave(form)}
+            onClick={() => {
+              const payload = sanitizePayload(form)
+              console.log('[REFERRAL-SAVE-PAYLOAD]', payload)
+              onSave(payload)
+            }}
             disabled={saving}
             className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accent/90 disabled:opacity-60 transition-colors"
           >
