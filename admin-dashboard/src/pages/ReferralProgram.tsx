@@ -705,14 +705,7 @@ function SettingsPanel({
       <div className="flex justify-end">
         <button
           onClick={() => {
-            // Log raw form values for numeric fields before sanitization
-            console.log('[REFERRAL-RAW-FORM]', JSON.stringify({
-              reward_value:            form.reward_value,            typeof_rv:  typeof form.reward_value,
-              min_amount:              form.min_amount,              typeof_ma:  typeof form.min_amount,
-              max_reward_cap:          form.max_reward_cap,          typeof_mrc: typeof form.max_reward_cap,
-              referred_reward_value:   form.referred_reward_value,   typeof_rrv: typeof form.referred_reward_value,
-              required_referral_count: form.required_referral_count, typeof_rrc: typeof form.required_referral_count,
-            }, null, 2))
+            console.log('[REFERRAL-SAVE-RAW-FORM]', JSON.stringify(form, null, 2))
             const payload = sanitizePayload(form)
             console.log('[REFERRAL-SAVE-PAYLOAD]', JSON.stringify(payload, null, 2))
             onSave(payload)
