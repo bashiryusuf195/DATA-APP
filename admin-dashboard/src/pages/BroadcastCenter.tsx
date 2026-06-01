@@ -169,13 +169,18 @@ function SendModal({
                 value={form.type}
                 onChange={(e) => set('type', e.target.value)}
                 options={[
-                  { value: 'email',     label: 'Email' },
-                  { value: 'sms',       label: 'SMS' },
-                  { value: 'push',      label: 'Push' },
-                  { value: 'in_app',    label: 'In-App' },
-                  { value: 'broadcast', label: 'Broadcast (all)' },
+                  { value: 'in_app',    label: 'In-App (customer inbox)' },
+                  { value: 'broadcast', label: 'Broadcast — In-App to all' },
+                  { value: 'email',     label: 'Email (not yet integrated)' },
+                  { value: 'sms',       label: 'SMS (not yet integrated)' },
+                  { value: 'push',      label: 'Push (not yet integrated)' },
                 ]}
               />
+              {(form.type === 'email' || form.type === 'sms' || form.type === 'push') && (
+                <p className="mt-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  This channel logs the job but does not deliver to customers yet. Use <strong>In-App</strong> or <strong>Broadcast</strong> to reach the customer notification inbox.
+                </p>
+              )}
             </div>
 
             {/* Notification type */}
