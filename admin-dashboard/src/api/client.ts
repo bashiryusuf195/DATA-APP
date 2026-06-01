@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AuthTokens } from '@/types'
 import { useAuthStore } from '@/store/auth.store'
 
 /**
@@ -36,7 +37,6 @@ apiClient.interceptors.request.use((config) => {
 })
 
 // ── 401 redirect guard ────────────────────────────────────────────────────────
-// Prevents multiple simultaneous 401 responses from triggering multiple redirects.
 let _isRedirectingToLogin = false
 
 function redirectToLogin() {
@@ -44,10 +44,26 @@ function redirectToLogin() {
   _isRedirectingToLogin = true
   useAuthStore.getState().clearAuth()
   delete apiClient.defaults.headers.common['Authorization']
-  // Flag for the login page to show a "session expired" toast.
   sessionStorage.setItem('session_expired', '1')
-  // replace() so the broken page is removed from history (Back button works correctly).
   window.location.replace('/login')
+}
+
+// ── Token refresh queue ────────────────────────────────────────────────────────
+// When the access token expires, the first failing request triggers a refresh.
+// Subsequent requests that arrive while the refresh is in-flight are queued and
+// replayed with the new token once refresh completes.
+let _isRefreshing = false
+let _refreshQueue: Array<{
+  resolve: (token: string) => void
+  reject:  (err: unknown) => void
+}> = []
+
+function drainQueue(err: unknown, token: string | null): void {
+  for (const cb of _refreshQueue) {
+    if (err) cb.reject(err)
+    else     cb.resolve(token!)
+  }
+  _refreshQueue = []
 }
 
 // ── Response interceptor: debug + error normalisation ────────────────────────
@@ -72,26 +88,70 @@ apiClient.interceptors.response.use(
     }
 
     if (status === 401) {
-      // If the 401 came from the login/2FA endpoint, it means wrong credentials —
-      // do NOT redirect; let the error propagate so the form shows the message.
-      const isLoginRequest = (
-        !!error.config?.url?.includes('/auth/login') ||
-        !!error.config?.url?.includes('/auth/2fa/verify-login')
-      )
+      const url = error.config?.url ?? ''
 
-      if (!isLoginRequest) {
-        // Normalize to a friendly message before anything else so that if any
-        // component briefly re-renders before navigation it shows clean text,
-        // not the raw API JSON body.
-        error.message = 'Session expired. Please log in again.'
-        redirectToLogin()
-        // Return a promise that never settles — the page is navigating away
-        // and no component should ever render this error response.
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        return new Promise(() => {})
+      // Auth endpoints (login, 2FA, refresh) are never silently retried.
+      // Login/2FA: propagate so the form can show the message.
+      // Refresh: handled by the catch below when the refresh itself fails.
+      const isLoginOrTwoFactor = url.includes('/auth/login') || url.includes('/auth/2fa/verify-login')
+      const isRefreshEndpoint  = url.includes('/auth/refresh')
+
+      if (!isLoginOrTwoFactor && !isRefreshEndpoint) {
+        // Protected resource — attempt silent token refresh before giving up.
+        const { refresh_token } = useAuthStore.getState()
+
+        if (!refresh_token) {
+          error.message = 'Session expired. Please log in again.'
+          redirectToLogin()
+          return new Promise(() => {})
+        }
+
+        if (_isRefreshing) {
+          // Another request is already refreshing — queue this one for replay.
+          return new Promise<string>((resolve, reject) => {
+            _refreshQueue.push({ resolve, reject })
+          })
+            .then((newToken) => {
+              error.config.headers = { ...error.config.headers, Authorization: `Bearer ${newToken}` }
+              return apiClient.request(error.config)
+            })
+            .catch(() => new Promise(() => {})) // page is navigating away
+        }
+
+        _isRefreshing = true
+
+        return new Promise((resolve, reject) => {
+          apiClient
+            .post<{ success: boolean; data: { tokens: AuthTokens; session_id: string } }>(
+              '/auth/refresh',
+              { refresh_token },
+            )
+            .then((res) => {
+              const { access_token, refresh_token: newRefresh } = res.data.data.tokens
+              useAuthStore.getState().setTokens({ access_token, refresh_token: newRefresh })
+              apiClient.defaults.headers.common.Authorization = `Bearer ${access_token}`
+              drainQueue(null, access_token)
+              error.config.headers = { ...error.config.headers, Authorization: `Bearer ${access_token}` }
+              resolve(apiClient.request(error.config))
+            })
+            .catch((refreshErr) => {
+              drainQueue(refreshErr, null)
+              error.message = 'Session expired. Please log in again.'
+              redirectToLogin()
+              reject(refreshErr)
+            })
+            .finally(() => {
+              _isRefreshing = false
+            })
+        })
       }
 
-      // Login endpoint: let the form handle it normally.
+      if (isRefreshEndpoint) {
+        // Refresh token itself is expired/invalid — caller's catch handles redirect.
+        return Promise.reject(error)
+      }
+
+      // Login / 2FA: let the form handle it normally.
       error.message = error.response?.data?.message ?? 'Invalid credentials.'
       return Promise.reject(error)
     }

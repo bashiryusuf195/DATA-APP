@@ -127,8 +127,11 @@ export const authApi = {
 
   refresh: (refresh_token: string) =>
     apiClient
-      .post<BackendAuthResponse['data']>('/auth/refresh', { refresh_token })
-      .then((r) => r.data.tokens as AuthTokens),
+      .post<{ success: boolean; data: { tokens: AuthTokens; session_id: string } }>(
+        '/auth/refresh',
+        { refresh_token },
+      )
+      .then((r) => r.data.data.tokens),
 
   // ── Account security ─────────────────────────────────────────────────────
 

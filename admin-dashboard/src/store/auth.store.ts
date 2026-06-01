@@ -16,6 +16,7 @@ interface AuthState {
     session_id: string
     user: User
   }) => void
+  setTokens: (tokens: { access_token: string; refresh_token: string }) => void
   setUser: (user: User) => void
   clearAuth: () => void
   isAdmin: () => boolean
@@ -35,6 +36,9 @@ export const useAuthStore = create<AuthState>()(
 
       setAuth: ({ access_token, refresh_token, session_id, user }) =>
         set({ access_token, refresh_token, session_id, user }),
+
+      setTokens: ({ access_token, refresh_token }) =>
+        set({ access_token, refresh_token }),
 
       setUser: (user) => set({ user }),
 
