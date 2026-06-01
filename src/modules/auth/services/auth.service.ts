@@ -158,10 +158,10 @@ export async function register(
   try {
     await db.transaction(async (trx) => {
 
-      // 3a. Referrer lookup (read-only, inside trx for snapshot consistency)
+      // 3a. Referrer lookup (case-insensitive — user may copy code in any case)
       if (input.referral_code) {
         const referrer = await trx("users")
-          .where({ referral_code: input.referral_code })
+          .whereRaw("LOWER(referral_code) = LOWER(?)", [input.referral_code.trim()])
           .whereNull("deleted_at")
           .first("id");
         referredById = referrer?.id ?? null;

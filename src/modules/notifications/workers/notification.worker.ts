@@ -68,7 +68,7 @@ export const notificationWorker = createWorker(
         const now     = new Date();
 
         if (recipientType === "all") {
-          const users = await db("users").where({ is_active: true }).select("id");
+          const users = await db("users").where("status", "active").select("id");
           console.log(`[NOTIFICATION WORKER] Fanning out in_app to ${users.length} users | job=${jobId}`);
 
           // Batch inserts to avoid huge single statements on large user bases.
