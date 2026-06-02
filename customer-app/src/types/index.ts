@@ -322,6 +322,20 @@ export interface KycStatus {
   verifications: KycVerificationRecord[]
 }
 
+// ── Announcements ─────────────────────────────────────────────────────────────
+
+export interface Announcement {
+  id:           string
+  title:        string
+  message:      string
+  display_type: 'popup' | 'ticker'
+  priority:     number
+  status:       'active' | 'inactive'
+  start_at:     string | null
+  end_at:       string | null
+  created_at:   string
+}
+
 // ── API envelope ──────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {

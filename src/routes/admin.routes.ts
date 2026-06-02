@@ -36,6 +36,7 @@ import { adminSystemHealthRouter }     from "../modules/system/routes/admin-syst
 import { adminBackupRouter }           from "../modules/backup/routes/admin-backup.routes";
 import { adminIntegrityRouter }        from "../modules/backup/routes/admin-integrity.routes";
 import { adminReferralRouter }         from "../modules/referral/routes/admin-referral.routes";
+import { adminAnnouncementRouter }    from "../modules/announcements/routes/admin-announcement.routes";
 import { adminTransactionsRouter }     from "../modules/transactions/routes/admin-transactions.routes";
 
 const router = Router();
@@ -72,6 +73,7 @@ router.use("/", adminSystemHealthRouter);
 router.use("/", adminBackupRouter);
 router.use("/", adminIntegrityRouter);
 router.use("/", adminReferralRouter);
+router.use("/", adminAnnouncementRouter);
 router.use("/", adminTransactionsRouter);
 
 export { router as adminRouter };

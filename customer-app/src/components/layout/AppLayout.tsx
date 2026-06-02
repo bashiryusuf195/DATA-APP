@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Sidebar }       from './Sidebar'
-import { BottomNav }     from './BottomNav'
-import { AppHeader }     from './AppHeader'
-import { PinSetupModal } from '@/components/shared/PinSetupModal'
-import { useAuthStore }  from '@/store/auth.store'
+import { Sidebar }                from './Sidebar'
+import { BottomNav }              from './BottomNav'
+import { AppHeader }              from './AppHeader'
+import { PinSetupModal }          from '@/components/shared/PinSetupModal'
+import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
+import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
+import { useAnnouncements }       from '@/hooks/useAnnouncements'
+import { useAuthStore }           from '@/store/auth.store'
 
 export function AppLayout() {
   const user    = useAuthStore((s) => s.user)
@@ -15,6 +18,10 @@ export function AppLayout() {
   // purchases until a PIN is created.
   const [dismissed, setDismissed] = useState(false)
   const showSetup = !!user && !user.has_transaction_pin && !dismissed
+
+  const { data: announcements = [] } = useAnnouncements()
+  const popups  = announcements.filter((a) => a.display_type === 'popup')
+  const tickers = announcements.filter((a) => a.display_type === 'ticker')
 
   // Temporary: log PIN state on every render so we can confirm the value in DevTools
   console.log('[PIN-STATE] user.has_transaction_pin =', user?.has_transaction_pin ?? '(no user)')
@@ -33,8 +40,11 @@ export function AppLayout() {
         {/* Mobile header */}
         <AppHeader />
 
+        {/* Scrolling ticker — sits flush below the mobile header */}
+        {tickers.length > 0 && <AnnouncementTicker items={tickers} />}
+
         {/* Page content */}
-        <main className="flex-1 px-4 pt-[72px] pb-24 md:pt-8 md:pb-8 md:px-8 max-w-lg w-full mx-auto md:max-w-2xl">
+        <main className={`flex-1 px-4 pb-24 md:pt-8 md:pb-8 md:px-8 max-w-lg w-full mx-auto md:max-w-2xl ${tickers.length > 0 ? 'pt-[80px]' : 'pt-[72px]'}`}>
           <Outlet />
         </main>
       </div>
@@ -48,6 +58,11 @@ export function AppLayout() {
           onSuccess={handlePinSetupSuccess}
           onDismiss={() => setDismissed(true)}
         />
+      )}
+
+      {/* Popup announcements — rendered above PIN modal so PIN takes precedence */}
+      {!showSetup && popups.length > 0 && (
+        <PopupAnnouncement announcements={popups} />
       )}
     </div>
   )

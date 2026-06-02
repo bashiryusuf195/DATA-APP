@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { notificationsApi } from '@/api/notifications.api'
+import { announcementsApi } from '@/api/announcements.api'
+import type { Announcement, AnnouncementInput } from '@/api/announcements.api'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { Button, Badge, Card, Input, Select, Modal } from '@/components/ui'
@@ -14,12 +16,358 @@ import type { NotificationJob, NotificationTemplate } from '@/types'
 import {
   Send, Eye, Radio, Users, User, Mail,
   MessageSquare, Smartphone, Bell, RefreshCw, CheckCircle2, Trash2,
+  Megaphone, TicketSlash, PenLine, Plus,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) return err.response?.data?.error ?? err.message ?? fallback
   if (err instanceof Error) return err.message
   return fallback
+}
+
+// ── Announcement form default ─────────────────────────────────────────────────
+
+const BLANK_ANN: AnnouncementInput = {
+  title: '', message: '', display_type: 'popup', priority: 0, status: 'active',
+  start_at: null, end_at: null,
+}
+
+// ── Announcements section ─────────────────────────────────────────────────────
+
+function AnnouncementsSection() {
+  const qc = useQueryClient()
+  const [formOpen,       setFormOpen]       = useState(false)
+  const [editing,        setEditing]        = useState<Announcement | null>(null)
+  const [confirmDelId,   setConfirmDelId]   = useState<string | null>(null)
+  const [form,           setForm]           = useState<AnnouncementInput>(BLANK_ANN)
+  const [annPage,        setAnnPage]        = useState(1)
+  const ANN_LIMIT = 10
+
+  const { data: annRaw, isLoading: annLoading } = useQuery({
+    queryKey: ['announcements', annPage],
+    queryFn:  () => announcementsApi.list({ page: annPage, limit: ANN_LIMIT }),
+  })
+
+  const createMut = useMutation({
+    mutationFn: () => announcementsApi.create(form),
+    onSuccess: () => {
+      toast.success('Announcement created')
+      void qc.invalidateQueries({ queryKey: ['announcements'] })
+      closeForm()
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to create announcement')),
+  })
+
+  const updateMut = useMutation({
+    mutationFn: () => announcementsApi.update(editing!.id, form),
+    onSuccess: () => {
+      toast.success('Announcement updated')
+      void qc.invalidateQueries({ queryKey: ['announcements'] })
+      closeForm()
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to update announcement')),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => announcementsApi.delete(id),
+    onSuccess: () => {
+      toast.success('Announcement deleted')
+      setConfirmDelId(null)
+      void qc.invalidateQueries({ queryKey: ['announcements'] })
+    },
+    onError: (err) => {
+      toast.error(errMsg(err, 'Failed to delete announcement'))
+      setConfirmDelId(null)
+    },
+  })
+
+  const toggleMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'inactive' }) =>
+      announcementsApi.update(id, { status }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['announcements'] }),
+    onError:   (err) => toast.error(errMsg(err, 'Failed to update status')),
+  })
+
+  function openCreate() {
+    setEditing(null)
+    setForm(BLANK_ANN)
+    setFormOpen(true)
+  }
+
+  function openEdit(a: Announcement) {
+    setEditing(a)
+    setForm({
+      title:        a.title,
+      message:      a.message,
+      display_type: a.display_type,
+      priority:     a.priority,
+      status:       a.status,
+      start_at:     a.start_at,
+      end_at:       a.end_at,
+    })
+    setFormOpen(true)
+  }
+
+  function closeForm() {
+    setFormOpen(false)
+    setEditing(null)
+    setForm(BLANK_ANN)
+  }
+
+  const setF = <K extends keyof AnnouncementInput>(k: K, v: AnnouncementInput[K]) =>
+    setForm((f) => ({ ...f, [k]: v }))
+
+  const anns      = annRaw?.data  ?? []
+  const annTotal  = annRaw?.total ?? 0
+  const annPages  = Math.max(1, Math.ceil(annTotal / ANN_LIMIT))
+
+  const annColumns = [
+    {
+      key: 'display_type',
+      header: 'Type',
+      render: (a: Announcement) => (
+        <div className="flex items-center gap-1.5">
+          {a.display_type === 'popup'
+            ? <Megaphone  className="h-3.5 w-3.5 text-ink-faint" />
+            : <TicketSlash className="h-3.5 w-3.5 text-ink-faint" />}
+          <Badge variant="neutral" size="sm">{a.display_type}</Badge>
+        </div>
+      ),
+    },
+    {
+      key: 'title',
+      header: 'Title',
+      render: (a: Announcement) => (
+        <span className="text-xs text-ink font-medium truncate max-w-[200px] block">{a.title}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (a: Announcement) => (
+        <button
+          onClick={() => toggleMut.mutate({ id: a.id, status: a.status === 'active' ? 'inactive' : 'active' })}
+          className="focus:outline-none"
+          title="Toggle status"
+        >
+          <Badge variant={a.status === 'active' ? 'success' : 'neutral'}>
+            {a.status}
+          </Badge>
+        </button>
+      ),
+    },
+    {
+      key: 'priority',
+      header: 'Priority',
+      render: (a: Announcement) => (
+        <span className="text-xs text-ink-muted tabular-nums">{a.priority}</span>
+      ),
+    },
+    {
+      key: 'schedule',
+      header: 'Schedule',
+      render: (a: Announcement) => (
+        <span className="text-xs text-ink-faint whitespace-nowrap">
+          {a.start_at ? fmtRelative(a.start_at) : '—'} → {a.end_at ? fmtRelative(a.end_at) : 'no end'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (a: Announcement) => (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => openEdit(a)}
+            className="p-1.5 rounded text-ink-faint hover:text-accent hover:bg-accent-subtle transition-colors"
+            title="Edit"
+          >
+            <PenLine className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setConfirmDelId(a.id)}
+            className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ),
+    },
+  ]
+
+  const isPending = editing ? updateMut.isPending : createMut.isPending
+  const canSave   = form.title.trim() && form.message.trim()
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">Popup &amp; Ticker Announcements</h2>
+          <p className="text-xs text-ink-faint mt-0.5">
+            Popup modals and scrolling tickers shown on the customer dashboard.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Plus className="h-3.5 w-3.5" />}
+          onClick={openCreate}
+        >
+          New Announcement
+        </Button>
+      </div>
+
+      <Card>
+        {annLoading ? (
+          <SkeletonTable rows={4} />
+        ) : (
+          <>
+            <DataTable
+              columns={annColumns}
+              data={anns}
+              rowKey={(a) => a.id}
+              emptyMessage="No announcements yet. Create one to show a popup or ticker on the customer dashboard."
+            />
+            {annPages > 1 && (
+              <div className="px-4 pb-2">
+                <Pagination page={annPage} limit={ANN_LIMIT} total={annTotal} onPage={setAnnPage} />
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Create / Edit modal */}
+      <Modal
+        open={formOpen}
+        onClose={closeForm}
+        title={editing ? 'Edit Announcement' : 'New Announcement'}
+        subtitle="Popup modals require user dismissal. Tickers scroll continuously."
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={closeForm} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => editing ? updateMut.mutate() : createMut.mutate()}
+              disabled={isPending || !canSave}
+            >
+              {isPending ? 'Saving…' : editing ? 'Save Changes' : 'Create'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Display Type *</label>
+              <Select
+                value={form.display_type}
+                onChange={(e) => setF('display_type', e.target.value as 'popup' | 'ticker')}
+                options={[
+                  { value: 'popup',  label: 'Popup — modal on dashboard' },
+                  { value: 'ticker', label: 'Ticker — scrolling banner' },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Status</label>
+              <Select
+                value={form.status ?? 'active'}
+                onChange={(e) => setF('status', e.target.value as 'active' | 'inactive')}
+                options={[
+                  { value: 'active',   label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                ]}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1.5">Title *</label>
+            <Input
+              value={form.title}
+              onChange={(e) => setF('title', e.target.value)}
+              placeholder="e.g. Scheduled Maintenance"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1.5">Message *</label>
+            <textarea
+              value={form.message}
+              onChange={(e) => setF('message', e.target.value)}
+              rows={4}
+              placeholder="The message customers will see…"
+              className="w-full rounded-lg border border-border bg-surface-2 text-ink text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-y"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Priority (0–100)</label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={String(form.priority ?? 0)}
+                onChange={(e) => setF('priority', Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Start (optional)</label>
+              <input
+                type="datetime-local"
+                value={form.start_at ? form.start_at.slice(0, 16) : ''}
+                onChange={(e) => setF('start_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                className="w-full text-sm bg-surface-2 border border-border rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">End (optional)</label>
+              <input
+                type="datetime-local"
+                value={form.end_at ? form.end_at.slice(0, 16) : ''}
+                onChange={(e) => setF('end_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                className="w-full text-sm bg-surface-2 border border-border rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete confirmation */}
+      <Modal
+        open={confirmDelId !== null}
+        onClose={() => setConfirmDelId(null)}
+        title="Delete announcement?"
+        subtitle="This removes the announcement immediately. Customers will no longer see it."
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmDelId(null)} disabled={deleteMut.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              onClick={() => confirmDelId && deleteMut.mutate(confirmDelId)}
+              disabled={deleteMut.isPending}
+            >
+              {deleteMut.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-muted">Are you sure? This cannot be undone.</p>
+      </Modal>
+    </div>
+  )
 }
 
 const NOTIFICATION_TYPES = [
@@ -503,6 +851,9 @@ export function BroadcastCenterPage() {
         onClose={() => setModalOpen(false)}
         templates={templates}
       />
+
+      {/* ── Announcements (popup / ticker) ───────────────────────────────── */}
+      <AnnouncementsSection />
 
       {/* Delete confirmation */}
       <Modal
