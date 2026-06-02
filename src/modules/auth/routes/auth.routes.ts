@@ -6,6 +6,8 @@ import { Router } from "express";
 import { authenticate }       from "../middleware/authenticate";
 import {
   refreshLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
   changePasswordLimiter,
 } from "../middleware/rateLimiter";
 import {
@@ -20,6 +22,8 @@ import {
   getMeController,
   changePasswordController,
   updateProfileController,
+  forgotPasswordController,
+  resetPasswordController,
 } from "../controllers/auth.controller";
 import {
   getSecurityStatusController,
@@ -33,9 +37,11 @@ import { twoFactorVerifyLimiter } from "../../../middleware/rateLimiter.redis";
 const router = Router();
 
 // ── Public routes (no auth required) ──────────────────────────
-router.post("/register",        registerRateLimiter, registerController);
-router.post("/login",           loginRateLimiter,    loginController);
-router.post("/refresh",         refreshLimiter,     refreshController);
+router.post("/register",         registerRateLimiter,   registerController);
+router.post("/login",            loginRateLimiter,      loginController);
+router.post("/refresh",          refreshLimiter,        refreshController);
+router.post("/forgot-password",  forgotPasswordLimiter, forgotPasswordController);
+router.post("/reset-password",   resetPasswordLimiter,  resetPasswordController);
 
 // ── Protected routes (authenticate middleware required) ────────
 router.post( "/logout",          authenticate, logoutController);

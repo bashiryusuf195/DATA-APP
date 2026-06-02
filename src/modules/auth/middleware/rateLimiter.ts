@@ -54,6 +54,24 @@ export const refreshLimiter = rateLimit({
   handler:         jsonHandler("token refresh"),
 });
 
+/** Forgot password: 5 per 15 min per IP — tight because each call triggers an outbound email. */
+export const forgotPasswordLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         jsonHandler("password reset request"),
+});
+
+/** Reset password (token exchange): 10 per 15 min per IP. */
+export const resetPasswordLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         jsonHandler("password reset"),
+});
+
 /** Change password: 5 per hour per user. */
 export const changePasswordLimiter = rateLimit({
   windowMs:        60 * 60 * 1000,

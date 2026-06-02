@@ -15,6 +15,8 @@ import {
   supabaseRefreshSession,
   supabaseSignOut,
   supabaseUpdatePassword,
+  verifySupabaseJwt,
+  getAnonClient,
 } from "./supabase.service";
 import {
   createSession,
@@ -649,6 +651,39 @@ export async function changePassword(
     resourceType: "user",
     resourceId:   userId,
   });
+}
+
+// ── Forgot password ────────────────────────────────────────────
+// Fire-and-forget design: we never surface Supabase's response to
+// the caller. Whether the email exists or not, the HTTP response is
+// identical — preventing user enumeration.
+
+export async function forgotPassword(email: string): Promise<void> {
+  const redirectTo = `${env.CUSTOMER_APP_URL}/reset-password`;
+
+  // Not awaited at the call site — error is intentionally swallowed
+  // after logging a non-PII category marker.
+  getAnonClient()
+    .auth.resetPasswordForEmail(email, { redirectTo })
+    .catch((err: unknown) => {
+      logger.warn("forgot_password_provider_error", {
+        code: (err as Record<string, unknown>).code ?? "unknown",
+      });
+    });
+}
+
+// ── Reset password ─────────────────────────────────────────────
+// Verifies the short-lived access token issued by Supabase's recovery
+// email link, then updates the password via the Admin API.
+// access_token and password are NEVER logged.
+
+export async function resetPassword(
+  accessToken:  string,
+  newPassword:  string,
+): Promise<void> {
+  // Throws AppError 401 if the token is expired or invalid.
+  const payload = await verifySupabaseJwt(accessToken);
+  await supabaseUpdatePassword(payload.sub, newPassword);
 }
 
 // ── Verify access token (used by authenticate middleware) ──────

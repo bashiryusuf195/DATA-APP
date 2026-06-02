@@ -7,4 +7,7 @@ export const env = {
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? "",
   SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET ?? "",
+
+  // Customer-facing frontend URL — used as the redirectTo base in password-reset emails.
+  CUSTOMER_APP_URL: process.env.CUSTOMER_APP_URL ?? "http://localhost:5174",
 };

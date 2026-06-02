@@ -70,6 +70,21 @@ export const RefreshSchema = z.object({
 
 export type RefreshInput = z.infer<typeof RefreshSchema>;
 
+// ── Forgot / Reset password ────────────────────────────────────
+
+export const ForgotPasswordSchema = z.object({
+  email: emailField,
+});
+
+export const ResetPasswordSchema = z.object({
+  access_token:  z.string().min(1, "access_token is required"),
+  refresh_token: z.string().min(1, "refresh_token is required"),
+  password:      passwordField,
+});
+
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordInput  = z.infer<typeof ResetPasswordSchema>;
+
 // ── Change password ────────────────────────────────────────────
 
 export const ChangePasswordSchema = z

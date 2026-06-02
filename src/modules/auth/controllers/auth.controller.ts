@@ -12,6 +12,8 @@ import {
   LogoutSchema,
   RefreshSchema,
   ChangePasswordSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
 } from "../validators/auth.validators";
 import {
   register,
@@ -20,6 +22,8 @@ import {
   refreshTokens,
   getMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
 } from "../services/auth.service";
 
 // ── Cookie helpers ─────────────────────────────────────────────
@@ -310,6 +314,49 @@ export async function updateProfileController(
 
     res.status(200).json({ success: true, data: updated });
   } catch (err) { next(err); }
+}
+
+// ── POST /auth/forgot-password ───────────────────────────────────────────────
+
+export async function forgotPasswordController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const { email } = ForgotPasswordSchema.parse(req.body);
+
+    // forgotPassword is fire-and-forget internally — it swallows Supabase errors
+    // so the caller can never tell whether the email existed.
+    await forgotPassword(email);
+
+    // Always return the same generic message (prevents user enumeration).
+    res.status(200).json({
+      success: true,
+      message: "If an account exists for this email, a password reset link has been sent.",
+    });
+  } catch (err) {
+    // Only Zod validation errors (invalid email format) propagate here.
+    next(err);
+  }
+}
+
+// ── POST /auth/reset-password ─────────────────────────────────────────────────
+
+export async function resetPasswordController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const { access_token, password } = ResetPasswordSchema.parse(req.body);
+
+    // access_token and password are NOT spread into any log statement.
+    await resetPassword(access_token, password);
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully. Please log in with your new password.",
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // ── POST /auth/change-password ────────────────────────────────
