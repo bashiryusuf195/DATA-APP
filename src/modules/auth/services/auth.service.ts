@@ -661,15 +661,17 @@ export async function changePassword(
 export async function forgotPassword(email: string): Promise<void> {
   const redirectTo = `${env.CUSTOMER_APP_URL}/reset-password`;
 
-  // Not awaited at the call site — error is intentionally swallowed
-  // after logging a non-PII category marker.
-  getAnonClient()
-    .auth.resetPasswordForEmail(email, { redirectTo })
-    .catch((err: unknown) => {
-      logger.warn("forgot_password_provider_error", {
-        code: (err as Record<string, unknown>).code ?? "unknown",
-      });
+  const { error } = await getAnonClient().auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (error) {
+    logger.warn("forgot_password_provider_error", {
+      code:   error.code   ?? null,
+      status: (error as unknown as { status?: number }).status ?? null,
+      name:   error.name   ?? null,
     });
+  } else {
+    logger.info("forgot_password_provider_accepted");
+  }
 }
 
 // ── Reset password ─────────────────────────────────────────────
