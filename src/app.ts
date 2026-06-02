@@ -34,6 +34,11 @@ import { publicRouter }               from "./modules/public/routes/public.route
 import "./modules/queue";
 export const app = express();
 
+// Trust the first proxy hop (Railway / Nginx / etc.) so that
+// req.ip and rate-limiter key-generators see the real client IP
+// from X-Forwarded-For rather than the load-balancer address.
+app.set("trust proxy", 1);
+
 // ── 1. Security headers ───────────────────────────────────────────────────────
 // Helmet applies a suite of well-known HTTP security headers.
 // CSP is tightened for an API: no scripts/styles/frames from external origins.
