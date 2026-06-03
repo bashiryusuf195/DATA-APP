@@ -78,11 +78,15 @@ export const walletApi = {
     return { data, total: raw.total ?? data.length }
   },
 
-  initializeFunding: (amount: number, idempotencyKey: string): Promise<FundingInitResponse> =>
+  initializeFunding: (
+    amount: number,
+    idempotencyKey: string,
+    method?: 'bank_transfer' | 'card'
+  ): Promise<FundingInitResponse> =>
     apiClient
       .post<ApiResponse<FundingInitResponse>>(
         '/wallet/fund/initialize',
-        { amount },
+        { amount, method },
         { headers: { 'Idempotency-Key': idempotencyKey } }
       )
       .then((r) => r.data.data),

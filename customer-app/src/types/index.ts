@@ -65,15 +65,24 @@ export interface WalletBalance {
   is_default: boolean
 }
 
+export interface TransferAccount {
+  account_number: string
+  account_name:   string
+  bank_name:      string
+  display_text:   string
+}
+
 export interface FundingInitResponse {
-  reference: string
-  authorization_url: string
-  access_code?: string
-  gateway: string
-  amount: number
-  charge: number
-  credited_amount: number
-  currency: string
+  reference:         string
+  method?:           'bank_transfer' | 'card'
+  authorization_url?: string
+  access_code?:       string
+  transfer_account?:  TransferAccount
+  gateway:           string
+  amount:            number
+  charge_amount?:    number
+  credited_amount:   number
+  currency:          string
 }
 
 export interface FundingVerifyResponse {

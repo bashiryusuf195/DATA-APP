@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ExternalLink, CheckCircle2, AlertCircle, Clock,
-  Building2, CreditCard, Copy, CheckCheck,
+  Building2, CreditCard, Copy, CheckCheck, Landmark,
 } from 'lucide-react'
+import type { TransferAccount } from '@/types'
 import { Button } from '@/components/ui'
 import { AmountInput } from '@/components/shared/AmountInput'
 import { useWalletBalance, useInitializeFunding, useVerifyFunding, useDedicatedAccount, useSquadAccount } from '@/hooks/useWallet'
@@ -11,7 +12,7 @@ import { fmtCurrency } from '@/utils/format'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
 
-type Phase = 'input' | 'redirect' | 'verifying' | 'success' | 'pending' | 'failed'
+type Phase = 'input' | 'transfer_details' | 'redirect' | 'verifying' | 'success' | 'pending' | 'failed'
 type Method = 'card' | 'bank'
 
 export function FundWalletPage() {
@@ -23,8 +24,11 @@ export function FundWalletPage() {
   const [reference, setReference]     = useState('')
   const [payUrl, setPayUrl]           = useState('')
   const [newBalance, setNewBalance]   = useState<number | null>(null)
-  const [copied, setCopied]           = useState(false)
-  const [copiedSquad, setCopiedSquad] = useState(false)
+  const [copied, setCopied]                     = useState(false)
+  const [copiedSquad, setCopiedSquad]           = useState(false)
+  const [copiedTransfer, setCopiedTransfer]     = useState(false)
+  const [transferAccount, setTransferAccount]   = useState<TransferAccount | null>(null)
+  const [transferAmount, setTransferAmount]     = useState<number | null>(null)
 
   const { data: balance }  = useWalletBalance()
   const { data: dva, isLoading: dvaLoading }     = useDedicatedAccount()
@@ -55,19 +59,36 @@ export function FundWalletPage() {
     })
   }
 
-  const handleInitialize = async () => {
+  const handleInitialize = async (payMethod: 'bank_transfer' | 'card' = 'card') => {
     const amt = parseFloat(amount)
     if (!amt || amt < 100) { setAmountError('Minimum amount is ₦100.'); return }
     if (amt > 5_000_000)   { setAmountError('Maximum is ₦5,000,000.'); return }
     setAmountError('')
     try {
-      const res = await initFunding.mutateAsync({ amount: amt, key: crypto.randomUUID() })
+      const res = await initFunding.mutateAsync({ amount: amt, key: crypto.randomUUID(), method: payMethod })
       setReference(res.reference)
-      setPayUrl(res.authorization_url)
-      setPhase('redirect')
+      if (res.transfer_account) {
+        // In-app bank transfer — show account details without redirect
+        setTransferAccount(res.transfer_account)
+        setTransferAmount(amt)
+        setPhase('transfer_details')
+      } else {
+        // Card / USSD / Squad — redirect to checkout
+        setPayUrl(res.authorization_url ?? '')
+        setPhase('redirect')
+      }
     } catch (err) {
       toast.error(isAxiosError(err) ? (err.response?.data?.error ?? 'Could not initialize payment.') : 'Something went wrong.')
     }
+  }
+
+  const handleCopyTransfer = () => {
+    if (!transferAccount?.account_number) return
+    navigator.clipboard.writeText(transferAccount.account_number).then(() => {
+      setCopiedTransfer(true)
+      setTimeout(() => setCopiedTransfer(false), 2500)
+      toast.success('Account number copied!')
+    })
   }
 
   const handleVerify = async () => {
@@ -154,6 +175,79 @@ export function FundWalletPage() {
     )
   }
 
+  if (phase === 'transfer_details' && transferAccount) {
+    return (
+      <div className="space-y-4 pt-2">
+        <button onClick={() => setPhase('input')} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+        <div className="bg-surface-1 rounded-3xl p-5 shadow-card space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
+              <Landmark className="h-5 w-5 text-brand-600" />
+            </div>
+            <div>
+              <p className="text-base font-bold text-ink">Transfer Details</p>
+              <p className="text-xs text-ink-faint">Send exactly this amount to credit your wallet</p>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between items-center py-2.5 border-b border-border">
+              <span className="text-ink-faint">Amount to Transfer</span>
+              <span className="font-bold text-lg text-ink">{fmtCurrency(transferAmount ?? 0)}</span>
+            </div>
+            <div className="flex justify-between items-center py-2.5 border-b border-border">
+              <span className="text-ink-faint">Bank</span>
+              <span className="font-semibold text-ink">{transferAccount.bank_name}</span>
+            </div>
+            <div className="flex justify-between items-center py-2.5 border-b border-border">
+              <span className="text-ink-faint">Account Name</span>
+              <span className="font-semibold text-ink">{transferAccount.account_name}</span>
+            </div>
+            <div className="flex justify-between items-center py-2.5">
+              <span className="text-ink-faint">Account Number</span>
+              <button onClick={handleCopyTransfer} className="flex items-center gap-2 group">
+                <span className="font-mono font-bold text-xl tracking-widest text-ink group-hover:text-brand-600 transition-colors">
+                  {transferAccount.account_number}
+                </span>
+                {copiedTransfer
+                  ? <CheckCheck className="h-4 w-4 text-success" />
+                  : <Copy className="h-4 w-4 text-ink-faint group-hover:text-brand-600 transition-colors" />}
+              </button>
+            </div>
+          </div>
+
+          {transferAccount.display_text && (
+            <div className="bg-surface-0 rounded-2xl px-4 py-3">
+              <p className="text-xs text-ink-muted leading-relaxed">{transferAccount.display_text}</p>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={handleCopyTransfer}
+          className="w-full py-3.5 rounded-2xl bg-brand-600 text-white text-sm font-bold shadow-brand hover:bg-brand-700 transition-colors flex items-center justify-center gap-2"
+        >
+          {copiedTransfer ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
+        </button>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+          <p className="text-xs text-amber-700 font-semibold mb-1">How it works</p>
+          <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
+            <li>Transfer <strong>{fmtCurrency(transferAmount ?? 0)}</strong> from your bank app to the account above</li>
+            <li>Your wallet will be credited automatically once the transfer is confirmed</li>
+            <li>This account is for this transaction only — do not reuse it</li>
+          </ul>
+        </div>
+
+        <Button variant="secondary" fullWidth loading={verifyFunding.isPending} onClick={handleVerify}>
+          I&apos;ve paid — Verify Payment
+        </Button>
+      </div>
+    )
+  }
+
   if (phase === 'redirect') {
     return (
       <div className="space-y-4 pt-2">
@@ -217,11 +311,29 @@ export function FundWalletPage() {
         </button>
       </div>
 
-      {/* Bank Transfer — dedicated accounts */}
+      {/* Bank Transfer */}
       {method === 'bank' && (
         <div className="space-y-3">
 
-          {/* Paystack Transfer Account */}
+          {/* ── One-time transfer (amount-specific temporary account) ── */}
+          <div className="bg-surface-1 rounded-3xl p-5 shadow-card space-y-4">
+            <div>
+              <p className="text-sm font-bold text-ink mb-0.5">Quick Bank Transfer</p>
+              <p className="text-xs text-ink-faint">Enter an amount to get a one-time transfer account. Wallet credited automatically.</p>
+            </div>
+            <AmountInput value={amount} onChange={setAmount} error={amountError} />
+            <Button fullWidth loading={initFunding.isPending} onClick={() => handleInitialize('bank_transfer')}>
+              Get Transfer Account
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3 px-1">
+            <div className="flex-1 h-px bg-border" />
+            <p className="text-xs text-ink-faint font-medium">or use your permanent accounts</p>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Paystack Dedicated Account */}
           <div className="bg-surface-1 rounded-3xl p-5 shadow-card">
             <div className="flex items-center justify-between mb-1">
               <p className="text-sm font-bold text-ink">Paystack Transfer Account</p>
@@ -356,7 +468,7 @@ export function FundWalletPage() {
         <div className="bg-surface-1 rounded-3xl p-5 shadow-card space-y-5">
           <p className="text-sm text-ink-muted">Enter the amount you want to add. You'll be redirected to Paystack to complete payment.</p>
           <AmountInput value={amount} onChange={setAmount} error={amountError} />
-          <Button fullWidth loading={initFunding.isPending} onClick={handleInitialize}>
+          <Button fullWidth loading={initFunding.isPending} onClick={() => handleInitialize('card')}>
             Proceed to Payment
           </Button>
         </div>

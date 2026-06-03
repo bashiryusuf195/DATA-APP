@@ -32,6 +32,7 @@ const InitializeFundingSchema = z.object({
     .number({ required_error: "amount is required" })
     .positive("amount must be positive")
     .max(5_000_000, "amount exceeds maximum single funding limit (₦5,000,000)"),
+  method: z.enum(["bank_transfer", "card"]).optional(),
 });
 
 // Canonical verify response shape — matches FundingVerifyResponse on the frontend.
@@ -119,36 +120,79 @@ export async function initializeFundingController(
       metadata:        { initiated_by: userId, gateway_id: activeGateway.id },
     });
 
-    // Initialize payment — passes our reference so we can match on webhook
-    const paymentResult = await gateway.initializePayment({
-      email:       user.email,
-      amount_kobo: amountKobo,
-      reference,
-      metadata:    { funding_transaction_id: fundingTx.id, user_id: userId },
-    });
+    const metadata = { funding_transaction_id: fundingTx.id, user_id: userId };
+    const useBankTransfer =
+      input.method === "bank_transfer" &&
+      activeGateway.code === "paystack";
 
-    logger.info("wallet_fund_initialized", {
-      reference,
-      user_id:         userId,
-      gateway:         activeGateway.code,
-      amount:          input.amount,
-      charge_amount:   charge.charge_amount,
-      credited_amount: charge.credited_amount,
-    });
+    let responseData: Record<string, unknown>;
 
-    res.status(200).json({
-      success: true,
-      data: {
+    if (useBankTransfer) {
+      // ── Paystack in-app bank transfer (no checkout redirect) ─────────────────
+      // POST /charge returns a temporary account number the user transfers to.
+      // The existing charge.success webhook credits the wallet automatically.
+      const transferResult = await paystackGateway.initiateBankTransfer({
+        email:       user.email,
+        amount_kobo: amountKobo,
         reference,
-        authorization_url:  paymentResult.authorization_url,
-        access_code:        paymentResult.access_code,
-        amount:             input.amount,
-        charge_amount:      charge.charge_amount,
-        credited_amount:    charge.credited_amount,
-        currency:           "NGN",
-        gateway:            activeGateway.code,
-      },
-    });
+        metadata,
+      });
+
+      responseData = {
+        reference,
+        method:          "bank_transfer",
+        transfer_account: {
+          account_number: transferResult.account_number,
+          account_name:   transferResult.account_name,
+          bank_name:      transferResult.bank_name,
+          display_text:   transferResult.display_text,
+        },
+        amount:          input.amount,
+        charge_amount:   charge.charge_amount,
+        credited_amount: charge.credited_amount,
+        currency:        "NGN",
+        gateway:         activeGateway.code,
+      };
+
+      logger.info("wallet_fund_bank_transfer_initiated", {
+        reference,
+        user_id:        userId,
+        account_number: transferResult.account_number,
+        bank_name:      transferResult.bank_name,
+        amount:         input.amount,
+      });
+    } else {
+      // ── Standard checkout redirect (card / USSD / Squad) ─────────────────────
+      const paymentResult = await gateway.initializePayment({
+        email:       user.email,
+        amount_kobo: amountKobo,
+        reference,
+        metadata,
+      });
+
+      responseData = {
+        reference,
+        method:            "card",
+        authorization_url: paymentResult.authorization_url,
+        access_code:       paymentResult.access_code,
+        amount:            input.amount,
+        charge_amount:     charge.charge_amount,
+        credited_amount:   charge.credited_amount,
+        currency:          "NGN",
+        gateway:           activeGateway.code,
+      };
+
+      logger.info("wallet_fund_initialized", {
+        reference,
+        user_id:         userId,
+        gateway:         activeGateway.code,
+        amount:          input.amount,
+        charge_amount:   charge.charge_amount,
+        credited_amount: charge.credited_amount,
+      });
+    }
+
+    res.status(200).json({ success: true, data: responseData });
     void checkFundingVelocity(userId, reference).catch(() => undefined);
   } catch (err) {
     next(err);

@@ -2,6 +2,15 @@
 // Paystack is the initial implementation; Flutterwave / Monnify can be added
 // by creating a new class that implements PaymentGateway.
 
+// Returned when a gateway supports in-app bank transfer (no checkout redirect).
+export interface TransferAccountDetails {
+  account_number: string;
+  account_name:   string;
+  bank_name:      string;
+  display_text:   string;   // full human-readable instruction from the provider
+  expires_at?:    string;   // ISO timestamp — set if the account is temporary
+}
+
 export interface InitializePaymentParams {
   email:        string;
   amount_kobo:  number;   // always in smallest unit (kobo for NGN)

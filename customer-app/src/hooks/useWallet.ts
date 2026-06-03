@@ -23,8 +23,8 @@ export function useWalletLedger(params?: { page?: number; limit?: number }) {
 export function useInitializeFunding() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ amount, key }: { amount: number; key: string }) =>
-      walletApi.initializeFunding(amount, key),
+    mutationFn: ({ amount, key, method }: { amount: number; key: string; method?: 'bank_transfer' | 'card' }) =>
+      walletApi.initializeFunding(amount, key, method),
     onSuccess: () => qc.invalidateQueries({ queryKey: WALLET_BALANCE_KEY }),
   })
 }

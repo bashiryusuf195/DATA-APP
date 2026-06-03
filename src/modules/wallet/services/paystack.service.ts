@@ -4,6 +4,7 @@ import type {
   PaymentGateway,
   InitializePaymentParams,
   InitializePaymentResult,
+  TransferAccountDetails,
   VerifyPaymentResult,
   GatewayPaymentStatus,
 } from "../types/payment-gateway.types";
@@ -69,6 +70,29 @@ interface PaystackInitializeResponse {
     authorization_url: string;
     access_code:       string;
     reference:         string;
+  };
+}
+
+// Response from POST /charge with bank_transfer method.
+// Paystack may return account details as flat fields or inside a nested object;
+// we handle both layouts defensively.
+interface PaystackChargeResponse {
+  status:  boolean;
+  message: string;
+  data: {
+    id:           number;
+    reference:    string;
+    status:       string;    // "pending"
+    amount:       number;    // kobo
+    currency:     string;
+    channel:      string;    // "bank_transfer"
+    next_action?: string;    // "display_details"
+    display_text?: string;
+    // Account details — present when next_action === "display_details":
+    account_number?: string;
+    account_name?:   string;
+    // Paystack returns bank as either a plain string or a { name, code } object:
+    bank?: string | { name: string; code?: string };
   };
 }
 
@@ -171,6 +195,49 @@ class PaystackGateway implements PaymentGateway {
       authorization_url: res.data.authorization_url,
       access_code:       res.data.access_code,
       reference:         res.data.reference,
+    };
+  }
+
+  // Initiate a one-time bank transfer charge via POST /charge.
+  // Returns transfer account details so the frontend can display them in-app
+  // without redirecting to the Paystack checkout page.
+  // The standard charge.success webhook fires on payment and the existing
+  // webhook worker credits the wallet — no separate handling needed.
+  async initiateBankTransfer(params: {
+    email:       string;
+    amount_kobo: number;
+    reference:   string;
+    metadata?:   Record<string, unknown>;
+  }): Promise<TransferAccountDetails & { reference: string }> {
+    if (!isConfigured()) {
+      throw new Error("Paystack is not configured — PAYSTACK_SECRET_KEY missing");
+    }
+
+    const res = await paystackFetch<PaystackChargeResponse>("POST", "/charge", {
+      email:     params.email,
+      amount:    params.amount_kobo,
+      reference: params.reference,
+      metadata:  params.metadata,
+      bank_transfer: {},
+    });
+
+    if (!res.status) {
+      throw new Error(`Paystack bank transfer charge failed: ${res.message}`);
+    }
+
+    const d = res.data;
+
+    // Normalise the bank field — Paystack returns it as either a string or object.
+    const bankName = typeof d.bank === "string"
+      ? d.bank
+      : (d.bank as { name?: string } | undefined)?.name ?? "Unknown Bank";
+
+    return {
+      reference:      d.reference ?? params.reference,
+      account_number: d.account_number ?? "",
+      account_name:   d.account_name   ?? "PAYSTACK",
+      bank_name:      bankName,
+      display_text:   d.display_text   ?? `Transfer to ${d.account_number ?? ""} — ${bankName}`,
     };
   }
 
