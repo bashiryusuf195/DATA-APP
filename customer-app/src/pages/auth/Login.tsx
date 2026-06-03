@@ -29,6 +29,10 @@ export function LoginPage() {
       sessionStorage.removeItem('session_expired')
       toast.error('Session expired. Please log in again.')
     }
+    if (sessionStorage.getItem('password_reset_success') === '1') {
+      sessionStorage.removeItem('password_reset_success')
+      toast.success('Password updated! Sign in with your new password.')
+    }
     // First-time mobile visitors see onboarding before login
     const isMobile = window.innerWidth < 768
     if (isMobile && !localStorage.getItem(ONBOARDING_KEY)) {

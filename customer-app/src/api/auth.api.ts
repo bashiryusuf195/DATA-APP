@@ -136,6 +136,15 @@ export const authApi = {
       .post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email })
       .then((r) => r.data.data),
 
+  resetPassword: (body: {
+    access_token:  string
+    refresh_token: string
+    password:      string
+  }) =>
+    apiClient
+      .post<ApiResponse<{ message: string }>>('/auth/reset-password', body)
+      .then((r) => r.data.data),
+
   updateProfile: async (body: {
     first_name?:    string
     last_name?:     string

@@ -11,7 +11,8 @@ import { OnboardingPage } from '@/pages/onboarding/Onboarding'
 // Auth pages
 import { LoginPage }          from '@/pages/auth/Login'
 import { RegisterPage }       from '@/pages/auth/Register'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPassword'
+import { ForgotPasswordPage }  from '@/pages/auth/ForgotPassword'
+import { ResetPasswordPage }   from '@/pages/auth/ResetPassword'
 
 // App pages
 import { DashboardPage }     from '@/pages/dashboard/Dashboard'
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: '/login',           element: <LoginPage /> },
       { path: '/register',        element: <RegisterPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password',  element: <ResetPasswordPage /> },
     ],
   },
 
