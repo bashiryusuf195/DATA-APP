@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   CreditCard, Plus, Star, ToggleLeft, ToggleRight,
   Pencil, CheckCircle, XCircle, AlertTriangle, Loader2,
-  Eye, EyeOff, Zap,
+  Eye, EyeOff, Zap, Info,
 } from 'lucide-react'
 import { paymentGatewaysApi } from '@/api/payment-gateways.api'
 import type {
@@ -45,53 +45,92 @@ function ModeBadge({ live }: { live: boolean }) {
   )
 }
 
+// ── KeyStatus ─────────────────────────────────────────────────────────────────
+
+function KeyStatus({
+  inDb,
+  inEnv,
+  label,
+}: {
+  inDb:  boolean
+  inEnv: boolean
+  label: string
+}) {
+  if (inDb) {
+    return (
+      <span className="text-green-600 flex items-center gap-1">
+        <CheckCircle className="h-3 w-3" /> Set
+      </span>
+    )
+  }
+  if (inEnv) {
+    return (
+      <span className="text-blue-600 flex items-center gap-1" title={`Configured via ${label} environment variable`}>
+        <Info className="h-3 w-3" /> Via env var
+      </span>
+    )
+  }
+  return (
+    <span className="text-amber-600 flex items-center gap-1">
+      <AlertTriangle className="h-3 w-3" /> Not set
+    </span>
+  )
+}
+
 // ── GatewayModal ──────────────────────────────────────────────────────────────
 
 interface GatewayModalProps {
-  open: boolean
+  open:    boolean
   gateway: PaymentGateway | null
   onClose: () => void
-  onSave: (data: CreatePaymentGatewayInput | UpdatePaymentGatewayInput) => void
-  saving: boolean
+  onSave:  (data: CreatePaymentGatewayInput | UpdatePaymentGatewayInput) => void
+  saving:  boolean
+  saveError: string | null
 }
 
 const BLANK_FORM: CreatePaymentGatewayInput = {
-  code: '',
-  name: '',
-  is_active: false,
-  is_live: false,
-  base_url: '',
-  public_key: '',
-  secret_key: '',
+  code:           '',
+  name:           '',
+  is_active:      false,
+  is_live:        false,
+  base_url:       '',
+  public_key:     '',
+  secret_key:     '',
   webhook_secret: '',
-  charge_type: 'none',
-  charge_value: 0,
-  notes: '',
+  charge_type:    'none',
+  charge_value:   0,
+  notes:          '',
 }
 
-function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalProps) {
-  const [form, setForm] = useState<CreatePaymentGatewayInput>(BLANK_FORM)
-  const [showSecret, setShowSecret] = useState(false)
+type FormErrors = Partial<Record<keyof CreatePaymentGatewayInput, string>>
+
+function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: GatewayModalProps) {
+  const [form, setForm]                       = useState<CreatePaymentGatewayInput>(BLANK_FORM)
+  const [showSecret, setShowSecret]           = useState(false)
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [errors, setErrors]                   = useState<FormErrors>({})
 
   useEffect(() => {
     if (open && gateway) {
       setForm({
-        code: gateway.code,
-        name: gateway.name,
-        is_active: gateway.is_active,
-        is_live: gateway.is_live,
-        base_url: gateway.base_url ?? '',
-        public_key: gateway.public_key ?? '',
-        secret_key: '',        // never pre-fill secrets
+        code:           gateway.code,
+        name:           gateway.name,
+        is_active:      gateway.is_active,
+        is_live:        gateway.is_live,
+        base_url:       gateway.base_url ?? '',
+        public_key:     gateway.public_key ?? '',
+        secret_key:     '',   // never pre-fill secrets
         webhook_secret: '',
-        charge_type: gateway.charge_type,
-        charge_value: gateway.charge_value,
-        notes: gateway.notes ?? '',
+        // charge_value is numeric in DB but node-postgres returns it as a string.
+        // Coerce to number here so the Zod schema (z.number()) doesn't reject it.
+        charge_type:    gateway.charge_type,
+        charge_value:   Number(gateway.charge_value) || 0,
+        notes:          gateway.notes ?? '',
       })
     } else if (open && !gateway) {
       setForm(BLANK_FORM)
     }
+    setErrors({})
     setShowSecret(false)
     setShowWebhookSecret(false)
   }, [open, gateway])
@@ -99,21 +138,53 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
   if (!open) return null
 
   const isEdit = !!gateway
-  const set = (k: keyof typeof form, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
+  const set = (k: keyof typeof form, v: unknown) => {
+    setForm((f) => ({ ...f, [k]: v }))
+    setErrors((e) => ({ ...e, [k]: undefined }))
+  }
+
+  function validate(): boolean {
+    const errs: FormErrors = {}
+    if (!form.name.trim()) errs.name = 'Name is required'
+    if (!isEdit && !form.code.trim()) errs.code = 'Code is required'
+    const cv = Number(form.charge_value)
+    if (isNaN(cv) || cv < 0) {
+      errs.charge_value = 'Must be a number ≥ 0'
+    }
+    if (form.charge_type !== 'none' && cv === 0) {
+      // warn but don't block — 0 is technically valid
+    }
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const payload: Record<string, unknown> = { ...form }
-    // Don't send empty strings for secret fields on edit — means "no change"
-    if (isEdit && !form.secret_key) delete payload.secret_key
-    if (isEdit && !form.webhook_secret) delete payload.webhook_secret
-    if (!isEdit) {
-      // code required on create
-    } else {
-      delete payload.code // code immutable after creation
+    if (!validate()) return
+
+    const payload: Record<string, unknown> = {
+      ...form,
+      // Always send charge_value as a number — DB returns it as "0.0000" string
+      // but the backend Zod schema requires z.number().
+      charge_value: Number(form.charge_value) || 0,
     }
-    onSave(payload as unknown as CreatePaymentGatewayInput)
+
+    // Empty string secret fields on edit = "no change" → omit from payload
+    if (isEdit && !form.secret_key)     delete payload.secret_key
+    if (isEdit && !form.webhook_secret) delete payload.webhook_secret
+    // Code is immutable after creation
+    if (isEdit) delete payload.code
+
+    onSave(payload as CreatePaymentGatewayInput)
   }
+
+  // Env-var context for the current gateway (only available when editing)
+  const envSecretSet     = gateway?.env_secret_key_set     ?? false
+  const envWebhookSet    = gateway?.env_webhook_secret_set ?? false
+  const envPublicKeySet  = gateway?.env_public_key_set     ?? false
+
+  // Env var name hint for this gateway's code
+  const envPrefix = gateway?.code?.toUpperCase() ?? ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -124,6 +195,14 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+
+          {/* Server-side save error */}
+          {saveError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {saveError}
+            </div>
+          )}
+
           {!isEdit && (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -136,6 +215,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
                   required
                   className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
                 />
+                {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-ink-muted mb-1">Name</label>
@@ -147,6 +227,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
                   required
                   className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
                 />
+                {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
               </div>
             </div>
           )}
@@ -161,6 +242,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
                 required
                 className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
               />
+              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
             </div>
           )}
 
@@ -176,19 +258,39 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-ink-muted mb-1">Public Key</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">
+              Public Key
+              {isEdit && envPublicKeySet && !gateway.public_key && (
+                <span className="ml-1.5 text-blue-600 font-normal">(env var configured)</span>
+              )}
+            </label>
             <input
               type="text"
-              placeholder="pk_..."
+              placeholder={isEdit && envPublicKeySet && !gateway.public_key
+                ? `${envPrefix}_PUBLIC_KEY env var is set`
+                : 'pk_...'}
               value={form.public_key ?? ''}
               onChange={(e) => set('public_key', e.target.value || null)}
               className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            {isEdit && envPublicKeySet && !gateway.public_key && (
+              <p className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Using <code className="font-mono">{envPrefix}_PUBLIC_KEY</code> environment variable.
+                Enter a value here to store in the database.
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">
-              Secret Key {isEdit && gateway?.has_secret_key && <span className="text-green-600">(currently set)</span>}
+              Secret Key{' '}
+              {isEdit && gateway?.has_secret_key && (
+                <span className="text-green-600">(currently set in DB)</span>
+              )}
+              {isEdit && !gateway?.has_secret_key && envSecretSet && (
+                <span className="text-blue-600">(env var configured)</span>
+              )}
             </label>
             <div className="relative">
               <input
@@ -206,11 +308,24 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
                 {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {isEdit && !gateway?.has_secret_key && envSecretSet && (
+              <p className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Using <code className="font-mono">{envPrefix}_SECRET_KEY</code> environment variable.
+                Leave blank to continue using it.
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">
-              Webhook Secret {isEdit && gateway?.has_webhook_secret && <span className="text-green-600">(currently set)</span>}
+              Webhook Secret{' '}
+              {isEdit && gateway?.has_webhook_secret && (
+                <span className="text-green-600">(currently set in DB)</span>
+              )}
+              {isEdit && !gateway?.has_webhook_secret && envWebhookSet && (
+                <span className="text-blue-600">(env var configured)</span>
+              )}
             </label>
             <div className="relative">
               <input
@@ -228,6 +343,13 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
                 {showWebhookSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {isEdit && !gateway?.has_webhook_secret && envWebhookSet && (
+              <p className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Using <code className="font-mono">{envPrefix}_WEBHOOK_SECRET</code> environment variable.
+                Leave blank to continue using it.
+              </p>
+            )}
           </div>
 
           <div>
@@ -258,6 +380,9 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
                   disabled={form.charge_type === 'none'}
                   className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-40"
                 />
+                {errors.charge_value && (
+                  <p className="mt-1 text-xs text-red-500">{errors.charge_value}</p>
+                )}
               </div>
             </div>
             {form.charge_type !== 'none' && (
@@ -332,7 +457,8 @@ function GatewayModal({ open, gateway, onClose, onSave, saving }: GatewayModalPr
 export function PaymentGatewaysPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<PaymentGateway | null>(null)
+  const [editing, setEditing]     = useState<PaymentGateway | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const { data: gateways = [], isLoading } = useQuery({
     queryKey: ['payment-gateways'],
@@ -343,13 +469,21 @@ export function PaymentGatewaysPage() {
 
   const createMutation = useMutation({
     mutationFn: (body: CreatePaymentGatewayInput) => paymentGatewaysApi.create(body),
-    onSuccess: () => { invalidate(); setModalOpen(false) },
+    onSuccess: () => { invalidate(); setModalOpen(false); setSaveError(null) },
+    onError: (err: unknown) => {
+      const msg = extractApiError(err)
+      setSaveError(msg)
+    },
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdatePaymentGatewayInput }) =>
       paymentGatewaysApi.update(id, body),
-    onSuccess: () => { invalidate(); setModalOpen(false); setEditing(null) },
+    onSuccess: () => { invalidate(); setModalOpen(false); setEditing(null); setSaveError(null) },
+    onError: (err: unknown) => {
+      const msg = extractApiError(err)
+      setSaveError(msg)
+    },
   })
 
   const defaultMutation = useMutation({
@@ -367,8 +501,8 @@ export function PaymentGatewaysPage() {
     onSuccess: invalidate,
   })
 
-  function openCreate() { setEditing(null); setModalOpen(true) }
-  function openEdit(gw: PaymentGateway) { setEditing(gw); setModalOpen(true) }
+  function openCreate() { setEditing(null); setSaveError(null); setModalOpen(true) }
+  function openEdit(gw: PaymentGateway) { setEditing(gw); setSaveError(null); setModalOpen(true) }
 
   function handleSave(data: CreatePaymentGatewayInput | UpdatePaymentGatewayInput) {
     if (editing) {
@@ -378,8 +512,7 @@ export function PaymentGatewaysPage() {
     }
   }
 
-  const isSaving = createMutation.isPending || updateMutation.isPending
-
+  const isSaving     = createMutation.isPending || updateMutation.isPending
   const activeCount  = gateways.filter((g) => g.is_active).length
   const defaultGw    = gateways.find((g) => g.is_default)
 
@@ -520,22 +653,20 @@ export function PaymentGatewaysPage() {
                 <div>
                   <p className="text-ink-faint mb-0.5">Public Key</p>
                   <p className="text-ink font-mono truncate">
-                    {gw.public_key ? `${gw.public_key.slice(0, 12)}…` : '—'}
+                    {gw.public_key
+                      ? `${gw.public_key.slice(0, 12)}…`
+                      : gw.env_public_key_set
+                        ? <span className="text-blue-600 font-sans font-medium not-italic flex items-center gap-1"><Info className="h-3 w-3" />Via env var</span>
+                        : '—'}
                   </p>
                 </div>
                 <div>
                   <p className="text-ink-faint mb-0.5">Secret Key</p>
-                  <p className="text-ink">
-                    {gw.has_secret_key ? (
-                      <span className="text-green-600 flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" /> Set
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" /> Not set
-                      </span>
-                    )}
-                  </p>
+                  <KeyStatus
+                    inDb={gw.has_secret_key}
+                    inEnv={gw.env_secret_key_set ?? false}
+                    label={`${gw.code.toUpperCase()}_SECRET_KEY`}
+                  />
                 </div>
                 <div>
                   <p className="text-ink-faint mb-0.5">Top-up Charge</p>
@@ -568,10 +699,27 @@ export function PaymentGatewaysPage() {
       <GatewayModal
         open={modalOpen}
         gateway={editing}
-        onClose={() => { setModalOpen(false); setEditing(null) }}
+        onClose={() => { setModalOpen(false); setEditing(null); setSaveError(null) }}
         onSave={handleSave}
         saving={isSaving}
+        saveError={saveError}
       />
     </div>
   )
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function extractApiError(err: unknown): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const res = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response
+    const fieldErrors = res?.data?.errors
+    if (fieldErrors) {
+      const first = Object.entries(fieldErrors).map(([k, v]) => `${k}: ${v.join(', ')}`).join('; ')
+      if (first) return first
+    }
+    if (res?.data?.message) return res.data.message
+  }
+  if (err instanceof Error) return err.message
+  return 'An unexpected error occurred'
 }

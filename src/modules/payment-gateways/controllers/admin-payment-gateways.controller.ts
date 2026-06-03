@@ -8,7 +8,39 @@ import {
   setDefaultGateway,
   enableGateway,
   disableGateway,
+  type PaymentGatewaySafe,
 } from "../services/payment-gateway.service";
+import { config } from "../../../config";
+
+// Indicates whether env vars are configured for a gateway, so the admin UI
+// can show "Configured via environment variable" instead of "Not set".
+// These flags are read-only and never expose actual key values.
+function envKeyStatus(code: string): {
+  env_public_key_set: boolean;
+  env_secret_key_set: boolean;
+  env_webhook_secret_set: boolean;
+} {
+  switch (code) {
+    case "paystack":
+      return {
+        env_public_key_set:     Boolean(config.paystack.publicKey),
+        env_secret_key_set:     Boolean(config.paystack.secretKey),
+        env_webhook_secret_set: Boolean(config.paystack.webhookSecret),
+      };
+    case "squad":
+      return {
+        env_public_key_set:     Boolean(config.squad.publicKey),
+        env_secret_key_set:     Boolean(config.squad.secretKey),
+        env_webhook_secret_set: Boolean(config.squad.webhookSecret),
+      };
+    default:
+      return { env_public_key_set: false, env_secret_key_set: false, env_webhook_secret_set: false };
+  }
+}
+
+function enrichGateway(gw: PaymentGatewaySafe) {
+  return { ...gw, ...envKeyStatus(gw.code) };
+}
 
 const CreateSchema = z.object({
   code: z.string().min(1).max(50).regex(/^[a-z0-9_-]+$/, "code must be lowercase alphanumeric"),
@@ -40,7 +72,7 @@ const UpdateSchema = z.object({
 export async function listPaymentGatewaysController(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const gateways = await listPaymentGateways();
-    res.json({ success: true, data: gateways });
+    res.json({ success: true, data: gateways.map(enrichGateway) });
   } catch (err) {
     next(err);
   }
@@ -54,7 +86,7 @@ export async function getPaymentGatewayController(req: Request, res: Response, n
       res.status(404).json({ success: false, message: "Payment gateway not found" });
       return;
     }
-    res.json({ success: true, data: gateway });
+    res.json({ success: true, data: enrichGateway(gateway) });
   } catch (err) {
     next(err);
   }

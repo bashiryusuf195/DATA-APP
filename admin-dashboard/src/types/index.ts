@@ -1267,6 +1267,11 @@ export interface PaymentGateway {
   notes: string | null
   created_at: string
   updated_at: string
+  // Whether credentials are configured via environment variables on the server.
+  // When true and has_secret_key is false, the gateway is using env vars, not DB.
+  env_public_key_set?: boolean
+  env_secret_key_set?: boolean
+  env_webhook_secret_set?: boolean
 }
 
 export interface CreatePaymentGatewayInput {
