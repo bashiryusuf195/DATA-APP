@@ -121,10 +121,10 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
         public_key:     gateway.public_key ?? '',
         secret_key:     '',   // never pre-fill secrets
         webhook_secret: '',
-        // charge_value is numeric in DB but node-postgres returns it as a string.
-        // Coerce to number here so the Zod schema (z.number()) doesn't reject it.
         charge_type:    gateway.charge_type,
-        charge_value:   Number(gateway.charge_value) || 0,
+        // node-postgres returns PostgreSQL NUMERIC as a string ("0.0000").
+        // parseFloat(String(...)) handles string, number, or undefined uniformly.
+        charge_value:   parseFloat(String(gateway.charge_value ?? 0)) || 0,
         notes:          gateway.notes ?? '',
       })
     } else if (open && !gateway) {
@@ -162,11 +162,14 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
     e.preventDefault()
     if (!validate()) return
 
+    // charge_value comes from the DB as a numeric string ("0.0000") because
+    // node-postgres returns PostgreSQL NUMERIC columns as strings.
+    // parseFloat converts any string/number/NaN safely to a JS number.
+    const chargeValue = parseFloat(String(form.charge_value ?? 0))
+
     const payload: Record<string, unknown> = {
       ...form,
-      // Always send charge_value as a number — DB returns it as "0.0000" string
-      // but the backend Zod schema requires z.number().
-      charge_value: Number(form.charge_value) || 0,
+      charge_value: isNaN(chargeValue) ? 0 : chargeValue,
     }
 
     // Empty string secret fields on edit = "no change" → omit from payload
@@ -174,6 +177,9 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
     if (isEdit && !form.webhook_secret) delete payload.webhook_secret
     // Code is immutable after creation
     if (isEdit) delete payload.code
+
+    // Debug: verify charge_value type before sending
+    console.log('[GatewayModal] payload charge_value:', payload.charge_value, typeof payload.charge_value)
 
     onSave(payload as CreatePaymentGatewayInput)
   }
@@ -505,6 +511,8 @@ export function PaymentGatewaysPage() {
   function openEdit(gw: PaymentGateway) { setEditing(gw); setSaveError(null); setModalOpen(true) }
 
   function handleSave(data: CreatePaymentGatewayInput | UpdatePaymentGatewayInput) {
+    // Debug: confirm charge_value is a number at the mutation boundary
+    console.log('[handleSave] charge_value:', (data as Record<string, unknown>).charge_value, typeof (data as Record<string, unknown>).charge_value)
     if (editing) {
       updateMutation.mutate({ id: editing.id, body: data as UpdatePaymentGatewayInput })
     } else {
