@@ -65,23 +65,35 @@ export async function authenticate(
         throw new UnauthorizedError('Account not found or has been suspended.');
       }
 
+      // Use slug (e.g. "admin") not name (e.g. "Admin") — slugs are what
+      // requireRole() and hasRole() compare against.
       const roles = await db('user_roles as ur')
         .join('roles as r', 'r.id', 'ur.role_id')
         .where({ 'ur.user_id': userRow.id })
-        .pluck('r.name') as string[];
+        .where((qb) =>
+          qb.whereNull('ur.expires_at').orWhere('ur.expires_at', '>', new Date())
+        )
+        .pluck('r.slug') as string[];
 
-      const permissions = await db('role_permissions as rp')
+      // permissions table has (resource, action) — no name column.
+      // Build "resource:action" strings, matching what hasPermission() expects.
+      const permRows = await db('role_permissions as rp')
         .join('permissions as p', 'p.id', 'rp.permission_id')
         .join('roles as r',       'r.id', 'rp.role_id')
-        .whereIn('r.name', roles)
-        .pluck('p.name') as string[];
+        .whereIn('r.slug', roles)
+        .select('p.resource', 'p.action') as Array<{ resource: string; action: string }>;
+
+      const permissions = [...new Set(permRows.map((row) => `${row.resource}:${row.action}`))];
+
+      // super_admin gets wildcard permission so requirePermission("*:*") always passes
+      if (roles.includes('super_admin')) permissions.push('*:*');
 
       userContext = {
         id:          userRow.id as string,
         authId:      supabaseUser.id,
         email:       supabaseUser.email ?? '',
         roles,
-        permissions: [...new Set(permissions)],
+        permissions,
       };
 
       // 4b. Cache for 5 minutes

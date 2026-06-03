@@ -19,7 +19,10 @@ const db = knex({
     min:                  2,
     max:                  10,
     acquireTimeoutMillis: 30_000,
-    idleTimeoutMillis:    600_000,
+    // Keep well below Supabase/PgBouncer's server_idle_timeout (~600 s).
+    // 30 s matches the default used by src/config/database.ts so both pools
+    // recycle connections on the same cadence.
+    idleTimeoutMillis:    30_000,
   },
 });
 
