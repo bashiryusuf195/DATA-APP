@@ -90,6 +90,13 @@ export interface DedicatedAccount {
   bank_slug:      string
 }
 
+export interface SquadAccount {
+  virtual_account_number: string
+  account_name:           string
+  bank_name:              string
+  bank_code:              string
+}
+
 export interface LedgerEntry {
   id: string
   type: 'credit' | 'debit'

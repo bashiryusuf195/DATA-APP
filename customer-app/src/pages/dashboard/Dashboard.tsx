@@ -6,7 +6,7 @@ import {
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useThemeStore } from '@/store/theme.store'
-import { useWalletBalance, useDedicatedAccount } from '@/hooks/useWallet'
+import { useWalletBalance, useDedicatedAccount, useSquadAccount } from '@/hooks/useWallet'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useNotifications } from '@/hooks/useNotifications'
 import { WalletBalanceCard } from '@/components/shared/WalletBalanceCard'
@@ -38,8 +38,12 @@ export function DashboardPage() {
   const { data: balance, isLoading: balanceLoading } = useWalletBalance()
   const { data: txData,  isLoading: txLoading }      = useTransactions({ limit: 5 })
   const { data: notifData }                          = useNotifications({ limit: 1 })
-  const { data: dva,     isLoading: dvaLoading }     = useDedicatedAccount()
-  const [copied, setCopied] = useState(false)
+  const { data: dva,        isLoading: dvaLoading }    = useDedicatedAccount()
+  const { data: squadData,  isLoading: squadLoading }  = useSquadAccount()
+  const [copiedKey, setCopiedKey] = useState<'dva' | 'squad' | null>(null)
+
+  const squadAccount         = squadData?.account ?? null
+  const squadProfileIncomplete = squadData?.profileIncomplete ?? false
 
   const firstName = user?.first_name ?? user?.email?.split('@')[0] ?? 'there'
   const unread    = notifData?.unread_count ?? 0
@@ -48,11 +52,12 @@ export function DashboardPage() {
   const initials = [user?.first_name?.[0], user?.last_name?.[0]].filter(Boolean).join('').toUpperCase()
                 || (user?.email?.[0] ?? 'U').toUpperCase()
 
-  const handleCopyAccount = () => {
-    if (!dva?.account_number) return
-    navigator.clipboard.writeText(dva.account_number).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+  const handleCopyAccount = (key: 'dva' | 'squad') => {
+    const text = key === 'dva' ? dva?.account_number : squadAccount?.virtual_account_number
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey(null), 2000)
     })
   }
 
@@ -111,14 +116,18 @@ export function DashboardPage() {
           </Link>
         </div>
 
+        {/* Paystack account */}
         {dvaLoading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 mb-3">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-4 w-2/3" />
           </div>
         ) : dva ? (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-sm mb-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Paystack</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-ink-faint">Bank:</span>
               <span className="font-semibold text-ink">{dva.bank_name}</span>
@@ -130,17 +139,60 @@ export function DashboardPage() {
             <div className="flex items-center justify-between">
               <span className="text-ink-faint">Account Number:</span>
               <button
-                onClick={handleCopyAccount}
+                onClick={() => handleCopyAccount('dva')}
                 className="flex items-center gap-1.5 font-bold text-brand-600 hover:text-brand-700 transition-colors"
               >
                 <span className="font-mono text-base tracking-wider">{dva.account_number}</span>
-                {copied
+                {copiedKey === 'dva'
                   ? <CheckCheck className="h-3.5 w-3.5 text-success" />
                   : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
-        ) : (
+        ) : null}
+
+        {/* Divider between accounts when both exist */}
+        {dva && squadAccount && (
+          <div className="border-t border-border my-3" />
+        )}
+
+        {/* Squad account */}
+        {squadLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ) : squadAccount ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">Squad</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-faint">Bank:</span>
+              <span className="font-semibold text-ink">{squadAccount.bank_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-faint">Account Name:</span>
+              <span className="font-semibold text-ink">{squadAccount.account_name}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-ink-faint">Account Number:</span>
+              <button
+                onClick={() => handleCopyAccount('squad')}
+                className="flex items-center gap-1.5 font-bold text-violet-600 hover:text-violet-700 transition-colors"
+              >
+                <span className="font-mono text-base tracking-wider">{squadAccount.virtual_account_number}</span>
+                {copiedKey === 'squad'
+                  ? <CheckCheck className="h-3.5 w-3.5 text-success" />
+                  : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+        ) : squadProfileIncomplete ? null : null}
+
+        {/* Fallback when neither account is available */}
+        {!dvaLoading && !squadLoading && !dva && !squadAccount && (
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-ink-faint">Account Name:</span>
@@ -156,8 +208,9 @@ export function DashboardPage() {
             </div>
           </div>
         )}
+
         <p className="text-[10px] text-ink-faint mt-3 leading-relaxed">
-          Transfer to this account from any bank — your wallet is credited instantly.
+          Transfer to any account above from your bank — wallet credited instantly.
         </p>
       </div>
 

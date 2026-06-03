@@ -2,11 +2,17 @@ import { apiClient } from './client'
 import type {
   WalletBalance,
   DedicatedAccount,
+  SquadAccount,
   FundingInitResponse,
   FundingVerifyResponse,
   LedgerEntry,
   ApiResponse,
 } from '@/types'
+
+export interface SquadAccountResult {
+  account:           SquadAccount | null
+  profileIncomplete: boolean
+}
 
 // Raw shape the backend may return (balance could be a nested object on older
 // builds, a string decimal from the pg driver, or a proper number after the fix).
@@ -89,4 +95,19 @@ export const walletApi = {
     apiClient
       .get<ApiResponse<DedicatedAccount | null>>('/wallet/account')
       .then((r) => r.data.data ?? null),
+
+  getSquadAccount: async (): Promise<SquadAccountResult> => {
+    try {
+      const r = await apiClient.get<
+        ApiResponse<SquadAccount | null> & { code?: string }
+      >('/wallet/squad-account')
+      return {
+        account:           r.data.data ?? null,
+        profileIncomplete: r.data.code === 'PROFILE_INCOMPLETE',
+      }
+    } catch {
+      // 503 = Squad not configured; any other error — silently return null
+      return { account: null, profileIncomplete: false }
+    }
+  },
 }

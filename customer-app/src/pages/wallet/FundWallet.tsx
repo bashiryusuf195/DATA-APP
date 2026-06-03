@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { AmountInput } from '@/components/shared/AmountInput'
-import { useWalletBalance, useInitializeFunding, useVerifyFunding, useDedicatedAccount } from '@/hooks/useWallet'
+import { useWalletBalance, useInitializeFunding, useVerifyFunding, useDedicatedAccount, useSquadAccount } from '@/hooks/useWallet'
 import { fmtCurrency } from '@/utils/format'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
@@ -24,17 +24,32 @@ export function FundWalletPage() {
   const [payUrl, setPayUrl]           = useState('')
   const [newBalance, setNewBalance]   = useState<number | null>(null)
   const [copied, setCopied]           = useState(false)
+  const [copiedSquad, setCopiedSquad] = useState(false)
 
   const { data: balance }  = useWalletBalance()
-  const { data: dva, isLoading: dvaLoading } = useDedicatedAccount()
+  const { data: dva, isLoading: dvaLoading }     = useDedicatedAccount()
+  const { data: squadData, isLoading: squadLoading } = useSquadAccount()
   const initFunding        = useInitializeFunding()
   const verifyFunding      = useVerifyFunding()
+
+  const squadAccount = squadData?.account ?? null
+  const squadProfileIncomplete = squadData?.profileIncomplete ?? false
 
   const handleCopy = () => {
     if (!dva?.account_number) return
     navigator.clipboard.writeText(dva.account_number).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
+      toast.success('Account number copied!')
+    })
+  }
+
+  const handleCopySquad = () => {
+    if (!squadAccount?.virtual_account_number) return
+    navigator.clipboard.writeText(squadAccount.virtual_account_number).then(() => {
+      setCopied(false)
+      setCopiedSquad(true)
+      setTimeout(() => setCopiedSquad(false), 2500)
       toast.success('Account number copied!')
     })
   }
@@ -201,12 +216,17 @@ export function FundWalletPage() {
         </button>
       </div>
 
-      {/* Bank Transfer — dedicated account */}
+      {/* Bank Transfer — dedicated accounts */}
       {method === 'bank' && (
         <div className="space-y-3">
+
+          {/* Paystack Transfer Account */}
           <div className="bg-surface-1 rounded-3xl p-5 shadow-card">
-            <p className="text-sm font-bold text-ink mb-1">Transfer to this account</p>
-            <p className="text-xs text-ink-faint mb-4">Your wallet is credited automatically within seconds.</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-bold text-ink">Paystack Transfer Account</p>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Paystack</span>
+            </div>
+            <p className="text-xs text-ink-faint mb-4">Wallet credited automatically within seconds.</p>
 
             {dvaLoading ? (
               <div className="space-y-3">
@@ -229,10 +249,7 @@ export function FundWalletPage() {
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-ink-faint">Account Number</span>
-                  <button
-                    onClick={handleCopy}
-                    className="flex items-center gap-2 group"
-                  >
+                  <button onClick={handleCopy} className="flex items-center gap-2 group">
                     <span className="font-mono font-bold text-lg tracking-widest text-ink group-hover:text-brand-600 transition-colors">
                       {dva.account_number}
                     </span>
@@ -254,7 +271,66 @@ export function FundWalletPage() {
               onClick={handleCopy}
               className="w-full py-3.5 rounded-2xl bg-brand-600 text-white text-sm font-bold shadow-brand hover:bg-brand-700 transition-colors flex items-center justify-center gap-2"
             >
-              {copied ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
+              {copied ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Paystack Account Number</>}
+            </button>
+          )}
+
+          {/* Squad Transfer Account */}
+          <div className="bg-surface-1 rounded-3xl p-5 shadow-card">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-bold text-ink">Squad Transfer Account</p>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">Squad</span>
+            </div>
+            <p className="text-xs text-ink-faint mb-4">Wallet credited automatically within seconds.</p>
+
+            {squadLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex justify-between">
+                    <div className="h-4 w-24 bg-surface-2 rounded animate-pulse" />
+                    <div className="h-4 w-32 bg-surface-2 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ) : squadAccount ? (
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-ink-faint">Bank</span>
+                  <span className="font-semibold text-ink">{squadAccount.bank_name}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-ink-faint">Account Name</span>
+                  <span className="font-semibold text-ink">{squadAccount.account_name}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-ink-faint">Account Number</span>
+                  <button onClick={handleCopySquad} className="flex items-center gap-2 group">
+                    <span className="font-mono font-bold text-lg tracking-widest text-ink group-hover:text-violet-600 transition-colors">
+                      {squadAccount.virtual_account_number}
+                    </span>
+                    {copiedSquad
+                      ? <CheckCheck className="h-4 w-4 text-success" />
+                      : <Copy className="h-4 w-4 text-ink-faint group-hover:text-violet-600 transition-colors" />}
+                  </button>
+                </div>
+              </div>
+            ) : squadProfileIncomplete ? (
+              <p className="text-sm text-ink-muted text-center py-4">
+                Complete your profile to generate your Squad transfer account.
+              </p>
+            ) : (
+              <p className="text-sm text-ink-muted text-center py-4">
+                Squad transfer account is not available. Contact support.
+              </p>
+            )}
+          </div>
+
+          {squadAccount && (
+            <button
+              onClick={handleCopySquad}
+              className="w-full py-3.5 rounded-2xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-colors flex items-center justify-center gap-2"
+            >
+              {copiedSquad ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Squad Account Number</>}
             </button>
           )}
 
@@ -263,7 +339,7 @@ export function FundWalletPage() {
             <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
               <li>Transfer any amount from your bank app</li>
               <li>Wallet is credited instantly after transfer</li>
-              <li>This account number is permanent and unique to you</li>
+              <li>Your account numbers are permanent and unique to you</li>
             </ul>
           </div>
         </div>

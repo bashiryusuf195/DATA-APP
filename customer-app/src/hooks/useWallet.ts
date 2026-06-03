@@ -45,3 +45,12 @@ export function useDedicatedAccount() {
     retry: false, // don't retry 503 when Paystack isn't configured
   })
 }
+
+export function useSquadAccount() {
+  return useQuery({
+    queryKey: ['wallet-squad-account'],
+    queryFn:  walletApi.getSquadAccount,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: false,
+  })
+}
