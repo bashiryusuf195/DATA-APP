@@ -115,11 +115,16 @@ async function squadFetch<T>(
       signal: controller.signal,
     });
 
-    const json = (await res.json()) as T;
+    // Parse defensively — Squad occasionally returns non-JSON on gateway errors.
+    const json = await res.json().catch(() => null) as T | null;
 
     if (!res.ok) {
-      const msg = (json as { message?: string }).message ?? `HTTP ${res.status}`;
+      const msg = (json as { message?: string } | null)?.message ?? `HTTP ${res.status}`;
       throw new Error(`Squad ${method} ${path} failed: ${msg}`);
+    }
+
+    if (!json) {
+      throw new Error(`Squad ${method} ${path}: unexpected empty response`);
     }
 
     return json;

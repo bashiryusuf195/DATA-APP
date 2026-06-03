@@ -74,11 +74,18 @@ export async function getOrCreateSquadVirtualAccount(
     });
   } else {
     // ── 5. Create new virtual account on Squad ─────────────────────────────────
+    // Squad's mobile_num expects local Nigerian format (09XXXXXXXXX).
+    // Phones stored in DB are E.164 (+2349XXXXXXXXX) — convert before sending.
+    const rawPhone = user.phone as string;
+    const mobileNum = rawPhone.startsWith("+234")
+      ? `0${rawPhone.slice(4)}`
+      : rawPhone;
+
     const created = await squadGateway.createVirtualAccount({
       customer_identifier: customerIdentifier,
       first_name:          user.first_name as string,
       last_name:           user.last_name  as string,
-      mobile_num:          user.phone      as string,
+      mobile_num:          mobileNum,
       email:               user.email      as string,
     });
 
