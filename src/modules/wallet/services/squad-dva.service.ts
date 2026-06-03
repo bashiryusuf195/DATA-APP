@@ -40,6 +40,7 @@ export async function getOrCreateSquadVirtualAccount(
       "users.phone",
       "p.first_name",
       "p.last_name",
+      "p.date_of_birth",
     )
     .first();
 
@@ -47,15 +48,17 @@ export async function getOrCreateSquadVirtualAccount(
 
   // ── 3. Validate required profile fields ─────────────────────────────────────
   const missingFields: string[] = [];
-  if (!user.first_name) missingFields.push("first name");
-  if (!user.last_name)  missingFields.push("last name");
-  if (!user.phone)      missingFields.push("phone number");
+  if (!user.first_name)    missingFields.push("first name");
+  if (!user.last_name)     missingFields.push("last name");
+  if (!user.phone)         missingFields.push("phone number");
+  if (!user.date_of_birth) missingFields.push("date of birth");
 
   if (missingFields.length > 0) {
+    const list = missingFields.join(", ");
     throw new AppError(
       422,
       "PROFILE_INCOMPLETE",
-      "Complete your profile with first name, last name, and phone number to generate a bank account.",
+      `Complete your profile: ${list} is required to generate your Squad transfer account.`,
     );
   }
 
@@ -81,12 +84,21 @@ export async function getOrCreateSquadVirtualAccount(
       ? `0${rawPhone.slice(4)}`
       : rawPhone;
 
+    // Squad's dob expects MM/DD/YYYY; DB stores DATE as "YYYY-MM-DD" or a Date object.
+    const rawDob = user.date_of_birth;
+    const dobIso = rawDob instanceof Date
+      ? rawDob.toISOString().slice(0, 10)
+      : String(rawDob).slice(0, 10);
+    const [yyyy, mm, dd] = dobIso.split("-");
+    const squadDob = `${mm}/${dd}/${yyyy}`;
+
     const created = await squadGateway.createVirtualAccount({
       customer_identifier: customerIdentifier,
       first_name:          user.first_name as string,
       last_name:           user.last_name  as string,
       mobile_num:          mobileNum,
       email:               user.email      as string,
+      dob:                 squadDob,
     });
 
     details = created;

@@ -30,14 +30,15 @@ export interface AuthUser {
 }
 
 export interface UserProfile {
-  id:           string;
-  user_id:      string;
-  first_name:   string | null;
-  last_name:    string | null;
-  display_name: string | null;
-  avatar_url:   string | null;
-  country:      string | null;
-  city:         string | null;
+  id:             string;
+  user_id:        string;
+  first_name:     string | null;
+  last_name:      string | null;
+  display_name:   string | null;
+  avatar_url:     string | null;
+  country:        string | null;
+  city:           string | null;
+  date_of_birth:  string | null;  // ISO "YYYY-MM-DD"
 }
 
 export interface AuthUserWithProfile extends AuthUser {

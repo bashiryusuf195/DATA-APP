@@ -12,6 +12,7 @@ import type {
 export interface SquadAccountResult {
   account:           SquadAccount | null
   profileIncomplete: boolean
+  incompleteMessage: string | null
 }
 
 // Raw shape the backend may return (balance could be a nested object on older
@@ -99,15 +100,17 @@ export const walletApi = {
   getSquadAccount: async (): Promise<SquadAccountResult> => {
     try {
       const r = await apiClient.get<
-        ApiResponse<SquadAccount | null> & { code?: string }
+        ApiResponse<SquadAccount | null> & { code?: string; message?: string }
       >('/wallet/squad-account')
+      const incomplete = r.data.code === 'PROFILE_INCOMPLETE'
       return {
         account:           r.data.data ?? null,
-        profileIncomplete: r.data.code === 'PROFILE_INCOMPLETE',
+        profileIncomplete: incomplete,
+        incompleteMessage: incomplete ? (r.data.message ?? null) : null,
       }
     } catch {
       // 503 = Squad not configured; any other error — silently return null
-      return { account: null, profileIncomplete: false }
+      return { account: null, profileIncomplete: false, incompleteMessage: null }
     }
   },
 }

@@ -285,7 +285,7 @@ export async function updateProfileController(
   try {
     if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
 
-    const { first_name, last_name, phone, username } = req.body as Record<string, string>;
+    const { first_name, last_name, phone, username, date_of_birth } = req.body as Record<string, string>;
     const { randomUUID } = await import("crypto");
     const db = getDbInstance();
 
@@ -313,6 +313,13 @@ export async function updateProfileController(
     const profileUpdate: Record<string, string | null> = {};
     if (first_name !== undefined) profileUpdate.first_name = String(first_name).trim() || null;
     if (last_name  !== undefined) profileUpdate.last_name  = String(last_name).trim()  || null;
+    if (date_of_birth !== undefined) {
+      const dob = String(date_of_birth).trim();
+      if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+        throw new AppError(422, "INVALID_DOB", "Date of birth must be in YYYY-MM-DD format");
+      }
+      profileUpdate.date_of_birth = dob || null;
+    }
 
     if (Object.keys(usersUpdate).length === 0 && Object.keys(profileUpdate).length === 0) {
       res.status(400).json({ success: false, error: "No fields to update" });
@@ -342,7 +349,7 @@ export async function updateProfileController(
         "users.id", "users.email", "users.phone", "users.username",
         "users.status", "users.kyc_level", "users.is_email_verified",
         "users.referral_code", "users.created_at",
-        "p.first_name", "p.last_name",
+        "p.first_name", "p.last_name", "p.date_of_birth",
       )
       .first();
 

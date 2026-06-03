@@ -13,10 +13,11 @@ export function EditProfilePage() {
   const setUser   = useAuthStore((s) => s.setUser)
 
   const [form, setForm] = useState({
-    first_name: user?.first_name ?? '',
-    last_name:  user?.last_name  ?? '',
-    phone:      user?.phone      ?? '',
-    username:   user?.username   ?? '',
+    first_name:    user?.first_name    ?? '',
+    last_name:     user?.last_name     ?? '',
+    phone:         user?.phone         ?? '',
+    username:      user?.username      ?? '',
+    date_of_birth: user?.date_of_birth ?? '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -80,6 +81,14 @@ export function EditProfilePage() {
             onChange={set('phone')}
             error={errors.phone}
             placeholder="e.g. 08012345678"
+          />
+          <Input
+            label="Date of Birth"
+            type="date"
+            value={form.date_of_birth}
+            onChange={set('date_of_birth')}
+            error={errors.date_of_birth}
+            max={new Date().toISOString().slice(0, 10)}
           />
           <Input
             label="Username"

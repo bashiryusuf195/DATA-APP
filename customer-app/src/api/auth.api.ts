@@ -40,8 +40,9 @@ function mapUser(raw: Record<string, unknown>): User {
     id:                  raw.id as string,
     email:               raw.email as string,
     phone:               (raw.phone ?? profile.phone) as string | null,
-    first_name:          (raw.first_name ?? profile.first_name) as string | null,
-    last_name:           (raw.last_name  ?? profile.last_name)  as string | null,
+    first_name:          (raw.first_name  ?? profile.first_name)  as string | null,
+    last_name:           (raw.last_name   ?? profile.last_name)   as string | null,
+    date_of_birth:       (raw.date_of_birth ?? profile.date_of_birth) as string | null,
     username:            raw.username as string | null,
     role:                primaryRole(raw.roles as string[]),
     status:              raw.status as User['status'],
@@ -134,10 +135,11 @@ export const authApi = {
       .then((r) => r.data.data),
 
   updateProfile: async (body: {
-    first_name?: string
-    last_name?:  string
-    phone?:      string
-    username?:   string
+    first_name?:    string
+    last_name?:     string
+    phone?:         string
+    username?:      string
+    date_of_birth?: string
   }): Promise<User> => {
     // Normalise phone to E.164 before sending — the backend stores it in the
     // users table which has a CHECK constraint: phone ~ '^[+][1-9][0-9]{6,14}$'.

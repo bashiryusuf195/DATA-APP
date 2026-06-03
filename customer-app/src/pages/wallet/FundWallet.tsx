@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ExternalLink, CheckCircle2, AlertCircle, Clock,
   Building2, CreditCard, Copy, CheckCheck,
@@ -34,6 +34,7 @@ export function FundWalletPage() {
 
   const squadAccount = squadData?.account ?? null
   const squadProfileIncomplete = squadData?.profileIncomplete ?? false
+  const squadIncompleteMessage = squadData?.incompleteMessage ?? null
 
   const handleCopy = () => {
     if (!dva?.account_number) return
@@ -315,9 +316,14 @@ export function FundWalletPage() {
                 </div>
               </div>
             ) : squadProfileIncomplete ? (
-              <p className="text-sm text-ink-muted text-center py-4">
-                Complete your profile to generate your Squad transfer account.
-              </p>
+              <div className="text-center py-4 space-y-2">
+                <p className="text-sm text-ink-muted">
+                  {squadIncompleteMessage ?? 'Complete your profile to generate your Squad transfer account.'}
+                </p>
+                <Link to="/profile/edit" className="text-sm font-semibold text-violet-600 hover:underline">
+                  Complete Profile
+                </Link>
+              </div>
             ) : (
               <p className="text-sm text-ink-muted text-center py-4">
                 Squad transfer account is not available. Contact support.

@@ -7,6 +7,7 @@ export interface User {
   first_name?: string | null
   last_name?: string | null
   username?: string | null
+  date_of_birth?: string | null  // ISO "YYYY-MM-DD"
   role: 'user' | 'admin' | 'super_admin'
   status: 'active' | 'suspended' | 'pending'
   kyc_level: number
