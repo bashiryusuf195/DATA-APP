@@ -30,12 +30,18 @@ function primaryRole(roles: string[] = []): User['role'] {
 }
 
 function mapUser(raw: Record<string, unknown>): User {
+  // The /auth/me endpoint nests name fields under a `profile` object.
+  // The /auth/profile (update) and register endpoints return them flat.
+  // Read both locations so all callers work correctly.
+  const profile = (raw.profile && typeof raw.profile === 'object')
+    ? raw.profile as Record<string, unknown>
+    : {}
   return {
     id:                  raw.id as string,
     email:               raw.email as string,
-    phone:               raw.phone as string | null,
-    first_name:          raw.first_name as string | null,
-    last_name:           raw.last_name as string | null,
+    phone:               (raw.phone ?? profile.phone) as string | null,
+    first_name:          (raw.first_name ?? profile.first_name) as string | null,
+    last_name:           (raw.last_name  ?? profile.last_name)  as string | null,
     username:            raw.username as string | null,
     role:                primaryRole(raw.roles as string[]),
     status:              raw.status as User['status'],
@@ -133,7 +139,16 @@ export const authApi = {
     phone?:      string
     username?:   string
   }): Promise<User> => {
-    const r = await apiClient.patch<ApiResponse<Record<string, unknown>>>('/auth/profile', body)
+    // Normalise phone to E.164 before sending — the backend stores it in the
+    // users table which has a CHECK constraint: phone ~ '^[+][1-9][0-9]{6,14}$'.
+    // Normalise username to lowercase — the users_username_fmt constraint
+    // requires ^[a-z0-9_]{3,30}$, so uppercase values like "BASH016" fail.
+    const payload = {
+      ...body,
+      phone:    body.phone    !== undefined ? normalizePhone(body.phone) : undefined,
+      username: body.username !== undefined ? body.username.trim().toLowerCase() || undefined : undefined,
+    }
+    const r = await apiClient.patch<ApiResponse<Record<string, unknown>>>('/auth/profile', payload)
     return mapUser(r.data.data)
   },
 }

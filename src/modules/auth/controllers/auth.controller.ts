@@ -264,6 +264,21 @@ export async function getMeController(
 
 // ── PATCH /auth/profile ────────────────────────────────────────
 
+// Normalise any Nigerian or international phone number to E.164.
+// Returns null for blank input, throws AppError for unrecognised formats.
+function normalisePhoneE164(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^\+[1-9]\d{6,14}$/.test(trimmed)) return trimmed;             // already E.164
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("0")) return `+234${digits.slice(1)}`;  // 080…
+  if (digits.length === 13 && digits.startsWith("234")) return `+${digits}`;             // 234…
+  throw new AppError(
+    422, "INVALID_PHONE",
+    "Phone must be in Nigerian format (08012345678) or international E.164 format (+2348012345678)",
+  );
+}
+
 export async function updateProfileController(
   req: Request, res: Response, next: NextFunction
 ): Promise<void> {
@@ -271,12 +286,28 @@ export async function updateProfileController(
     if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
 
     const { first_name, last_name, phone, username } = req.body as Record<string, string>;
+    const { randomUUID } = await import("crypto");
     const db = getDbInstance();
 
     // Fields that live on the users table
     const usersUpdate: Record<string, string | null> = {};
-    if (phone    !== undefined) usersUpdate.phone    = String(phone).trim()    || null;
-    if (username !== undefined) usersUpdate.username = String(username).trim() || null;
+    if (phone !== undefined) {
+      // Normalise to E.164 — "09061615797" → "+2349061615797"
+      // Throws 422 AppError for invalid formats that can't be normalised.
+      usersUpdate.phone = normalisePhoneE164(String(phone));
+    }
+    if (username !== undefined) {
+      // The users_username_fmt constraint requires lowercase [a-z0-9_]{3,30}.
+      // Convert silently so the UI can submit mixed-case values without 500s.
+      const lower = String(username).trim().toLowerCase() || null;
+      if (lower && !/^[a-z0-9_]{3,30}$/.test(lower)) {
+        throw new AppError(
+          422, "INVALID_USERNAME",
+          "Username must be 3–30 characters and contain only letters, numbers and underscores",
+        );
+      }
+      usersUpdate.username = lower;
+    }
 
     // Fields that live on user_profiles
     const profileUpdate: Record<string, string | null> = {};
@@ -297,7 +328,10 @@ export async function updateProfileController(
       if (exists) {
         await db("user_profiles").where({ user_id: req.user.id }).update({ ...profileUpdate, updated_at: new Date() });
       } else {
-        await db("user_profiles").insert({ id: require("crypto").randomUUID(), user_id: req.user.id, ...profileUpdate, created_at: new Date(), updated_at: new Date() });
+        await db("user_profiles").insert({
+          id: randomUUID(), user_id: req.user.id,
+          ...profileUpdate, created_at: new Date(), updated_at: new Date(),
+        });
       }
     }
 
