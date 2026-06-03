@@ -19,6 +19,7 @@ export function EditProfilePage() {
     username:      user?.username      ?? '',
     date_of_birth: user?.date_of_birth ?? '',
     address_line1: user?.address_line1 ?? '',
+    gender:        user?.gender        ?? '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -98,6 +99,22 @@ export function EditProfilePage() {
             error={errors.address_line1}
             placeholder="e.g. 12 Main Street, Lagos"
           />
+          <div className="w-full">
+            <label htmlFor="gender" className="block text-sm font-medium text-ink mb-1.5">
+              Gender
+            </label>
+            <select
+              id="gender"
+              value={form.gender}
+              onChange={(e) => { setForm((f) => ({ ...f, gender: e.target.value })); setErrors((err) => ({ ...err, gender: '' })) }}
+              className="w-full rounded-xl border bg-surface-1 text-ink h-11 px-3.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent border-border"
+            >
+              <option value="">Select gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+            {errors.gender && <p className="mt-1.5 text-xs text-danger">{errors.gender}</p>}
+          </div>
           <Input
             label="Username"
             value={form.username}

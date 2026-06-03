@@ -44,6 +44,7 @@ function mapUser(raw: Record<string, unknown>): User {
     last_name:           (raw.last_name   ?? profile.last_name)   as string | null,
     date_of_birth:       (raw.date_of_birth  ?? profile.date_of_birth)  as string | null,
     address_line1:       (raw.address_line1  ?? profile.address_line1) as string | null,
+    gender:              (raw.gender         ?? profile.gender)        as string | null,
     username:            raw.username as string | null,
     role:                primaryRole(raw.roles as string[]),
     status:              raw.status as User['status'],
@@ -142,6 +143,7 @@ export const authApi = {
     username?:      string
     date_of_birth?: string
     address_line1?: string
+    gender?:        string
   }): Promise<User> => {
     // Normalise phone to E.164 before sending — the backend stores it in the
     // users table which has a CHECK constraint: phone ~ '^[+][1-9][0-9]{6,14}$'.

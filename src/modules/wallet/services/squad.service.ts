@@ -1,5 +1,6 @@
 import { createHmac } from "crypto";
 import { config } from "../../../config";
+import { logger } from "../../../lib/logger";
 import type {
   PaymentGateway,
   InitializePaymentParams,
@@ -120,6 +121,12 @@ async function squadFetch<T>(
 
     if (!res.ok) {
       const msg = (json as { message?: string } | null)?.message ?? `HTTP ${res.status}`;
+      logger.error("squad_api_error", {
+        method,
+        path,
+        http_status:   res.status,
+        response_body: json,
+      });
       throw new Error(`Squad ${method} ${path} failed: ${msg}`);
     }
 

@@ -39,6 +39,7 @@ export interface UserProfile {
   country:        string | null;
   city:           string | null;
   address_line1:  string | null;
+  gender:         string | null;  // "male" | "female" | "other" | "prefer_not_to_say"
   date_of_birth:  string | null;  // ISO "YYYY-MM-DD"
 }
 

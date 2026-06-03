@@ -41,6 +41,7 @@ export async function getOrCreateSquadVirtualAccount(
       "p.first_name",
       "p.last_name",
       "p.address_line1",
+      "p.gender",
       "p.date_of_birth",
     )
     .first();
@@ -54,6 +55,10 @@ export async function getOrCreateSquadVirtualAccount(
   if (!user.phone)         missingFields.push("phone number");
   if (!user.date_of_birth) missingFields.push("date of birth");
   if (!user.address_line1) missingFields.push("address");
+
+  // Squad only accepts "1" (male) or "2" (female) — any other value is treated as missing.
+  const SQUAD_GENDER: Record<string, string> = { male: "1", female: "2" };
+  if (!user.gender || !SQUAD_GENDER[user.gender as string]) missingFields.push("gender (Male or Female)");
 
   if (missingFields.length > 0) {
     const list = missingFields.join(", ");
@@ -102,6 +107,7 @@ export async function getOrCreateSquadVirtualAccount(
       email:               user.email         as string,
       dob:                 squadDob,
       address:             user.address_line1 as string,
+      gender:              SQUAD_GENDER[user.gender as string],
     });
 
     details = created;
