@@ -20,12 +20,14 @@ import {
   verifyFundingController,
 } from "../controllers/wallet-funding.controller";
 import { getDedicatedAccountController } from "../controllers/dva.controller";
+import { getSquadAccountController } from "../controllers/squad-dva.controller";
 
 const router = Router();
 
-router.get("/balance",  authenticate, balanceRateLimiter, getBalanceController);
-router.get("/ledger",   authenticate, balanceRateLimiter, getLedgerController);
-router.get("/account",  authenticate, balanceRateLimiter, getDedicatedAccountController);
+router.get("/balance",        authenticate, balanceRateLimiter, getBalanceController);
+router.get("/ledger",         authenticate, balanceRateLimiter, getLedgerController);
+router.get("/account",        authenticate, balanceRateLimiter, getDedicatedAccountController);
+router.get("/squad-account",  authenticate, balanceRateLimiter, getSquadAccountController);
 
 router.post("/fund/initialize",       authenticate, fundingRateLimiter, idempotency, initializeFundingController);
 router.post("/fund/verify/:reference", authenticate, fundingRateLimiter, verifyFundingController);

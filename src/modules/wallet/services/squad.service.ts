@@ -12,6 +12,45 @@ const TIMEOUT_MS = 15_000;
 
 // ── Internal response shapes ──────────────────────────────────────────────────
 
+interface SquadVirtualAccountResponse {
+  status:  number;
+  success: boolean;
+  message: string;
+  data: {
+    customer_identifier:    string;
+    first_name:             string;
+    last_name:              string;
+    mobile_num:             string;
+    email:                  string;
+    virtual_account_number: string;
+    account_name?:          string;
+    bank_code:              string;
+    bank_name:              string;
+    is_active:              boolean;
+    created_at:             string;
+  };
+}
+
+export interface SquadVirtualAccountDetails {
+  customer_identifier:    string;
+  virtual_account_number: string;
+  account_name:           string;
+  bank_name:              string;
+  bank_code:              string;
+}
+
+export interface CreateVirtualAccountParams {
+  customer_identifier: string;
+  first_name:          string;
+  last_name:           string;
+  mobile_num:          string;
+  email:               string;
+  bvn?:                string;
+  dob?:                string;   // MM/DD/YYYY
+  address?:            string;
+  gender?:             string;   // "1" = male, "2" = female
+}
+
 interface SquadInitializeResponse {
   status:  number;
   success: boolean;
@@ -163,6 +202,69 @@ class SquadGateway implements PaymentGateway {
       customer_email:    d.email ?? null,
       metadata:          d.meta ?? {},
     };
+  }
+
+  // ── Virtual Accounts (Reserved Accounts) ─────────────────────────────────
+
+  async createVirtualAccount(
+    params: CreateVirtualAccountParams
+  ): Promise<SquadVirtualAccountDetails> {
+    if (!isConfigured()) {
+      throw new Error("Squad is not configured — SQUAD_SECRET_KEY missing");
+    }
+
+    const body: Record<string, unknown> = {
+      customer_identifier: params.customer_identifier,
+      first_name:          params.first_name,
+      last_name:           params.last_name,
+      mobile_num:          params.mobile_num,
+      email:               params.email,
+    };
+    if (params.bvn)     body.bvn     = params.bvn;
+    if (params.dob)     body.dob     = params.dob;
+    if (params.address) body.address = params.address;
+    if (params.gender)  body.gender  = params.gender;
+
+    const res = await squadFetch<SquadVirtualAccountResponse>("POST", "/virtual-account", body);
+
+    if (!res.success) {
+      throw new Error(`Squad create virtual account failed: ${res.message}`);
+    }
+
+    const d = res.data;
+    return {
+      customer_identifier:    d.customer_identifier,
+      virtual_account_number: d.virtual_account_number,
+      account_name:           d.account_name ?? `${d.first_name} ${d.last_name}`,
+      bank_name:              d.bank_name,
+      bank_code:              d.bank_code,
+    };
+  }
+
+  async fetchVirtualAccount(
+    customerIdentifier: string
+  ): Promise<SquadVirtualAccountDetails | null> {
+    if (!isConfigured()) return null;
+
+    try {
+      const res = await squadFetch<SquadVirtualAccountResponse>(
+        "GET",
+        `/virtual-account/customer/${encodeURIComponent(customerIdentifier)}`
+      );
+
+      if (!res.success || !res.data?.virtual_account_number) return null;
+
+      const d = res.data;
+      return {
+        customer_identifier:    d.customer_identifier,
+        virtual_account_number: d.virtual_account_number,
+        account_name:           d.account_name ?? `${d.first_name} ${d.last_name}`,
+        bank_name:              d.bank_name,
+        bank_code:              d.bank_code,
+      };
+    } catch {
+      return null;
+    }
   }
 
   // Squad signs webhook payloads with HMAC-SHA512 of the raw request body.

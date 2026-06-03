@@ -29,11 +29,22 @@ export async function squadWebhookController(
       ? (payload.Body as Record<string, unknown>)
       : {};
 
-    const squadRef   = typeof body.transaction_ref  === "string" ? body.transaction_ref  : null;
-    const channel    = typeof body.channel          === "string" ? body.channel          :
-                       typeof body.payment_type     === "string" ? body.payment_type     : null;
-    const amountKobo = typeof body.merchant_amount  === "number" ? body.merchant_amount  : null;
-    const paidAt     = typeof body.paid_at          === "string" ? body.paid_at          : null;
+    // Checkout payment fields
+    const squadRef   = typeof body.transaction_ref === "string" ? body.transaction_ref : null;
+    const channel    = typeof body.channel         === "string" ? body.channel         :
+                       typeof body.payment_type    === "string" ? body.payment_type    : null;
+    const amountKobo = typeof body.merchant_amount === "number" ? body.merchant_amount : null;
+    const paidAt     = typeof body.paid_at         === "string" ? body.paid_at         : null;
+
+    // Virtual account credit fields
+    const customerIdentifier   = typeof body.customer_identifier    === "string" ? body.customer_identifier    : null;
+    const virtualAccountNumber = typeof body.virtual_account_number === "string" ? body.virtual_account_number : null;
+    const senderName           = typeof body.sender_name            === "string" ? body.sender_name            : null;
+    // VA credit amounts come as numeric strings in NGN (e.g. "5000.00"), not kobo
+    const rawPrincipal = body.principal_amount;
+    const amountNgn    = rawPrincipal != null ? parseFloat(String(rawPrincipal)) : null;
+    // For VA credits, use transaction_ref as the deduplication reference
+    const vaTransactionRef = squadRef ?? reference;
 
     logger.info("squad_webhook_received", {
       event,
@@ -68,7 +79,7 @@ export async function squadWebhookController(
         provider_code:         "squad",
         event_type:            event,
         provider_reference:    squadRef,
-        transaction_reference: reference,
+        transaction_reference: event === "virtual-account.credit" ? vaTransactionRef : reference,
         payload,
         headers: Object.fromEntries(
           Object.entries(req.headers).filter(([, v]) => v !== undefined)
@@ -87,20 +98,20 @@ export async function squadWebhookController(
       return next(storeErr);
     }
 
-    // ── Enqueue processing for charge_successful with valid signature ──────────
+    // ── Enqueue processing for actionable events with valid signature ──────────
     if (event === "charge_successful" && reference && signatureValid) {
       const jobPayload: SquadWebhookJobPayload = {
         webhook_event_id: eventRecord.id,
         reference,
         event,
-        channel:     channel   ?? null,
-        squad_ref:   squadRef  ?? null,
+        channel:     channel    ?? null,
+        squad_ref:   squadRef   ?? null,
         amount_kobo: amountKobo ?? null,
-        paid_at:     paidAt    ?? null,
+        paid_at:     paidAt     ?? null,
       };
 
       await squadWebhookQueue.add("process-payment", jobPayload, {
-        jobId:    `squad_${reference}`,  // deduplication key
+        jobId:    `squad_${reference}`,
         attempts: 5,
         backoff:  { type: "exponential", delay: 5_000 },
       });
@@ -110,13 +121,42 @@ export async function squadWebhookController(
         channel:          channel ?? null,
         webhook_event_id: eventRecord.id,
       });
-    } else if (event === "charge_successful" && !signatureValid) {
-      logger.warn("squad_webhook_charge_success_rejected", {
+
+    } else if (event === "virtual-account.credit" && vaTransactionRef && signatureValid) {
+      const jobPayload: SquadWebhookJobPayload = {
+        webhook_event_id:       eventRecord.id,
+        reference:              vaTransactionRef,
+        event,
+        squad_ref:              squadRef ?? null,
+        channel:                "virtual_account",
+        customer_identifier:    customerIdentifier,
+        amount_ngn:             !isNaN(amountNgn!) ? amountNgn : null,
+        virtual_account_number: virtualAccountNumber,
+        sender_name:            senderName,
+        paid_at:                paidAt ?? (typeof body.created_at === "string" ? body.created_at : null),
+      };
+
+      await squadWebhookQueue.add("process-va-credit", jobPayload, {
+        jobId:    `squad_va_${vaTransactionRef}`,  // deduplication key
+        attempts: 5,
+        backoff:  { type: "exponential", delay: 5_000 },
+      });
+
+      logger.info("squad_va_credit_enqueued", {
+        transaction_ref:        vaTransactionRef,
+        customer_identifier:    customerIdentifier ?? null,
+        amount_ngn:             amountNgn,
+        webhook_event_id:       eventRecord.id,
+      });
+
+    } else if ((event === "charge_successful" || event === "virtual-account.credit") && !signatureValid) {
+      logger.warn("squad_webhook_rejected", {
         reason:           "invalid_signature",
-        reference,
+        event,
+        reference:        event === "virtual-account.credit" ? vaTransactionRef : reference,
         webhook_event_id: eventRecord.id,
       });
-    } else if (event && event !== "charge_successful") {
+    } else if (event && event !== "charge_successful" && event !== "virtual-account.credit") {
       logger.info("squad_webhook_event_unhandled", {
         event,
         webhook_event_id: eventRecord.id,
