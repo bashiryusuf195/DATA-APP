@@ -569,7 +569,7 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
       "u.is_email_verified", "u.is_phone_verified",
       "u.last_login_at", "u.login_count", "u.created_at",
       "p.first_name", "p.last_name", "p.display_name",
-      "p.avatar_url", "p.country", "p.city", "p.date_of_birth",
+      "p.avatar_url", "p.country", "p.city", "p.address_line1", "p.date_of_birth",
       db.raw("u.transaction_pin_hash IS NOT NULL AS has_transaction_pin"),
     ]);
 
@@ -598,6 +598,7 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
       avatar_url:    (row.avatar_url    as string | null) ?? null,
       country:       (row.country       as string | null) ?? null,
       city:          (row.city          as string | null) ?? null,
+      address_line1: (row.address_line1 as string | null) ?? null,
       date_of_birth: row.date_of_birth
         ? (row.date_of_birth instanceof Date
             ? row.date_of_birth.toISOString().slice(0, 10)

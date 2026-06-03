@@ -18,6 +18,7 @@ export function EditProfilePage() {
     phone:         user?.phone         ?? '',
     username:      user?.username      ?? '',
     date_of_birth: user?.date_of_birth ?? '',
+    address_line1: user?.address_line1 ?? '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -89,6 +90,13 @@ export function EditProfilePage() {
             onChange={set('date_of_birth')}
             error={errors.date_of_birth}
             max={new Date().toISOString().slice(0, 10)}
+          />
+          <Input
+            label="Address"
+            value={form.address_line1}
+            onChange={set('address_line1')}
+            error={errors.address_line1}
+            placeholder="e.g. 12 Main Street, Lagos"
           />
           <Input
             label="Username"

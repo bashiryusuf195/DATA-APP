@@ -40,6 +40,7 @@ export async function getOrCreateSquadVirtualAccount(
       "users.phone",
       "p.first_name",
       "p.last_name",
+      "p.address_line1",
       "p.date_of_birth",
     )
     .first();
@@ -52,6 +53,7 @@ export async function getOrCreateSquadVirtualAccount(
   if (!user.last_name)     missingFields.push("last name");
   if (!user.phone)         missingFields.push("phone number");
   if (!user.date_of_birth) missingFields.push("date of birth");
+  if (!user.address_line1) missingFields.push("address");
 
   if (missingFields.length > 0) {
     const list = missingFields.join(", ");
@@ -94,11 +96,12 @@ export async function getOrCreateSquadVirtualAccount(
 
     const created = await squadGateway.createVirtualAccount({
       customer_identifier: customerIdentifier,
-      first_name:          user.first_name as string,
-      last_name:           user.last_name  as string,
+      first_name:          user.first_name    as string,
+      last_name:           user.last_name     as string,
       mobile_num:          mobileNum,
-      email:               user.email      as string,
+      email:               user.email         as string,
       dob:                 squadDob,
+      address:             user.address_line1 as string,
     });
 
     details = created;

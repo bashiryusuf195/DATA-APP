@@ -285,7 +285,7 @@ export async function updateProfileController(
   try {
     if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
 
-    const { first_name, last_name, phone, username, date_of_birth } = req.body as Record<string, string>;
+    const { first_name, last_name, phone, username, date_of_birth, address_line1 } = req.body as Record<string, string>;
     const { randomUUID } = await import("crypto");
     const db = getDbInstance();
 
@@ -311,8 +311,9 @@ export async function updateProfileController(
 
     // Fields that live on user_profiles
     const profileUpdate: Record<string, string | null> = {};
-    if (first_name !== undefined) profileUpdate.first_name = String(first_name).trim() || null;
-    if (last_name  !== undefined) profileUpdate.last_name  = String(last_name).trim()  || null;
+    if (first_name    !== undefined) profileUpdate.first_name    = String(first_name).trim()    || null;
+    if (last_name     !== undefined) profileUpdate.last_name     = String(last_name).trim()     || null;
+    if (address_line1 !== undefined) profileUpdate.address_line1 = String(address_line1).trim() || null;
     if (date_of_birth !== undefined) {
       const dob = String(date_of_birth).trim();
       if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
@@ -349,7 +350,7 @@ export async function updateProfileController(
         "users.id", "users.email", "users.phone", "users.username",
         "users.status", "users.kyc_level", "users.is_email_verified",
         "users.referral_code", "users.created_at",
-        "p.first_name", "p.last_name", "p.date_of_birth",
+        "p.first_name", "p.last_name", "p.address_line1", "p.date_of_birth",
       )
       .first();
 

@@ -38,6 +38,7 @@ export interface UserProfile {
   avatar_url:     string | null;
   country:        string | null;
   city:           string | null;
+  address_line1:  string | null;
   date_of_birth:  string | null;  // ISO "YYYY-MM-DD"
 }
 
