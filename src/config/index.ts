@@ -93,11 +93,23 @@ export const config = {
   // All optional — wallet funding endpoint will return 503 if absent.
   // Populate PAYSTACK_* env vars to enable live funding.
   paystack: {
-    secretKey:   optional('PAYSTACK_SECRET_KEY',   ''),
-    publicKey:   optional('PAYSTACK_PUBLIC_KEY',   ''),
-    baseUrl:     optional('PAYSTACK_BASE_URL',      'https://api.paystack.co'),
-    callbackUrl: optional('PAYSTACK_CALLBACK_URL', ''),
+    secretKey:     optional('PAYSTACK_SECRET_KEY',     ''),
+    publicKey:     optional('PAYSTACK_PUBLIC_KEY',     ''),
+    baseUrl:       optional('PAYSTACK_BASE_URL',        'https://api.paystack.co'),
+    callbackUrl:   optional('PAYSTACK_CALLBACK_URL',   ''),
     webhookSecret: optional('PAYSTACK_WEBHOOK_SECRET', ''),
+  },
+
+  // ── Squad ──────────────────────────────────────────────────────────────────
+  // All optional — wallet funding endpoint will return 503 if absent.
+  // Sandbox: https://sandbox-api-d.squadco.com
+  // Production: see Squad dashboard for the live base URL.
+  squad: {
+    secretKey:     optional('SQUAD_SECRET_KEY',     ''),
+    publicKey:     optional('SQUAD_PUBLIC_KEY',     ''),
+    baseUrl:       optional('SQUAD_BASE_URL',        'https://sandbox-api-d.squadco.com'),
+    callbackUrl:   optional('SQUAD_CALLBACK_URL',   ''),
+    webhookSecret: optional('SQUAD_WEBHOOK_SECRET', ''),
   },
 
   // ── Workers ───────────────────────────────────────────────────────────────

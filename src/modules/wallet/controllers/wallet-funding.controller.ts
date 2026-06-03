@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDbInstance } from "../../../db/knex";
 import { logger } from "../../../lib/logger";
 import { paystackGateway } from "../services/paystack.service";
+import { squadGateway } from "../services/squad.service";
 import {
   createFundingTransaction,
   getFundingTransactionByReference,
@@ -21,6 +22,7 @@ import {
 } from "../../payment-gateways/services/payment-gateway.service";
 import { processReferralReward } from "../../referral/services/referral-reward.service";
 import { checkFundingVelocity } from "../../transactions/services/velocity.service";
+import type { PaymentGateway } from "../types/payment-gateway.types";
 
 const db            = getDbInstance();
 const walletService = new WalletService(db);
@@ -65,8 +67,15 @@ export async function initializeFundingController(
       return;
     }
 
-    // Only Paystack is currently supported — unsupported gateways return 501
-    if (activeGateway.code !== "paystack") {
+    // Resolve the gateway adapter — add new cases here as gateways are added
+    let gateway: (PaymentGateway & { isConfigured(): boolean }) | null = null;
+    if (activeGateway.code === "paystack") {
+      gateway = paystackGateway;
+    } else if (activeGateway.code === "squad") {
+      gateway = squadGateway;
+    }
+
+    if (!gateway) {
       res.status(501).json({
         success: false,
         error:   `Payment gateway '${activeGateway.name}' is configured but not yet implemented.`,
@@ -75,15 +84,15 @@ export async function initializeFundingController(
       return;
     }
 
-    if (!paystackGateway.isConfigured()) {
+    if (!gateway.isConfigured()) {
       res.status(503).json({
         success: false,
-        error:   "Paystack is not configured. Contact support.",
+        error:   `${activeGateway.name} is not configured. Contact support.`,
       });
       return;
     }
 
-    // Load user email for Paystack initialization
+    // Load user email for payment initialization
     const user = await db("users").where({ id: userId }).select("id", "email").first();
     if (!user) {
       res.status(404).json({ success: false, error: "User not found" });
@@ -110,8 +119,8 @@ export async function initializeFundingController(
       metadata:        { initiated_by: userId, gateway_id: activeGateway.id },
     });
 
-    // Initialize with Paystack — passes our reference so we can match on webhook
-    const paymentResult = await paystackGateway.initializePayment({
+    // Initialize payment — passes our reference so we can match on webhook
+    const paymentResult = await gateway.initializePayment({
       email:       user.email,
       amount_kobo: amountKobo,
       reference,
@@ -209,8 +218,24 @@ export async function verifyFundingController(
       return;
     }
 
-    // ── Verify with Paystack API — never trust client input ───────────────────
-    if (!paystackGateway.isConfigured()) {
+    // ── Resolve the gateway adapter used for this transaction ────────────────
+    const gatewayCode = fundingTx.payment_gateway;
+    let verifyGateway: (PaymentGateway & { isConfigured(): boolean }) | null = null;
+    if (gatewayCode === "paystack") {
+      verifyGateway = paystackGateway;
+    } else if (gatewayCode === "squad") {
+      verifyGateway = squadGateway;
+    }
+
+    if (!verifyGateway) {
+      res.status(501).json({
+        success: false,
+        error:   `Payment gateway '${gatewayCode}' verification is not implemented.`,
+      });
+      return;
+    }
+
+    if (!verifyGateway.isConfigured()) {
       res.status(503).json({
         success: false,
         error:   "Payment gateway is not configured. Contact support.",
@@ -218,10 +243,11 @@ export async function verifyFundingController(
       return;
     }
 
-    const verifyResult = await paystackGateway.verifyPayment(reference);
+    const verifyResult = await verifyGateway.verifyPayment(reference);
 
     logger.info("wallet_fund_verify_result", {
       reference,
+      gateway: gatewayCode,
       status:  verifyResult.status,
       channel: verifyResult.channel ?? "unknown",
     });
@@ -233,7 +259,7 @@ export async function verifyFundingController(
         provider_reference: verifyResult.gateway_reference,
         metadata: {
           ...fundingTx.metadata,
-          paystack_status: verifyResult.status,
+          gateway_status:  verifyResult.status,
           last_checked_at: new Date().toISOString(),
         },
       });
@@ -252,7 +278,7 @@ export async function verifyFundingController(
       return;
     }
 
-    // ── Paystack confirmed — credit the wallet ────────────────────────────────
+    // ── Gateway confirmed — credit the wallet ─────────────────────────────────
     const settlementWalletId = process.env.SYSTEM_SETTLEMENT_WALLET_ID;
     if (!settlementWalletId) {
       throw new Error("SYSTEM_SETTLEMENT_WALLET_ID is not configured");
@@ -277,11 +303,11 @@ export async function verifyFundingController(
         contra_wallet_id: settlementWalletId,
         amount:           amountNgn,
         currency:         "NGN",
-        description:      `Wallet funding via Paystack (${reference})`,
-        idempotency_key:  `paystack_credit_${reference}`,
-        reference_type:   "paystack_funding",
+        description:      `Wallet funding via ${gatewayCode} (${reference})`,
+        idempotency_key:  `${gatewayCode}_credit_${reference}`,
+        reference_type:   `${gatewayCode}_funding`,
         reference_id:     fundingTx.id,
-        metadata:         { reference, gateway: "paystack" },
+        metadata:         { reference, gateway: gatewayCode },
       });
 
       // Fetch the new balance immediately after credit
@@ -300,9 +326,9 @@ export async function verifyFundingController(
           source_wallet_id:      settlementWalletId,
           destination_wallet_id: userWallet.id,
           journal_batch_id:      walletResult.journal_batch_id,
-          provider:              "paystack",
+          provider:              gatewayCode,
           provider_reference:    verifyResult.gateway_reference,
-          description:           "Wallet funding via Paystack",
+          description:           `Wallet funding via ${gatewayCode}`,
           metadata: {
             payment_channel:        verifyResult.channel,
             paid_at:                verifyResult.paid_at?.toISOString() ?? null,
@@ -322,7 +348,7 @@ export async function verifyFundingController(
         paid_at:            verifyResult.paid_at,
         metadata: {
           ...fundingTx.metadata,
-          paystack_raw: {
+          gateway_raw: {
             status:            verifyResult.status,
             channel:           verifyResult.channel,
             gateway_reference: verifyResult.gateway_reference,
@@ -348,7 +374,7 @@ export async function verifyFundingController(
         channel: "in_app",
         type:    "wallet_funded",
         title:   "Wallet Funded",
-        message: `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? "Paystack"}.`,
+        message: `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? gatewayCode}.`,
         metadata: {
           reference,
           paid_amount_ngn:  paidAmountNgn,
@@ -365,6 +391,7 @@ export async function verifyFundingController(
 
       logger.info("wallet_fund_credited", {
         reference,
+        gateway:     gatewayCode,
         user_id:     fundingTx.user_id,
         amount_ngn:  amountNgn,
         idempotent:  walletResult.idempotent,
@@ -384,12 +411,13 @@ export async function verifyFundingController(
       res.status(200).json({ success: true, data });
 
     } catch (creditErr) {
-      // Paystack confirmed the payment, but the wallet credit failed.
-      // Persist the Paystack confirmation in metadata so the repair script can
+      // Gateway confirmed the payment, but the wallet credit failed.
+      // Persist the confirmation in metadata so the repair script can
       // find and retry this funding.  Do NOT set verified=true — the next
       // verify call will re-attempt the credit safely (idempotent key).
       logger.error("wallet_fund_credit_failed", {
         reference,
+        gateway: gatewayCode,
         user_id: fundingTx.user_id,
         error:   (creditErr as Error).message,
       });
@@ -398,8 +426,8 @@ export async function verifyFundingController(
         provider_reference: verifyResult.gateway_reference,
         metadata: {
           ...fundingTx.metadata,
-          paystack_confirmed:  true,
-          paystack_raw: {
+          gateway_confirmed: true,
+          gateway_raw: {
             status:            verifyResult.status,
             channel:           verifyResult.channel,
             gateway_reference: verifyResult.gateway_reference,

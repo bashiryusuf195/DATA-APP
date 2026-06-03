@@ -11,6 +11,7 @@ if (!config.workers.disabled) {
     import("./workers/vtu-purchase.worker"),
     import("./workers/vtu-verify-pending.worker"),
     import("./workers/paystack-webhook.worker"),
+    import("./workers/squad-webhook.worker"),
     import("../reconciliation/workers/reconciliation.worker"),
     import("../notifications/workers/notification.worker"),
   ]);
