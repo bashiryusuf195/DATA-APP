@@ -1,5 +1,7 @@
 import { createHmac } from "crypto";
 import { config } from "../../../config";
+import { logger } from "../../../lib/logger";
+import { AppError } from "../../../shared/errors/AppError";
 import type {
   PaymentGateway,
   InitializePaymentParams,
@@ -134,6 +136,10 @@ async function paystackFetch<T>(
 
   const url = `${config.paystack.baseUrl}${path}`;
 
+  if (body) {
+    logger.debug("paystack_request", { method, path, body });
+  }
+
   try {
     const res = await fetch(url, {
       method,
@@ -149,13 +155,18 @@ async function paystackFetch<T>(
 
     if (!res.ok) {
       const msg = (json as { message?: string }).message ?? `HTTP ${res.status}`;
-      throw new Error(`Paystack ${method} ${path} failed: ${msg}`);
+      logger.error("paystack_error_response", { method, path, http_status: res.status, message: msg });
+      // 4xx = bad request / validation — caller error, surface as 400
+      // 5xx = Paystack-side failure — surface as 502 Bad Gateway
+      const statusCode = res.status >= 500 ? 502 : 400;
+      throw new AppError(statusCode, "PAYMENT_GATEWAY_ERROR", `Paystack ${method} ${path} failed: ${msg}`);
     }
 
     return json;
   } catch (err) {
+    if (err instanceof AppError) throw err;
     if ((err as Error).name === "AbortError") {
-      throw new Error(`Paystack request timed out: ${method} ${path}`);
+      throw new AppError(504, "PAYMENT_GATEWAY_TIMEOUT", `Paystack request timed out: ${method} ${path}`);
     }
     throw err;
   } finally {
@@ -210,19 +221,24 @@ class PaystackGateway implements PaymentGateway {
     metadata?:   Record<string, unknown>;
   }): Promise<TransferAccountDetails & { reference: string }> {
     if (!isConfigured()) {
-      throw new Error("Paystack is not configured — PAYSTACK_SECRET_KEY missing");
+      throw new AppError(503, "PAYMENT_GATEWAY_ERROR", "Paystack is not configured — PAYSTACK_SECRET_KEY missing");
     }
+
+    // account_expires_at is required by Paystack — set to 1 hour from now.
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
     const res = await paystackFetch<PaystackChargeResponse>("POST", "/charge", {
       email:     params.email,
       amount:    params.amount_kobo,
       reference: params.reference,
       metadata:  params.metadata,
-      bank_transfer: {},
+      bank_transfer: {
+        account_expires_at: expiresAt,
+      },
     });
 
     if (!res.status) {
-      throw new Error(`Paystack bank transfer charge failed: ${res.message}`);
+      throw new AppError(502, "PAYMENT_GATEWAY_ERROR", `Paystack bank transfer charge failed: ${res.message}`);
     }
 
     const d = res.data;
