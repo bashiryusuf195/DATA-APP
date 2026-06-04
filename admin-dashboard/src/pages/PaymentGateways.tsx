@@ -14,6 +14,15 @@ import type {
 } from '@/types'
 import { cn } from '@/utils/cn'
 
+// ── Gateway descriptions ──────────────────────────────────────────────────────
+
+const GATEWAY_DESCRIPTIONS: Record<string, string> = {
+  paystack:  'Nigerian payment processor — supports card, bank transfer, USSD, and dedicated virtual accounts (DVA). Live base URL: https://api.paystack.co',
+  squad:     'Squad by GTBank — supports DVA and QR payments. Sandbox: https://sandbox-api-d.squadco.com · Live: https://api-d.squadco.com',
+  monnify:   'Monnify by Moniepoint — supports reserved accounts and card payments. Sandbox: https://sandbox.monnify.com · Live: https://api.monnify.com',
+  billstack: 'BillStack — VTU and utility bill aggregator. Contact BillStack support for base URL and credentials.',
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmtCharge(gw: PaymentGateway): string {
@@ -178,10 +187,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
     // Code is immutable after creation
     if (isEdit) delete payload.code
 
-    // Debug: verify charge_value type before sending
-    console.log('[GatewayModal] payload charge_value:', payload.charge_value, typeof payload.charge_value)
-
-    onSave(payload as CreatePaymentGatewayInput)
+    onSave(payload as unknown as CreatePaymentGatewayInput)
   }
 
   // Env-var context for the current gateway (only available when editing)
@@ -511,8 +517,6 @@ export function PaymentGatewaysPage() {
   function openEdit(gw: PaymentGateway) { setEditing(gw); setSaveError(null); setModalOpen(true) }
 
   function handleSave(data: CreatePaymentGatewayInput | UpdatePaymentGatewayInput) {
-    // Debug: confirm charge_value is a number at the mutation boundary
-    console.log('[handleSave] charge_value:', (data as Record<string, unknown>).charge_value, typeof (data as Record<string, unknown>).charge_value)
     if (editing) {
       updateMutation.mutate({ id: editing.id, body: data as UpdatePaymentGatewayInput })
     } else {
@@ -610,6 +614,11 @@ export function PaymentGatewaysPage() {
                       <ModeBadge live={gw.is_live} />
                       <span className="text-xs text-ink-faint font-mono">{gw.code}</span>
                     </div>
+                    {GATEWAY_DESCRIPTIONS[gw.code] && (
+                      <p className="text-xs text-ink-faint mt-1.5 leading-relaxed max-w-xl">
+                        {GATEWAY_DESCRIPTIONS[gw.code]}
+                      </p>
+                    )}
                   </div>
                 </div>
 

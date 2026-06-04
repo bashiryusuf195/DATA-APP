@@ -41,6 +41,8 @@ export function TransactionsPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [serviceType, setServiceType] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [selected, setSelected] = useState<Transaction | null>(null)
   const [confirmRetry, setConfirmRetry] = useState(false)
 
@@ -65,6 +67,8 @@ export function TransactionsPage() {
   })
 
   const debouncedSearch = useDebounce(search)
+  const debouncedFrom   = useDebounce(dateFrom)
+  const debouncedTo     = useDebounce(dateTo)
   const limit = 20
 
   const { data: attemptsData } = useQuery({
@@ -76,14 +80,16 @@ export function TransactionsPage() {
   const attempts: ProviderAttempt[] = attemptsData?.data ?? []
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['admin-transactions', { page, limit, status, service_type: serviceType, reference: debouncedSearch }],
+    queryKey: ['admin-transactions', { page, limit, status, service_type: serviceType, reference: debouncedSearch, date_from: debouncedFrom, date_to: debouncedTo }],
     queryFn: () =>
       transactionsApi.list({
         page,
         limit,
-        ...(status ? { status } : {}),
-        ...(serviceType ? { service_type: serviceType } : {}),
-        ...(debouncedSearch ? { reference: debouncedSearch } : {}),
+        ...(status           ? { status }                     : {}),
+        ...(serviceType      ? { service_type: serviceType }  : {}),
+        ...(debouncedSearch  ? { reference: debouncedSearch } : {}),
+        ...(debouncedFrom    ? { date_from: debouncedFrom }   : {}),
+        ...(debouncedTo      ? { date_to: debouncedTo }       : {}),
       }),
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -92,8 +98,8 @@ export function TransactionsPage() {
   const rows: Transaction[] = data && 'data' in data ? data.data : []
   const total = data && 'total' in data ? (data.total ?? rows.length) : rows.length
 
-  const clearFilters = () => { setSearch(''); setStatus(''); setServiceType(''); setPage(1) }
-  const hasFilters = search || status || serviceType
+  const clearFilters = () => { setSearch(''); setStatus(''); setServiceType(''); setDateFrom(''); setDateTo(''); setPage(1) }
+  const hasFilters = search || status || serviceType || dateFrom || dateTo
 
   if (error) return <ErrorMessage error={error} onRetry={() => void refetch()} endpoint={ENDPOINTS.transactions.path} />
 
@@ -132,6 +138,23 @@ export function TransactionsPage() {
             onChange={(e) => { setServiceType(e.target.value); setPage(1) }}
             options={SERVICE_OPTIONS}
             placeholder="All services"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+            title="From date"
+            className="h-9 rounded-lg border border-border bg-surface-1 px-3 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <span className="text-xs text-ink-faint">–</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+            title="To date"
+            className="h-9 rounded-lg border border-border bg-surface-1 px-3 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
         {hasFilters && (

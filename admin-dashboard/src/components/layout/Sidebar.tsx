@@ -3,130 +3,143 @@ import { NavLink } from 'react-router-dom'
 import { useUiStore } from '@/store/ui.store'
 import { useState, useCallback } from 'react'
 import {
-  LayoutDashboard,
-  Zap,
-  GitBranch,
-  ArrowLeftRight,
-  CreditCard,
-  HeartPulse,
-  Wallet,
-  Bell,
-  WalletCards,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Users,
-  RotateCcw,
-  Scale,
-  List,
-  Globe,
-  Plug,
-  Landmark,
-  ClipboardList,
-  SlidersHorizontal,
-  ArrowUpDown,
-  Radio,
-  ShieldCheck,
-  Gift,
-  MessageSquare,
-  Flag,
-  PackageX,
-  Webhook,
-  Layout,
-  MonitorDot,
-  HeartHandshake,
-  HardDrive,
+  LayoutDashboard, Zap, GitBranch, ArrowLeftRight, CreditCard,
+  HeartPulse, Wallet, Bell, WalletCards, ChevronLeft, ChevronRight,
+  ChevronDown, Users, RotateCcw, Scale, List, Globe, Plug, Landmark,
+  ClipboardList, SlidersHorizontal, ArrowUpDown, Radio, ShieldCheck,
+  Gift, MessageSquare, Flag, PackageX, Webhook, Layout, MonitorDot,
+  HeartHandshake, HardDrive, KeyRound, TrendingUp, AlertTriangle,
+  BookOpen, Tag, RefreshCcw,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface NavItem {
-  to: string
+  to:    string
   label: string
-  icon: ReactNode
+  icon:  ReactNode
 }
 
 interface NavSection {
-  key: string
+  key:   string
   title: string
   items: NavItem[]
 }
 
 const nav: NavSection[] = [
   {
-    key: 'overview',
+    key:   'overview',
     title: 'Overview',
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'users',
-    title: 'Users & Wallets',
+    key:   'users',
+    title: 'Users',
     items: [
-      { to: '/users',              label: 'Users',            icon: <Users         className="h-4 w-4" /> },
-      { to: '/system/wallet-adjust', label: 'Manual Wallet Ops', icon: <ArrowUpDown className="h-4 w-4" /> },
-      { to: '/wallets',            label: 'Wallets',          icon: <Wallet        className="h-4 w-4" /> },
-      { to: '/transactions',       label: 'Transactions',     icon: <ArrowLeftRight className="h-4 w-4" /> },
-      { to: '/finance/refunds-reversals', label: 'Refunds',  icon: <RotateCcw     className="h-4 w-4" /> },
+      { to: '/users', label: 'Users',              icon: <Users       className="h-4 w-4" /> },
+      { to: '/roles', label: 'Roles & Permissions', icon: <ShieldCheck className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'services',
-    title: 'Services & Operations',
+    key:   'wallet',
+    title: 'Wallet & Funding',
     items: [
-      { to: '/service-plans',        label: 'Service & Plans',  icon: <List       className="h-4 w-4" /> },
-      { to: '/service-availability', label: 'Availability',     icon: <Globe      className="h-4 w-4" /> },
-      { to: '/routing-rules',        label: 'API Routing',      icon: <GitBranch  className="h-4 w-4" /> },
-      { to: '/api-integrations',     label: 'API Integrations', icon: <Plug       className="h-4 w-4" /> },
-      { to: '/provider-wallets',     label: 'Provider Wallets', icon: <WalletCards className="h-4 w-4" /> },
+      { to: '/system/wallet-adjust', label: 'Manual Wallet Ops',   icon: <ArrowUpDown className="h-4 w-4" /> },
+      { to: '/wallets',              label: 'Wallets',              icon: <Wallet      className="h-4 w-4" /> },
+      { to: '/funding',              label: 'Funding Transactions', icon: <Landmark    className="h-4 w-4" /> },
+      { to: '/ledger',               label: 'Ledger',               icon: <BookOpen    className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key:   'transactions',
+    title: 'Transactions',
+    items: [
+      { to: '/transactions',                 label: 'Transactions',      icon: <ArrowLeftRight className="h-4 w-4" /> },
+      { to: '/attempts',                     label: 'Provider Attempts', icon: <RefreshCcw     className="h-4 w-4" /> },
+      { to: '/finance/refunds-reversals',    label: 'Refunds',           icon: <RotateCcw      className="h-4 w-4" /> },
+      { to: '/finance/reconciliation-reports', label: 'Reconciliation',  icon: <Scale          className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key:   'services',
+    title: 'Services & Pricing',
+    items: [
+      { to: '/service-plans',        label: 'Service Plans', icon: <List  className="h-4 w-4" /> },
+      { to: '/service-availability', label: 'Availability',  icon: <Globe className="h-4 w-4" /> },
+      { to: '/pricing',              label: 'Pricing',       icon: <Tag   className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key:   'providers',
+    title: 'Providers',
+    items: [
+      { to: '/providers',               label: 'Providers',       icon: <Plug       className="h-4 w-4" /> },
+      { to: '/api-integrations',        label: 'Credentials',     icon: <KeyRound   className="h-4 w-4" /> },
+      { to: '/routing-rules',           label: 'Routing Rules',   icon: <GitBranch  className="h-4 w-4" /> },
+      { to: '/provider-wallets',        label: 'Provider Wallets',icon: <WalletCards className="h-4 w-4" /> },
       { to: '/operations/provider-health', label: 'Provider Health', icon: <HeartPulse className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'payments',
+    key:   'payments',
     title: 'Payments',
     items: [
-      { to: '/payment-gateways',               label: 'Payment Gateways',     icon: <CreditCard className="h-4 w-4" /> },
-      { to: '/funding',                         label: 'Funding Transactions', icon: <Landmark   className="h-4 w-4" /> },
-      { to: '/finance/reconciliation-reports',  label: 'Reconciliation',       icon: <Scale      className="h-4 w-4" /> },
+      { to: '/payment-gateways',    label: 'Payment Gateways', icon: <CreditCard className="h-4 w-4" /> },
+      { to: '/operations/webhooks', label: 'Webhook Events',   icon: <Webhook    className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'growth',
-    title: 'Growth & Communication',
+    key:   'comms',
+    title: 'Notifications & Broadcasts',
     items: [
-      { to: '/referral-program',              label: 'Referral Program', icon: <Gift          className="h-4 w-4" /> },
-      { to: '/communication/notifications',   label: 'Notifications',    icon: <Bell          className="h-4 w-4" /> },
-      { to: '/communication/broadcasts',      label: 'Broadcast',        icon: <Radio         className="h-4 w-4" /> },
-      { to: '/support/tickets',               label: 'Support',          icon: <MessageSquare className="h-4 w-4" /> },
-      { to: '/support/disputes',              label: 'Disputes',         icon: <Flag          className="h-4 w-4" /> },
+      { to: '/communication/broadcasts',   label: 'Broadcast Center', icon: <Radio         className="h-4 w-4" /> },
+      { to: '/communication/notifications',label: 'Notifications',    icon: <Bell          className="h-4 w-4" /> },
+      { to: '/support/tickets',            label: 'Support Tickets',  icon: <MessageSquare className="h-4 w-4" /> },
+      { to: '/support/disputes',           label: 'Disputes',         icon: <Flag          className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'security',
-    title: 'Security & Compliance',
+    key:   'reports',
+    title: 'Reports',
     items: [
-      { to: '/compliance/kyc',   label: 'KYC / Compliance', icon: <ShieldCheck       className="h-4 w-4" /> },
-      { to: '/audit-logs',       label: 'Audit Logs',       icon: <ClipboardList     className="h-4 w-4" /> },
-      { to: '/app-content',      label: 'App Content',      icon: <Layout            className="h-4 w-4" /> },
-      { to: '/settings',         label: 'Settings',         icon: <SlidersHorizontal className="h-4 w-4" /> },
+      { to: '/finance/revenue',                label: 'Revenue',        icon: <TrendingUp    className="h-4 w-4" /> },
+      { to: '/finance/reconciliation-issues',  label: 'Recon Issues',   icon: <AlertTriangle className="h-4 w-4" /> },
+      { to: '/audit-logs',                     label: 'Audit Logs',     icon: <ClipboardList className="h-4 w-4" /> },
+      { to: '/referral-program',               label: 'Referral Program',icon: <Gift         className="h-4 w-4" /> },
     ],
   },
   {
-    key: 'system',
-    title: 'System',
+    key:   'security',
+    title: 'Security',
     items: [
-      { to: '/operations/system-health',     label: 'System Health',     icon: <HeartHandshake className="h-4 w-4" /> },
-      { to: '/operations/backup-integrity',  label: 'Backup & Integrity', icon: <HardDrive      className="h-4 w-4" /> },
-      { to: '/operations/queue-monitor', label: 'Queue Monitor', icon: <MonitorDot     className="h-4 w-4" /> },
-      { to: '/failed-jobs',              label: 'Failed Jobs',   icon: <PackageX       className="h-4 w-4" /> },
-      { to: '/operations/webhooks',      label: 'Webhook Logs',  icon: <Webhook        className="h-4 w-4" /> },
+      { to: '/compliance/kyc', label: 'KYC / Compliance', icon: <ShieldCheck className="h-4 w-4" /> },
+      { to: '/app-content',    label: 'App Content',      icon: <Layout      className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key:   'system',
+    title: 'System Health',
+    items: [
+      { to: '/operations/system-health',         label: 'System Health',        icon: <HeartHandshake className="h-4 w-4" /> },
+      { to: '/operations/queue-monitor',         label: 'Queue Monitor',        icon: <MonitorDot     className="h-4 w-4" /> },
+      { to: '/failed-jobs',                      label: 'Failed Jobs',          icon: <PackageX       className="h-4 w-4" /> },
+      { to: '/operations/backup-integrity',      label: 'Backup & Integrity',   icon: <HardDrive      className="h-4 w-4" /> },
+      { to: '/operations/webhook-diagnostics',   label: 'Webhook Diagnostics',  icon: <Webhook        className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key:   'settings',
+    title: 'Settings',
+    items: [
+      { to: '/settings', label: 'Settings', icon: <SlidersHorizontal className="h-4 w-4" /> },
     ],
   },
 ]
 
-// Keep infra group tucked away on first load
-const DEFAULT_CLOSED = new Set(['system'])
+// Reports and Settings start collapsed — they're lower-priority and would
+// overflow the sidebar if all sections were open on first load.
+const DEFAULT_CLOSED = new Set(['reports', 'settings'])
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUiStore()

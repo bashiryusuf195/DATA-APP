@@ -3,6 +3,7 @@ import { providersApi }    from '@/api/providers.api'
 import { transactionsApi } from '@/api/transactions.api'
 import { metricsApi }      from '@/api/metrics.api'
 import { dashboardApi }    from '@/api/dashboard.api'
+import { healthApi }       from '@/api/health.api'
 import { StatCard }        from '@/components/shared/StatCard'
 import { PageHeader }      from '@/components/shared/PageHeader'
 import { ErrorMessage }    from '@/components/shared/ErrorMessage'
@@ -18,6 +19,7 @@ import {
 import {
   Activity, CreditCard, Zap, AlertTriangle,
   Users, TrendingUp, MessageSquare, RefreshCw,
+  CheckCircle2, XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { ENDPOINTS } from '@/config/endpoints'
@@ -45,6 +47,14 @@ export function DashboardPage() {
   const { data: circuitMetrics = [] } = useQuery({
     queryKey: ['health-metrics'],
     queryFn:  metricsApi.list,
+  })
+
+  // ── System health (gateway config status) ──────────────────────────────────
+  const { data: systemHealth } = useQuery({
+    queryKey: ['system-health'],
+    queryFn:  healthApi.getSystemHealth,
+    staleTime: 60_000,
+    retry: false,   // don't redirect on 401 — health is supplemental info
   })
 
   // ── Recent transactions display panel (8 rows — not used for stat computation) ─
@@ -193,6 +203,36 @@ export function DashboardPage() {
           )}
         </Card>
       </div>
+
+      {/* ── Payment gateway status ─────────────────────────────────────────── */}
+      {systemHealth?.payment_gateways && (
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-ink">Payment Gateways</h3>
+            <span className="text-xs text-ink-faint">Key presence only — no secrets exposed</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Object.entries(systemHealth.payment_gateways).map(([code, gw]) => (
+              <div key={code} className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-ink capitalize">{code}</span>
+                  {gw.configured
+                    ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                    : <XCircle     className="h-3.5 w-3.5 text-rose-400" />}
+                </div>
+                <p className="text-[10px] text-ink-faint">
+                  {gw.configured ? 'Configured' : 'Not configured'}
+                </p>
+                {gw.configured && (
+                  <p className={`text-[10px] ${gw.has_webhook_secret ? 'text-green-500' : 'text-amber-400'}`}>
+                    Webhook secret: {gw.has_webhook_secret ? 'set' : 'using key fallback'}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* ── Bottom row ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

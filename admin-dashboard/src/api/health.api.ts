@@ -51,6 +51,11 @@ export interface SystemHealthData {
     down:      number
     providers: ProviderEntry[]
   }
+  payment_gateways?: Record<string, {
+    configured:         boolean
+    base_url:           string
+    has_webhook_secret: boolean
+  }>
   timestamp: string
 }
 

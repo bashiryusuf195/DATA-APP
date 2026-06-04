@@ -1,14 +1,14 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { walletOpsApi, type WalletAdjustResult } from '@/api/walletOps.api'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { Button, Card, Input } from '@/components/ui'
+import { Button, Card, Input, Modal } from '@/components/ui'
 import { fmtCurrency } from '@/utils/format'
 import {
   AlertTriangle, CheckCircle2, ArrowUpCircle, ArrowDownCircle,
-  User, Wallet, Hash, FileText,
+  User, Wallet, Hash, FileText, ShieldAlert,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -70,20 +70,17 @@ function ResultCard({ result }: { result: WalletAdjustResult }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function ManualWalletOpsPage() {
-  const [operation, setOperation] = useState<Operation>('credit')
-  const [identifier, setIdentifier] = useState('')
-  const [amount, setAmount] = useState('')
-  const [reason, setReason] = useState('')
-  const [lastResult, setLastResult] = useState<WalletAdjustResult | null>(null)
-  const [formError, setFormError] = useState('')
+  const [operation,   setOperation]   = useState<Operation>('credit')
+  const [identifier,  setIdentifier]  = useState('')
+  const [amount,      setAmount]      = useState('')
+  const [reason,      setReason]      = useState('')
+  const [lastResult,  setLastResult]  = useState<WalletAdjustResult | null>(null)
+  const [formError,   setFormError]   = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const mutation = useMutation({
     mutationFn: () => {
       const parsed = parseFloat(amount)
-      if (!identifier.trim()) throw new Error('Identifier is required.')
-      if (isNaN(parsed) || parsed <= 0) throw new Error('Amount must be a positive number.')
-      if (!reason.trim() || reason.trim().length < 5) throw new Error('Reason must be at least 5 characters.')
-
       return walletOpsApi[operation]({
         identifier: identifier.trim(),
         amount:     parsed,
@@ -93,6 +90,7 @@ export function ManualWalletOpsPage() {
     onSuccess: (data) => {
       setLastResult(data)
       setFormError('')
+      setConfirmOpen(false)
       setIdentifier('')
       setAmount('')
       setReason('')
@@ -104,15 +102,21 @@ export function ManualWalletOpsPage() {
     },
     onError: (err) => {
       setFormError(errMsg(err, 'Operation failed. Please try again.'))
+      setConfirmOpen(false)
     },
   })
 
-  function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
     setLastResult(null)
-    mutation.mutate()
-  }
+    // Validate before opening the confirmation dialog
+    const parsed = parseFloat(amount)
+    if (!identifier.trim()) { setFormError('Identifier is required.'); return }
+    if (isNaN(parsed) || parsed <= 0) { setFormError('Amount must be a positive number.'); return }
+    if (!reason.trim() || reason.trim().length < 5) { setFormError('Reason must be at least 5 characters.'); return }
+    setConfirmOpen(true)
+  }, [identifier, amount, reason])
 
   const isCredit = operation === 'credit'
 
@@ -256,6 +260,60 @@ export function ManualWalletOpsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Confirmation dialog ─────────────────────────────────────────────── */}
+      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Confirm Wallet Adjustment" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-rose-500/20 bg-rose-500/5 px-4 py-3">
+            <ShieldAlert className="h-4 w-4 text-rose-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-rose-300">
+              This will immediately affect the user's live wallet balance and is fully audited.
+              This action cannot be undone without a separate manual operation.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-surface-2 px-4 py-3 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-ink-faint">Operation</span>
+              <span className={`font-semibold ${isCredit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {isCredit ? 'CREDIT' : 'DEBIT'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-faint">User</span>
+              <span className="text-ink font-mono text-xs">{identifier}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-faint">Amount</span>
+              <span className="font-semibold text-ink">
+                ₦{parseFloat(amount || '0').toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between items-start gap-4">
+              <span className="text-ink-faint shrink-0">Reason</span>
+              <span className="text-ink text-right text-xs">{reason}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setConfirmOpen(false)}
+              disabled={mutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              loading={mutation.isPending}
+              className={`w-full ${!isCredit ? 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500' : ''}`}
+              onClick={() => mutation.mutate()}
+            >
+              {isCredit ? 'Confirm Credit' : 'Confirm Debit'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

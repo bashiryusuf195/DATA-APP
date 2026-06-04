@@ -231,7 +231,7 @@ export function ReferralProgramPage() {
       toast.success('Referral settings saved')
     },
     onError: (err: Error) => {
-      const details = (err as Record<string, unknown>).response as
+      const details = (err as unknown as Record<string, unknown>).response as
         | { data?: { details?: Record<string, string[]> } }
         | undefined
       const fieldErrors = details?.data?.details
@@ -705,9 +705,7 @@ function SettingsPanel({
       <div className="flex justify-end">
         <button
           onClick={() => {
-            console.log('[REFERRAL-SAVE-RAW-FORM]', JSON.stringify(form, null, 2))
             const payload = sanitizePayload(form)
-            console.log('[REFERRAL-SAVE-PAYLOAD]', JSON.stringify(payload, null, 2))
             onSave(payload)
           }}
           disabled={saving}
