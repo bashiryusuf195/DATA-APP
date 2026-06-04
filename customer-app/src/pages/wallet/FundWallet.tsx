@@ -38,7 +38,6 @@ export function FundWalletPage() {
 
   const squadAccount = squadData?.account ?? null
   const squadProfileIncomplete = squadData?.profileIncomplete ?? false
-  const squadIncompleteMessage = squadData?.incompleteMessage ?? null
 
   const handleCopy = () => {
     if (!dva?.account_number) return
@@ -178,7 +177,10 @@ export function FundWalletPage() {
   if (phase === 'transfer_details' && transferAccount) {
     return (
       <div className="space-y-4 pt-2">
-        <button onClick={() => setPhase('input')} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
+        <button
+          onClick={() => { setPhase('input'); setTransferAccount(null); setTransferAmount(null) }}
+          className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink"
+        >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div className="bg-surface-1 rounded-3xl p-5 shadow-card space-y-4">
@@ -242,7 +244,7 @@ export function FundWalletPage() {
         </div>
 
         <Button variant="secondary" fullWidth loading={verifyFunding.isPending} onClick={handleVerify}>
-          I&apos;ve paid — Verify Payment
+          I&apos;ve transferred — Check Status
         </Button>
       </div>
     )
@@ -430,15 +432,15 @@ export function FundWalletPage() {
             ) : squadProfileIncomplete ? (
               <div className="text-center py-4 space-y-2">
                 <p className="text-sm text-ink-muted">
-                  {squadIncompleteMessage ?? 'Complete your profile to generate your Squad transfer account.'}
+                  Your Squad account needs a complete profile to activate.
                 </p>
                 <Link to="/profile/edit" className="text-sm font-semibold text-violet-600 hover:underline">
-                  Complete Profile
+                  Complete Profile →
                 </Link>
               </div>
             ) : (
               <p className="text-sm text-ink-muted text-center py-4">
-                Squad transfer account is not available. Contact support.
+                Squad transfer account is temporarily unavailable.
               </p>
             )}
           </div>
@@ -453,11 +455,11 @@ export function FundWalletPage() {
           )}
 
           <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-            <p className="text-xs text-amber-700 font-semibold mb-1">Important</p>
+            <p className="text-xs text-amber-700 font-semibold mb-1">How permanent accounts work</p>
             <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
-              <li>Transfer any amount from your bank app</li>
-              <li>Wallet is credited instantly after transfer</li>
-              <li>Your account numbers are permanent and unique to you</li>
+              <li>Transfer any amount — your wallet is credited automatically</li>
+              <li>These account numbers are yours permanently</li>
+              <li>Use "Quick Bank Transfer" above to fund a specific exact amount</li>
             </ul>
           </div>
         </div>

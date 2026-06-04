@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   User, Settings, ChevronRight, Lock, Shield, Hash,
-  Bell, Mail, Moon, Sun, LogOut, BadgeCheck, Edit2,
+  Bell, Mail, Moon, Sun, LogOut, BadgeCheck, Edit2, AlertCircle,
 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -150,7 +150,11 @@ export function ProfilePage() {
               ? <span className="text-2xl font-bold text-brand-700">{initials}</span>
               : <User className="h-9 w-9 text-brand-600" />}
           </div>
-          <button className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-brand-600 flex items-center justify-center shadow-brand border-2 border-white">
+          <button
+            onClick={() => navigate('/profile/edit')}
+            className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-brand-600 flex items-center justify-center shadow-brand border-2 border-white hover:bg-brand-700 transition-colors"
+            title="Edit profile"
+          >
             <Edit2 className="h-3 w-3 text-white" />
           </button>
         </div>
@@ -235,7 +239,18 @@ export function ProfilePage() {
       <div className="bg-surface-1 rounded-3xl p-5 shadow-card">
         <p className="text-sm font-bold text-ink mb-2">Preferences</p>
         {prefsLoading ? (
-          <p className="text-xs text-ink-faint py-4">Loading preferences…</p>
+          <div className="space-y-3 py-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-2">
+                <div className="h-10 w-10 rounded-full bg-surface-2 animate-pulse shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3.5 w-32 bg-surface-2 rounded animate-pulse" />
+                  <div className="h-3 w-24 bg-surface-2 rounded animate-pulse" />
+                </div>
+                <div className="h-6 w-11 rounded-full bg-surface-2 animate-pulse shrink-0" />
+              </div>
+            ))}
+          </div>
         ) : prefs ? (
           <div className="divide-y divide-border">
             <PrefRow
@@ -260,7 +275,12 @@ export function ProfilePage() {
               onChange={toggleDark}
             />
           </div>
-        ) : null}
+        ) : (
+          <div className="flex items-center gap-2 py-3 text-ink-muted">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <p className="text-sm">Could not load preferences. Try refreshing.</p>
+          </div>
+        )}
       </div>
 
       {/* ── Referral code ─────────────────────────────────────────── */}

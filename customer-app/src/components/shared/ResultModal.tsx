@@ -1,5 +1,5 @@
 import { Modal, Button } from '@/components/ui'
-import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search, Copy, Check, Download, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search, Copy, Check, Download, ShieldCheck, Receipt } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useState, useCallback } from 'react'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
@@ -330,6 +330,16 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
               View History
             </Button>
           )}
+          {isSuccess && transaction && (
+            <Button
+              variant="outline"
+              fullWidth
+              onClick={() => { onClose(); navigate(`/transactions/${transaction.reference}`) }}
+              icon={<Receipt className="h-4 w-4" />}
+            >
+              View Details
+            </Button>
+          )}
           <Button
             variant={isSuccess ? 'primary' : 'secondary'}
             fullWidth
@@ -337,7 +347,7 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
             onClick={() => { onClose(); navigate('/dashboard') }}
             icon={<Home className="h-4 w-4" />}
           >
-            Home
+            {isSuccess ? 'Done' : 'Home'}
           </Button>
         </div>
       </div>

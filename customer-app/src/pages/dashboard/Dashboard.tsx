@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
   Phone, Wifi, Zap, Tv, ShieldCheck, Building2,
-  Bell, ArrowRight, Gift, Copy, CheckCheck, Sun, Moon,
+  Bell, ArrowRight, ArrowLeftRight, Gift, Copy, CheckCheck, Sun, Moon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
@@ -189,7 +189,17 @@ export function DashboardPage() {
               </button>
             </div>
           </div>
-        ) : squadProfileIncomplete ? null : null}
+        ) : squadProfileIncomplete ? (
+          <div className="pt-1">
+            <p className="text-xs text-ink-muted mb-1.5">Squad account not activated yet.</p>
+            <Link
+              to="/wallet/fund"
+              className="text-xs font-semibold text-violet-600 hover:underline"
+            >
+              Complete profile to activate →
+            </Link>
+          </div>
+        ) : null}
 
         {/* Fallback when neither account is available */}
         {!dvaLoading && !squadLoading && !dva && !squadAccount && (
@@ -281,7 +291,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <EmptyState
-              icon={ArrowRight}
+              icon={ArrowLeftRight}
               title="No transactions yet"
               description="Your transaction history will appear here."
             />

@@ -110,7 +110,14 @@ export function AirtimePage() {
             quickAmounts={[100, 200, 500, 1000, 2000, 5000]}
           />
 
-          <Button type="submit" fullWidth size="lg">Continue</Button>
+          <Button
+            type="submit"
+            fullWidth
+            size="lg"
+            disabled={!operator || !phone || !amount}
+          >
+            Continue
+          </Button>
         </form>
       </Card>
 
