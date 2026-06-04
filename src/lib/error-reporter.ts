@@ -169,5 +169,91 @@ export const errorReporter = {
         ...context,
       });
     },
+
+    // Fires when a webhook job (Paystack/Squad) exhausts all retries without
+    // crediting the user's wallet. Requires manual reconciliation.
+    webhookCreditFailed(
+      gateway:   string,
+      reference: string,
+      error:     string,
+      context:   ErrorContext = {},
+    ): void {
+      errorReporter.captureMessage('webhook_credit_failed', 'error', {
+        gateway,
+        reference,
+        error,
+        alert_type:  'webhook_credit_failed',
+        severity:    'critical',   // user paid but wallet not credited
+        ...context,
+      });
+    },
+
+    // Fires when a wallet.credit() call fails inside any funding path.
+    walletCreditFailed(
+      userId:    string,
+      reference: string,
+      amount:    number,
+      error:     string,
+      context:   ErrorContext = {},
+    ): void {
+      errorReporter.captureMessage('wallet_credit_failed', 'error', {
+        user_id:    userId,
+        reference,
+        amount,
+        error,
+        alert_type: 'wallet_credit_failed',
+        ...context,
+      });
+    },
+
+    // Fires when a provider's purchase failure rate crosses a threshold.
+    purchaseFailureSpike(
+      providerCode:   string,
+      failureCount:   number,
+      windowMinutes:  number,
+      context:        ErrorContext = {},
+    ): void {
+      errorReporter.captureMessage('purchase_failure_spike', 'error', {
+        provider_code:  providerCode,
+        failure_count:  failureCount,
+        window_minutes: windowMinutes,
+        alert_type:     'purchase_failure_spike',
+        ...context,
+      });
+    },
+
+    // Fires when the 5xx error rate exceeds a threshold in a rolling window.
+    repeated500Errors(
+      count:         number,
+      windowMinutes: number,
+      samplePath?:   string,
+      context:       ErrorContext = {},
+    ): void {
+      errorReporter.captureMessage('repeated_500_errors', 'error', {
+        count,
+        window_minutes: windowMinutes,
+        sample_path:    samplePath ?? null,
+        alert_type:     'repeated_500_errors',
+        ...context,
+      });
+    },
+
+    // Fires when a BullMQ job reaches its final failed state (no retries left).
+    failedQueueJob(
+      queueName: string,
+      jobId:     string | undefined,
+      error:     string,
+      attempts:  number,
+      context:   ErrorContext = {},
+    ): void {
+      errorReporter.captureMessage('failed_queue_job', 'error', {
+        queue_name: queueName,
+        job_id:     jobId ?? 'unknown',
+        error,
+        attempts,
+        alert_type: 'failed_queue_job',
+        ...context,
+      });
+    },
   },
 };

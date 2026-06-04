@@ -16,7 +16,8 @@ import { markWebhookProcessed } from "../../webhooks/services/webhook.service";
 import { getDedicatedAccountByCustomerCode } from "../../wallet/services/dva.service";
 import { getDbInstance } from "../../../db/knex";
 import { WalletService } from "../../../services/wallet/WalletService";
-import { logger } from "../../../lib/logger";
+import { logger }        from "../../../lib/logger";
+import { errorReporter } from "../../../lib/error-reporter";
 
 const db            = getDbInstance();
 const walletService = new WalletService(db);
@@ -192,6 +193,37 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
   });
 
   logger.info("paystack_webhook_job_complete", { reference, amount_ngn: amountNgn });
+});
+
+// ── Alert on final failure (all retries exhausted) ────────────────────────────
+// BullMQ emits 'failed' after the last attempt. At this point the user's wallet
+// has NOT been credited. This requires manual reconciliation — the alert is critical.
+paystackWebhookWorker.on('failed', (job, err) => {
+  const data      = (job?.data ?? {}) as Partial<PaystackWebhookJobPayload>;
+  const reference = data.reference ?? 'unknown';
+  const isFinal   = (job?.attemptsMade ?? 0) >= (job?.opts?.attempts ?? 1);
+
+  logger.error('paystack_webhook_job_failed', {
+    job_id:       job?.id ?? 'unknown',
+    reference,
+    attempt:      job?.attemptsMade ?? '?',
+    max_attempts: job?.opts?.attempts ?? '?',
+    is_final:     isFinal,
+    error:        err.message,
+  });
+
+  if (isFinal) {
+    errorReporter.alert.webhookCreditFailed('paystack', reference, err.message, {
+      job_id: job?.id ?? 'unknown',
+    });
+    errorReporter.alert.failedQueueJob(
+      'paystack-webhooks',
+      job?.id,
+      err.message,
+      job?.attemptsMade ?? 0,
+      { reference },
+    );
+  }
 });
 
 // ── DVA transfer processor ────────────────────────────────────────────────────

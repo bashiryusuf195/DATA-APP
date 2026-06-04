@@ -180,6 +180,76 @@ healthRouter.get('/providers', ...adminGuard, async (_req: Request, res: Respons
   }
 });
 
+// ── Deep health (admin-only aggregate) ───────────────────────────────────────
+// Equivalent to /admin/system-health but mounted under /health for tooling
+// that already polls the /health prefix. Includes payment gateway config status.
+healthRouter.get('/deep', ...adminGuard, async (_req: Request, res: Response) => {
+  const start = Date.now();
+
+  const [dbResult, redisOk, queueResult, providerResult] = await Promise.allSettled([
+    (async () => { const t = Date.now(); await db.raw('SELECT 1'); return Date.now() - t; })(),
+    checkRedisHealth(),
+    import('../modules/queue/services/queue-monitor.service').then((m) => m.getAllQueueStats()),
+    import('../modules/providers/services/provider-health-dashboard.service')
+      .then((m) => m.getProviderHealthDashboard({ window: '1h' })),
+  ]);
+
+  const dbStatus  = dbResult.status  === 'fulfilled' ? 'ok' : 'degraded';
+  const redisStatus = (redisOk.status === 'fulfilled' && redisOk.value) ? 'ok' : 'degraded';
+
+  const queueStats = queueResult.status === 'fulfilled' ? queueResult.value : [];
+  const providers  = providerResult.status === 'fulfilled' ? providerResult.value : [];
+
+  // Payment gateway config — key presence only, never the key values themselves
+  const gateways = {
+    paystack: {
+      configured:     Boolean(config.paystack.secretKey),
+      base_url:       config.paystack.baseUrl,
+      has_webhook_secret: Boolean(config.paystack.webhookSecret),
+    },
+    squad: {
+      configured:     Boolean(config.squad.secretKey),
+      base_url:       config.squad.baseUrl,
+      has_webhook_secret: Boolean(config.squad.webhookSecret),
+    },
+  };
+
+  const totalFailed  = queueStats.reduce((s, q) => s + q.failed,  0);
+  const totalWaiting = queueStats.reduce((s, q) => s + q.waiting, 0);
+  const downProviders = providers.filter((p) => p.computed_health === 'down').length;
+
+  const overallStatus =
+    dbStatus !== 'ok' || redisStatus !== 'ok' ? 'degraded' :
+    totalFailed > 100 || downProviders > 0    ? 'degraded' : 'ok';
+
+  res.status(overallStatus === 'ok' ? 200 : 503).json({
+    status:         overallStatus,
+    checked_in_ms:  Date.now() - start,
+    uptime_seconds: Math.floor((Date.now() - SERVER_START) / 1000),
+    database: {
+      status:     dbStatus,
+      latency_ms: dbResult.status === 'fulfilled' ? dbResult.value : null,
+    },
+    redis: { status: redisStatus },
+    queues: {
+      status:        totalFailed > 100 ? 'degraded' : 'ok',
+      total_waiting: totalWaiting,
+      total_failed:  totalFailed,
+      list:          queueStats.map((q) => ({
+        name: q.name, waiting: q.waiting, active: q.active, failed: q.failed,
+      })),
+    },
+    providers: {
+      status:        downProviders > 0 ? 'degraded' : 'ok',
+      healthy:       providers.filter((p) => p.computed_health === 'healthy').length,
+      degraded:      providers.filter((p) => p.computed_health === 'degraded').length,
+      down:          downProviders,
+    },
+    payment_gateways: gateways,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── Build / deploy info ───────────────────────────────────────────────────────
 // Admin-only — reveals git commit, FIELD_MAP hash, and key PDF coordinates.
 // Use this to confirm Railway is running the latest calibrated build without

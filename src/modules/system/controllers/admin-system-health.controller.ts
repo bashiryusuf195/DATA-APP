@@ -16,6 +16,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { db }                          from '../../../config/database';
 import { checkRedisHealth }            from '../../../config/redis';
+import { config }                      from '../../../config';
 import { logger }                      from '../../../lib/logger';
 import { errorReporter }               from '../../../lib/error-reporter';
 import { getAllQueueStats }             from '../../queue/services/queue-monitor.service';
@@ -171,6 +172,22 @@ export async function getSystemHealthController(
       providerSummary = { status: 'error', healthy: 0, degraded: 0, down: 0, providers: [] };
     }
 
+    // ── Payment gateway config (key presence only — never the values) ─────────
+    const paymentGateways = {
+      paystack: {
+        configured:         Boolean(config.paystack.secretKey),
+        base_url:           config.paystack.baseUrl,
+        has_webhook_secret: Boolean(config.paystack.webhookSecret),
+        has_callback_url:   Boolean(config.paystack.callbackUrl),
+      },
+      squad: {
+        configured:         Boolean(config.squad.secretKey),
+        base_url:           config.squad.baseUrl,
+        has_webhook_secret: Boolean(config.squad.webhookSecret),
+        has_callback_url:   Boolean(config.squad.callbackUrl),
+      },
+    };
+
     // ── Overall status ────────────────────────────────────────────────────────
     const overallOk =
       database.status === 'ok' &&
@@ -181,14 +198,16 @@ export async function getSystemHealthController(
     res.status(200).json({
       success: true,
       data: {
-        status:          overallOk ? 'ok' : 'degraded',
-        uptime_seconds:  Math.floor((Date.now() - PROCESS_START) / 1000),
-        version:         process.env.APP_VERSION ?? 'unknown',
+        status:           overallOk ? 'ok' : 'degraded',
+        uptime_seconds:   Math.floor((Date.now() - PROCESS_START) / 1000),
+        version:          process.env.APP_VERSION ?? 'unknown',
+        commit_sha:       process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.COMMIT_SHA ?? 'unknown',
         database,
-        redis:           { status: redisStatus },
-        queues:          queueSummary,
-        providers:       providerSummary,
-        timestamp:       new Date().toISOString(),
+        redis:            { status: redisStatus },
+        queues:           queueSummary,
+        providers:        providerSummary,
+        payment_gateways: paymentGateways,
+        timestamp:        new Date().toISOString(),
       },
     });
   } catch (err) {
