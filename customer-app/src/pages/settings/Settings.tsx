@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle } from 'lucide-react'
+import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle, Fingerprint, Trash2, Plus } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Button, Card, Input } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
 import { pinApi } from '@/api/pin.api'
 import { notificationsApi } from '@/api/notifications.api'
+import { passkeyApi } from '@/api/passkey.api'
 import { PinSetupModal } from '@/components/shared/PinSetupModal'
 import { useAuthStore } from '@/store/auth.store'
+import { isWebAuthnSupported, isPlatformAuthenticatorAvailable, registerPasskey } from '@/hooks/usePasskey'
 import type { NotificationPreferences } from '@/types'
+import { fmtDateTime } from '@/utils/format'
 
 type PinSection = null | 'setup' | 'change' | 'reset-request' | 'reset-confirm'
 
@@ -191,6 +194,56 @@ export function SettingsPage() {
 
   const openPinSection = (s: PinSection) => { setPinErr(null); setPinSection(s) }
 
+  // ── Passkeys ───────────────────────────────────────────────────────────────
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [registeringPasskey, setRegisteringPasskey] = useState(false)
+
+  useEffect(() => {
+    if (isWebAuthnSupported()) {
+      isPlatformAuthenticatorAvailable().then(setBiometricAvailable)
+    }
+  }, [])
+
+  const { data: passkeys, isLoading: passkeysLoading, refetch: refetchPasskeys } = useQuery({
+    queryKey: ['passkeys'],
+    queryFn:  passkeyApi.list,
+    staleTime: 30_000,
+  })
+
+  const revokePasskeyMutation = useMutation({
+    mutationFn: (id: string) => passkeyApi.revoke(id),
+    onSuccess: () => {
+      toast.success('Passkey removed.')
+      refetchPasskeys()
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const handleAddPasskey = async () => {
+    setRegisteringPasskey(true)
+    try {
+      // Derive a friendly name from device/OS hints in the user agent
+      const ua           = navigator.userAgent
+      const friendlyName =
+        /iPhone|iPad/.test(ua)   ? 'iPhone / iPad'    :
+        /Android/.test(ua)       ? 'Android Device'   :
+        /Mac/.test(ua)           ? 'Mac Touch ID'     :
+        /Windows/.test(ua)       ? 'Windows Hello'    : 'This Device'
+
+      await registerPasskey(friendlyName)
+      toast.success('Passkey added! You can now sign in with biometrics.')
+      refetchPasskeys()
+    } catch (err) {
+      const name = (err as Error)?.name
+      if (name !== 'NotAllowedError') {
+        // NotAllowedError = user cancelled — no toast needed
+        toast.error((err as Error)?.message ?? 'Failed to add passkey.')
+      }
+    } finally {
+      setRegisteringPasskey(false)
+    }
+  }
+
   return (
     <div className="space-y-4 pt-2">
       <button
@@ -342,6 +395,84 @@ export function SettingsPage() {
                 <Button type="submit" fullWidth loading={resetConfirmMutation.isPending}>Reset PIN</Button>
               </div>
             </form>
+          )}
+        </div>
+
+        {/* ── Biometric Login ───────────────────────────────────────────────── */}
+        <div className="mb-6 pb-6 border-b border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <Fingerprint className="h-4 w-4 text-ink-muted" />
+            <p className="text-sm font-semibold text-ink">Biometric Login</p>
+            {passkeys && passkeys.length > 0 && (
+              <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">
+                {passkeys.length} device{passkeys.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {passkeysLoading ? (
+            <div className="space-y-2">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="h-11 bg-surface-2 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : passkeys && passkeys.length > 0 ? (
+            <div className="space-y-2 mb-3">
+              {passkeys.map((pk) => (
+                <div
+                  key={pk.id}
+                  className="flex items-center justify-between gap-3 bg-surface-0 rounded-xl px-3.5 py-2.5"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Fingerprint className="h-4 w-4 text-brand-600 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink truncate">
+                        {pk.friendly_name ?? 'Passkey'}
+                        {pk.backed_up && (
+                          <span className="ml-1.5 text-[10px] font-semibold text-ink-faint bg-surface-2 px-1.5 py-0.5 rounded-full">
+                            Synced
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-ink-faint">
+                        {pk.last_used_at
+                          ? `Last used ${fmtDateTime(pk.last_used_at)}`
+                          : `Added ${fmtDateTime(pk.created_at)}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => revokePasskeyMutation.mutate(pk.id)}
+                    disabled={revokePasskeyMutation.isPending}
+                    className="shrink-0 p-1.5 rounded-lg text-ink-faint hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
+                    title="Remove passkey"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-ink-muted mb-3">
+              No passkeys registered. Add this device to sign in with biometrics.
+            </p>
+          )}
+
+          {biometricAvailable ? (
+            <Button
+              fullWidth
+              variant="outline"
+              icon={<Plus className="h-4 w-4" />}
+              loading={registeringPasskey}
+              onClick={handleAddPasskey}
+            >
+              Add this device
+            </Button>
+          ) : (
+            <p className="text-xs text-ink-faint text-center py-1">
+              Biometric login is not available on this device or browser.
+            </p>
           )}
         </div>
 

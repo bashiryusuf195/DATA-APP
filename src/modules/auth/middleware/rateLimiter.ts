@@ -85,6 +85,24 @@ export const changePasswordLimiter = rateLimit({
   },
 });
 
+/** Passkey auth begin: 20 per 15 min per IP — prevents credential enumeration. */
+export const passkeyAuthBeginLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             20,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         jsonHandler("passkey authentication"),
+});
+
+/** Passkey auth complete: 10 per 15 min per IP. */
+export const passkeyAuthCompleteLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         jsonHandler("passkey authentication"),
+});
+
 /** Global catch-all: 300 requests per 15 min per IP. */
 export const generalLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,

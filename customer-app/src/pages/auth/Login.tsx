@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, Navigate } from 'react-router-dom'
-import { Mail, Lock, Smartphone, ArrowLeft } from 'lucide-react'
+import { Mail, Lock, Smartphone, ArrowLeft, Fingerprint } from 'lucide-react'
 import { ONBOARDING_KEY } from '@/pages/onboarding/Onboarding'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
@@ -8,6 +8,11 @@ import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/store/auth.store'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
+import {
+  isWebAuthnSupported,
+  isPlatformAuthenticatorAvailable,
+  authenticateWithPasskey,
+} from '@/hooks/usePasskey'
 
 type Step = 'credentials' | '2fa'
 
@@ -19,6 +24,8 @@ export function LoginPage() {
   const [totpCode, setTotpCode]       = useState('')
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricLoading, setBiometricLoading]     = useState(false)
 
   const { setAuth, access_token, _hasHydrated } = useAuthStore()
   const navigate = useNavigate()
@@ -38,10 +45,38 @@ export function LoginPage() {
     if (isMobile && !localStorage.getItem(ONBOARDING_KEY)) {
       navigate('/onboarding', { replace: true })
     }
+
+    // Check biometric availability without blocking the page render
+    if (isWebAuthnSupported()) {
+      isPlatformAuthenticatorAvailable().then(setBiometricAvailable)
+    }
   }, [navigate])
 
   if (!_hasHydrated) return null
   if (access_token) return <Navigate to="/dashboard" replace />
+
+  const handleBiometric = async () => {
+    setBiometricLoading(true)
+    setError('')
+    try {
+      const result = await authenticateWithPasskey()
+      if (result === null) {
+        // User cancelled or no credential — stay on the form, no error message
+        return
+      }
+      toast.success('Welcome back!')
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      // Any error that isn't a user-cancellation shows an inline message.
+      // The email form remains fully accessible below.
+      const msg = isAxiosError(err)
+        ? (err.response?.data?.message ?? 'Biometric sign-in failed.')
+        : (err as Error)?.message ?? 'Biometric sign-in failed.'
+      setError(msg)
+    } finally {
+      setBiometricLoading(false)
+    }
+  }
 
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,6 +172,24 @@ export function LoginPage() {
         {error && <p className="text-xs text-danger">{error}</p>}
         <Button type="submit" loading={loading} fullWidth>Sign in</Button>
       </form>
+      {biometricAvailable && (
+        <>
+          <div className="flex items-center gap-3 mt-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-ink-faint">or</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <button
+            type="button"
+            disabled={biometricLoading}
+            onClick={handleBiometric}
+            className="mt-3 w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl border border-border bg-surface-1 text-sm font-semibold text-ink hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Fingerprint className="h-5 w-5 text-brand-600" />
+            {biometricLoading ? 'Verifying…' : 'Sign in with Biometrics'}
+          </button>
+        </>
+      )}
       <p className="text-center text-sm text-ink-muted mt-5">
         Don't have an account?{' '}
         <Link to="/register" className="text-brand-600 font-medium hover:underline">Sign up</Link>

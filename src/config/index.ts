@@ -112,6 +112,16 @@ export const config = {
     webhookSecret: optional('SQUAD_WEBHOOK_SECRET', ''),
   },
 
+  // ── WebAuthn / Passkeys ────────────────────────────────────────────────────
+  // rpId: the domain (no protocol/port). Must match the origin's hostname.
+  // origin: the exact URL the frontend is served from.
+  // Defaults are for local development; override in production env vars.
+  webauthn: {
+    rpId:     optional("WEBAUTHN_RP_ID",     "localhost"),
+    rpName:   optional("WEBAUTHN_RP_NAME",   "VTU Platform"),
+    origin:   optional("WEBAUTHN_ORIGIN",    "http://localhost:5174"),
+  },
+
   // ── Workers ───────────────────────────────────────────────────────────────
   // Set DISABLE_WORKERS=true to prevent BullMQ workers from starting.
   // Useful when developing the frontend against the API without local Redis.

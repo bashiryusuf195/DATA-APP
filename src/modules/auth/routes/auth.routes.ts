@@ -9,6 +9,8 @@ import {
   forgotPasswordLimiter,
   resetPasswordLimiter,
   changePasswordLimiter,
+  passkeyAuthBeginLimiter,
+  passkeyAuthCompleteLimiter,
 } from "../middleware/rateLimiter";
 import {
   loginRateLimiter,
@@ -31,6 +33,14 @@ import {
   verifyTotpSetupController,
   disableTotpController,
 } from "../controllers/security.controller";
+import {
+  beginRegistrationController,
+  completeRegistrationController,
+  beginAuthenticationController,
+  completeAuthenticationController,
+  listPasskeysController,
+  deletePasskeyController,
+} from "../controllers/passkey.controller";
 import { verifyLoginTotpController } from "../controllers/login-2fa.controller";
 import { twoFactorVerifyLimiter } from "../../../middleware/rateLimiter.redis";
 
@@ -57,5 +67,18 @@ router.get(   "/security/status",       authenticate, getSecurityStatusControlle
 router.post(  "/security/totp/setup",   authenticate, setupTotpController);
 router.post(  "/security/totp/verify",  authenticate, verifyTotpSetupController);
 router.delete("/security/totp",         authenticate, disableTotpController);
+
+// ── Passkeys (WebAuthn) ────────────────────────────────────────
+// Registration (requires existing session — passkeys bind to real accounts)
+router.post("/passkey/register/begin",    authenticate, beginRegistrationController);
+router.post("/passkey/register/complete", authenticate, completeRegistrationController);
+
+// Authentication (public — no session exists yet)
+router.post("/passkey/auth/begin",    passkeyAuthBeginLimiter,    beginAuthenticationController);
+router.post("/passkey/auth/complete", passkeyAuthCompleteLimiter, completeAuthenticationController);
+
+// Device management
+router.get(   "/passkey",     authenticate, listPasskeysController);
+router.delete("/passkey/:id", authenticate, deletePasskeyController);
 
 export { router as authRouter };
