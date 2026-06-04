@@ -32,7 +32,7 @@ export const passkeyApi = {
         tokens:     AuthTokens
         session_id: string
       }>>('/auth/passkey/auth/complete', { passkeySessionToken, assertion })
-      .then((r) => r.data.data as { user: User; tokens: AuthTokens; session_id: string }),
+      .then((r) => r.data.data as unknown as { user: User; tokens: AuthTokens; session_id: string }),
 
   // ── Device management ───────────────────────────────────────────────────────
 

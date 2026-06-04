@@ -3,6 +3,7 @@ import type { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequest
 import { passkeyApi }    from '@/api/passkey.api'
 import { useAuthStore }  from '@/store/auth.store'
 import { apiClient }     from '@/api/client'
+import type { User }     from '@/types'
 
 // ── Support detection ─────────────────────────────────────────────────────────
 
@@ -53,11 +54,11 @@ export async function registerPasskey(friendlyName?: string): Promise<void> {
 // ── Authentication ────────────────────────────────────────────────────────────
 
 export interface BiometricAuthResult {
-  success:    true
+  success:       true
   access_token:  string
   refresh_token: string
   session_id:    string
-  user:          Record<string, unknown>
+  user:          User
 }
 
 /**
@@ -103,6 +104,6 @@ export async function authenticateWithPasskey(): Promise<BiometricAuthResult | n
     access_token:  result.tokens.access_token,
     refresh_token: result.tokens.refresh_token,
     session_id:    result.session_id,
-    user:          result.user as Record<string, unknown>,
+    user:          result.user,
   }
 }

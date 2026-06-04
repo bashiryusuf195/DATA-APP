@@ -208,6 +208,7 @@ export function SettingsPage() {
     queryKey: ['passkeys'],
     queryFn:  passkeyApi.list,
     staleTime: 30_000,
+    retry:     false,   // a 401 here must NOT trigger the apiClient redirect loop
   })
 
   const revokePasskeyMutation = useMutation({
@@ -470,9 +471,16 @@ export function SettingsPage() {
               Add this device
             </Button>
           ) : (
-            <p className="text-xs text-ink-faint text-center py-1">
-              Biometric login is not available on this device or browser.
-            </p>
+            <div className="flex items-start gap-2.5 rounded-xl bg-surface-0 border border-border px-4 py-3">
+              <Fingerprint className="h-4 w-4 text-ink-faint shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-ink-muted">Not supported on this device</p>
+                <p className="text-xs text-ink-faint mt-0.5">
+                  Biometric login requires a device with fingerprint, Face ID, or Windows Hello.
+                  Try Chrome or Safari on a supported device.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
