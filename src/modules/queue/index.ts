@@ -14,5 +14,6 @@ if (!config.workers.disabled) {
     import("./workers/squad-webhook.worker"),
     import("../reconciliation/workers/reconciliation.worker"),
     import("../notifications/workers/notification.worker"),
+    import("../backup/workers/integrity.worker"),
   ]);
 }
