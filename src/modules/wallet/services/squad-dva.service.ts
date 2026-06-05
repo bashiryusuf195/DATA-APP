@@ -85,6 +85,12 @@ export async function getOrCreateSquadVirtualAccount(
   const customerIdentifier = userId;
 
   // ── 4. Guard: beneficiary_account is a merchant-level config required by Squad ─
+  // Safe diagnostic — logs presence and length only, never the account number itself.
+  logger.info("squad_beneficiary_check", {
+    configured: !!config.squad.beneficiaryAccount,
+    length:     config.squad.beneficiaryAccount?.length ?? 0,
+  });
+
   if (!config.squad.beneficiaryAccount) {
     throw new AppError(
       503,
@@ -137,10 +143,10 @@ export async function getOrCreateSquadVirtualAccount(
       });
       details = created;
     } catch (err) {
-      // Map Squad BVN validation errors to a structured 422 so the frontend can guide the user.
       // The error text from squadFetch is: "Squad POST /virtual-account failed: <Squad message>"
       const msg = (err as Error).message ?? "";
       const lmsg = msg.toLowerCase();
+
       if (lmsg.includes("invalid bvn") || (lmsg.includes("validation") && lmsg.includes("bvn"))) {
         throw new AppError(
           422,
@@ -148,6 +154,18 @@ export async function getOrCreateSquadVirtualAccount(
           "Invalid BVN. Please enter a valid 11-digit BVN that matches your registered bank details.",
         );
       }
+
+      // Squad rejects beneficiary_account values that are not registered settlement
+      // accounts in the merchant portal. Map to PROVIDER_NOT_CONFIGURED so the
+      // error is actionable in Railway logs and clearly not a user fault.
+      if (lmsg.includes("beneficiary account") || lmsg.includes("beneficiary_account")) {
+        throw new AppError(
+          503,
+          "PROVIDER_NOT_CONFIGURED",
+          "Squad beneficiary account is invalid or not registered. Check SQUAD_BENEFICIARY_ACCOUNT and Squad merchant settings.",
+        );
+      }
+
       throw err;
     }
 

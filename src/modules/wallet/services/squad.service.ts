@@ -233,11 +233,19 @@ class SquadGateway implements PaymentGateway {
       mobile_num:          params.mobile_num,
       email:               params.email,
     };
-    if (params.bvn)                  body.bvn                  = params.bvn;
-    if (params.dob)                  body.dob                  = params.dob;
-    if (params.address)              body.address              = params.address;
-    if (params.gender)               body.gender               = params.gender;
-    if (params.beneficiary_account)  body.beneficiary_account  = params.beneficiary_account;
+    if (params.bvn)     body.bvn     = params.bvn;
+    if (params.dob)     body.dob     = params.dob;
+    if (params.address) body.address = params.address;
+    if (params.gender)  body.gender  = params.gender;
+    // Always include — squad-dva.service.ts already guards that this is non-empty.
+    body.beneficiary_account = params.beneficiary_account ?? "";
+
+    // Log payload field names (never values) so Railway logs confirm presence.
+    logger.info("squad_dva_payload_fields", {
+      fields:                   Object.keys(body),
+      has_beneficiary_account:  "beneficiary_account" in body,
+      beneficiary_account_len:  String(body.beneficiary_account ?? "").length,
+    });
 
     const res = await squadFetch<SquadVirtualAccountResponse>("POST", "/virtual-account", body);
 
