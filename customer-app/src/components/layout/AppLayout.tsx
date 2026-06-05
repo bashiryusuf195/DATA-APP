@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar }                from './Sidebar'
 import { BottomNav }              from './BottomNav'
@@ -8,10 +8,23 @@ import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
 import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
 import { useAuthStore }           from '@/store/auth.store'
+import { authApi }                from '@/api/auth.api'
 
 export function AppLayout() {
   const user    = useAuthStore((s) => s.user)
   const setUser = useAuthStore((s) => s.setUser)
+
+  // Refresh user profile from /auth/me on every app load so the store is never
+  // stale. The login response historically omitted profile fields (first_name,
+  // last_name, phone, etc.) — this call hydrates them after the persisted state
+  // is loaded. Silently ignored on network error so the cached store is used.
+  useEffect(() => {
+    if (!user) return
+    authApi.me()
+      .then((fresh) => setUser(fresh))
+      .catch(() => { /* keep existing store data on network error */ })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Show setup modal once per session if no PIN is configured.
   // "Set up later" hides it for this session; the API will still reject
@@ -22,9 +35,6 @@ export function AppLayout() {
   const { data: announcements = [] } = useAnnouncements()
   const popups  = announcements.filter((a) => a.display_type === 'popup')
   const tickers = announcements.filter((a) => a.display_type === 'ticker')
-
-  // Temporary: log PIN state on every render so we can confirm the value in DevTools
-  console.log('[PIN-STATE] user.has_transaction_pin =', user?.has_transaction_pin ?? '(no user)')
 
   const handlePinSetupSuccess = () => {
     if (user) setUser({ ...user, has_transaction_pin: true })

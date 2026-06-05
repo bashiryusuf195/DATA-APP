@@ -26,7 +26,9 @@ export function EditProfilePage() {
   const updateMutation = useMutation({
     mutationFn: (data: typeof form) => authApi.updateProfile(data),
     onSuccess: (updated) => {
-      setUser(updated)
+      // Merge with existing user to preserve fields the PATCH response doesn't return
+      // (e.g. roles, permissions — though has_transaction_pin is now included).
+      setUser({ ...user!, ...updated })
       toast.success('Profile updated')
       navigate('/profile')
     },

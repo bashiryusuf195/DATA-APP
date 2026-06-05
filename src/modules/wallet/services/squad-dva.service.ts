@@ -51,24 +51,33 @@ export async function getOrCreateSquadVirtualAccount(
   if (!user) throw new Error("User not found");
 
   // ── 3. Validate required profile fields ─────────────────────────────────────
-  const missingFields: string[] = [];
-  if (!user.first_name)    missingFields.push("first name");
-  if (!user.last_name)     missingFields.push("last name");
-  if (!user.phone)         missingFields.push("phone number");
-  if (!user.date_of_birth) missingFields.push("date of birth");
-  if (!user.address_line1) missingFields.push("address");
-  if (!user.bvn)           missingFields.push("BVN (Bank Verification Number)");
-
   // Squad only accepts "1" (male) or "2" (female) — any other value is treated as missing.
   const SQUAD_GENDER: Record<string, string> = { male: "1", female: "2" };
-  if (!user.gender || !SQUAD_GENDER[user.gender as string]) missingFields.push("gender (Male or Female)");
 
-  if (missingFields.length > 0) {
-    const list = missingFields.join(", ");
+  // Non-BVN fields live on /profile/edit — group them separately from BVN (/kyc).
+  const missingProfile: string[] = [];
+  if (!user.first_name)    missingProfile.push("first name");
+  if (!user.last_name)     missingProfile.push("last name");
+  if (!user.phone)         missingProfile.push("phone number");
+  if (!user.date_of_birth) missingProfile.push("date of birth");
+  if (!user.address_line1) missingProfile.push("address");
+  if (!user.gender || !SQUAD_GENDER[user.gender as string]) missingProfile.push("gender (Male or Female)");
+
+  if (missingProfile.length > 0) {
+    const list = missingProfile.join(", ");
     throw new AppError(
       422,
       "PROFILE_INCOMPLETE",
-      `Complete your profile: ${list} is required to generate your Squad transfer account.`,
+      `Complete your profile: ${list} required to activate your Squad transfer account.`,
+    );
+  }
+
+  // BVN is checked separately so the frontend can route the user to /kyc, not /profile/edit.
+  if (!user.bvn) {
+    throw new AppError(
+      422,
+      "MISSING_BVN",
+      "Add your BVN on the KYC page to activate your Squad transfer account. Dial *565*0# to retrieve it.",
     );
   }
 

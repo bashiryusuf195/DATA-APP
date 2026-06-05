@@ -151,18 +151,36 @@ export async function loginController(
     const { user, tokens, sessionId, rbac } = loginResult;
     setAuthCookies(res, tokens.access_token, tokens.refresh_token);
 
+    // Include profile fields so the frontend auth store is fully hydrated on login.
+    // Without this, the store has null for first_name/last_name/phone/username on every
+    // fresh login, and the Profile page shows empty states even for completed profiles.
+    const profile = await db("user_profiles").where({ user_id: user.id }).first([
+      "first_name", "last_name", "date_of_birth", "address_line1", "gender",
+    ]);
+    const rawDob = profile?.date_of_birth;
+    const dobStr = rawDob
+      ? (rawDob instanceof Date ? rawDob.toISOString().slice(0, 10) : String(rawDob).slice(0, 10))
+      : null;
+
     res.status(200).json({
       success: true,
       data: {
         user: {
           id:                  user.id,
           email:               user.email,
+          phone:               (user.phone as string | null) ?? null,
+          username:            (user.username as string | null) ?? null,
           status:              user.status,
           kyc_level:           user.kyc_level,
           is_email_verified:   user.is_email_verified,
           roles:               rbac.roles,
           permissions:         rbac.permissions,
           has_transaction_pin: user.has_transaction_pin,
+          first_name:          profile?.first_name   ?? null,
+          last_name:           profile?.last_name    ?? null,
+          date_of_birth:       dobStr,
+          address_line1:       profile?.address_line1 ?? null,
+          gender:              profile?.gender        ?? null,
         },
         tokens: {
           access_token:             tokens.access_token,
@@ -358,6 +376,7 @@ export async function updateProfileController(
         "users.id", "users.email", "users.phone", "users.username",
         "users.status", "users.kyc_level", "users.is_email_verified",
         "users.referral_code", "users.created_at",
+        db.raw("users.transaction_pin_hash IS NOT NULL AS has_transaction_pin"),
         "p.first_name", "p.last_name", "p.address_line1", "p.gender", "p.date_of_birth",
       )
       .first();

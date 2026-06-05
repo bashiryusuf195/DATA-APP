@@ -13,7 +13,8 @@ export interface SquadAccountResult {
   account:           SquadAccount | null
   profileIncomplete: boolean
   incompleteMessage: string | null
-  invalidBvn:        boolean
+  missingBvn:        boolean   // BVN not on file → direct user to /kyc
+  invalidBvn:        boolean   // BVN on file but rejected by Squad
   bvnMessage:        string | null
 }
 
@@ -106,19 +107,21 @@ export const walletApi = {
   getSquadAccount: async (): Promise<SquadAccountResult> => {
     const EMPTY: SquadAccountResult = {
       account: null, profileIncomplete: false, incompleteMessage: null,
-      invalidBvn: false, bvnMessage: null,
+      missingBvn: false, invalidBvn: false, bvnMessage: null,
     }
     try {
       const r = await apiClient.get<
         ApiResponse<SquadAccount | null> & { code?: string; message?: string }
       >('/wallet/squad-account')
       const code = r.data.code
+      const msg  = r.data.message ?? null
       return {
         account:           r.data.data ?? null,
         profileIncomplete: code === 'PROFILE_INCOMPLETE',
-        incompleteMessage: code === 'PROFILE_INCOMPLETE' ? (r.data.message ?? null) : null,
+        incompleteMessage: code === 'PROFILE_INCOMPLETE' ? msg : null,
+        missingBvn:        code === 'MISSING_BVN',
         invalidBvn:        code === 'INVALID_BVN',
-        bvnMessage:        code === 'INVALID_BVN'        ? (r.data.message ?? null) : null,
+        bvnMessage:        (code === 'MISSING_BVN' || code === 'INVALID_BVN') ? msg : null,
       }
     } catch {
       // 503 = Squad not configured; any other error — silently degrade

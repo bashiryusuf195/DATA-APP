@@ -56,10 +56,11 @@ export async function getOrCreateDedicatedAccount(
   if (!user.phone)      missingFields.push("phone number");
 
   if (missingFields.length > 0) {
+    const list = missingFields.join(", ");
     throw new AppError(
       422,
       "PROFILE_INCOMPLETE",
-      "Complete your profile with first name, last name, and phone number to generate a bank account.",
+      `Complete your profile: ${list} required to activate your Paystack bank account.`,
     );
   }
 

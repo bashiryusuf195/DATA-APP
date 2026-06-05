@@ -38,6 +38,7 @@ export function FundWalletPage() {
 
   const squadAccount           = squadData?.account           ?? null
   const squadProfileIncomplete = squadData?.profileIncomplete ?? false
+  const squadMissingBvn        = squadData?.missingBvn        ?? false
   const squadInvalidBvn        = squadData?.invalidBvn        ?? false
   const squadBvnMessage        = squadData?.bvnMessage        ?? null
 
@@ -392,8 +393,8 @@ export function FundWalletPage() {
                   <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center">
                     <Building2 className="h-5 w-5 text-ink-faint" />
                   </div>
-                  <p className="text-sm text-ink-muted">Complete your profile to activate your Paystack account.</p>
-                  <Link to="/profile/edit" className="text-xs font-semibold text-brand-600 hover:underline">
+                  <p className="text-sm text-ink-muted">Add your name and phone number to activate your Paystack account.</p>
+                  <Link to="/profile/edit" className="text-xs font-semibold text-brand-600 hover:underline cursor-pointer">
                     Complete Profile →
                   </Link>
                 </div>
@@ -447,6 +448,18 @@ export function FundWalletPage() {
                     {copiedSquad ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
                   </button>
                 </>
+              ) : squadMissingBvn ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
+                  <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <p className="text-sm text-ink-muted">
+                    {squadBvnMessage ?? 'Add your BVN to activate your Squad transfer account.'}
+                  </p>
+                  <Link to="/kyc" className="text-xs font-semibold text-violet-600 hover:underline cursor-pointer">
+                    Add BVN →
+                  </Link>
+                </div>
               ) : squadInvalidBvn ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
                   <div className="h-10 w-10 rounded-full bg-danger/10 flex items-center justify-center">
@@ -455,7 +468,7 @@ export function FundWalletPage() {
                   <p className="text-sm text-ink-muted">
                     {squadBvnMessage ?? 'Invalid BVN. Please enter a valid BVN that matches your profile details.'}
                   </p>
-                  <Link to="/kyc" className="text-xs font-semibold text-violet-600 hover:underline">
+                  <Link to="/kyc" className="text-xs font-semibold text-violet-600 hover:underline cursor-pointer">
                     Update BVN →
                   </Link>
                 </div>
@@ -464,8 +477,10 @@ export function FundWalletPage() {
                   <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center">
                     <Building2 className="h-5 w-5 text-ink-faint" />
                   </div>
-                  <p className="text-sm text-ink-muted">Complete your profile to activate your Squad account.</p>
-                  <Link to="/profile/edit" className="text-xs font-semibold text-violet-600 hover:underline">
+                  <p className="text-sm text-ink-muted">
+                    {squadData?.incompleteMessage ?? 'Complete your profile to activate your Squad account.'}
+                  </p>
+                  <Link to="/profile/edit" className="text-xs font-semibold text-violet-600 hover:underline cursor-pointer">
                     Complete Profile →
                   </Link>
                 </div>
