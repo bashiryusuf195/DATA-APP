@@ -247,6 +247,14 @@ class SquadGateway implements PaymentGateway {
       beneficiary_account_len:  String(body.beneficiary_account ?? "").length,
     });
 
+    // Full payload log — BVN masked to last 4 digits only.
+    const bvnRaw = typeof body.bvn === "string" ? body.bvn : "";
+    const payload = {
+      ...body,
+      bvn: bvnRaw ? `***${bvnRaw.slice(-4)}` : undefined,
+    };
+    logger.info("squad_request_body", payload);
+
     const res = await squadFetch<SquadVirtualAccountResponse>("POST", "/virtual-account", body);
 
     if (!res.success) {
