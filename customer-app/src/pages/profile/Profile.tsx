@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  User, Settings, ChevronRight, Lock, Shield, Hash,
+  ChevronRight, Lock, Shield, Hash,
   Bell, Mail, Moon, Sun, LogOut, BadgeCheck, Edit2, AlertCircle,
 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -78,6 +78,38 @@ function PrefRow({ icon: Icon, label, hint, checked, onChange }: {
   )
 }
 
+function InfoRow({ label, value, empty, mono }: {
+  label: string
+  value?: string | null
+  empty?: string
+  mono?: boolean
+}) {
+  const hasValue = value != null && value !== ''
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5 border-b border-border last:border-0">
+      <span className="text-xs text-ink-faint shrink-0 mt-0.5">{label}</span>
+      {hasValue
+        ? <span className={cn('text-sm font-semibold text-ink text-right break-all', mono && 'font-mono')}>{value}</span>
+        : <span className="text-sm text-ink-faint italic text-right">{empty ?? '—'}</span>}
+    </div>
+  )
+}
+
+// ── KYC level → user-facing label and badge style ────────────────────────────
+
+const KYC_LABEL: Record<number, string> = {
+  0: 'Not Started',
+  1: 'Pending Review',
+  2: 'Verified',
+  3: 'Verified',
+}
+
+function kycBadgeStyle(level: number): string {
+  if (level >= 2) return 'bg-success/10 text-success border border-success/20'
+  if (level === 1) return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+  return 'bg-surface-2 text-ink-faint border border-border'
+}
+
 export function ProfilePage() {
   const navigate  = useNavigate()
   const user      = useAuthStore((s) => s.user)
@@ -86,13 +118,14 @@ export function ProfilePage() {
   const { dark, toggle: toggleDark } = useThemeStore()
   const [logging, setLogging] = useState(false)
 
-  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ')
-                   || user?.username || user?.email || 'User'
+  // Derived display values — never fall back to email for name fields
+  const fullName    = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || null
+  const displayName = fullName || user?.username || 'User'
+  const showUsername = !!(user?.username && fullName)   // show @handle only when we also have a real name
 
   const initials = [user?.first_name?.[0], user?.last_name?.[0]].filter(Boolean).join('').toUpperCase()
-                || (user?.email?.[0] ?? 'U').toUpperCase()
+                || user?.username?.[0]?.toUpperCase() || 'U'
 
-  const KYC_LABELS: Record<number, string> = { 0: 'Unverified', 1: 'Basic', 2: 'Verified', 3: 'Full' }
   const kycLevel = user?.kyc_level ?? 0
 
   const handleLogout = async () => {
@@ -128,15 +161,9 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-4 pb-2">
-      {/* ── Top row ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pt-1">
+      {/* ── Page heading ───────────────────────────────────────────── */}
+      <div className="pt-1">
         <h1 className="text-xl font-bold text-ink">Profile</h1>
-        <button
-          onClick={() => navigate('/settings')}
-          className="h-10 w-10 rounded-2xl bg-surface-1 border border-border flex items-center justify-center hover:bg-surface-2 transition-colors shadow-card"
-        >
-          <Settings className="h-5 w-5 text-ink-muted" />
-        </button>
       </div>
 
       {/* ── Desktop 2-col / mobile single-col ─────────────────────── */}
@@ -145,13 +172,12 @@ export function ProfilePage() {
         {/* LEFT: avatar + personal info */}
         <div className="space-y-4">
 
-          {/* Avatar card */}
+          {/* ── Avatar card ─────────────────────────────────────────── */}
           <div className="bg-surface-1 rounded-3xl p-6 shadow-card border border-border flex flex-col items-center text-center gap-3">
+            {/* Avatar with edit button */}
             <div className="relative">
               <div className="h-20 w-20 rounded-full bg-brand-100 border-4 border-brand-200 flex items-center justify-center">
-                {initials
-                  ? <span className="text-2xl font-bold text-brand-700">{initials}</span>
-                  : <User className="h-9 w-9 text-brand-600" />}
+                <span className="text-2xl font-bold text-brand-700">{initials}</span>
               </div>
               <button
                 onClick={() => navigate('/profile/edit')}
@@ -162,58 +188,56 @@ export function ProfilePage() {
               </button>
             </div>
 
+            {/* Name hierarchy — name → username → email (once only) */}
             <div>
               <p className="text-lg font-bold text-ink">{displayName}</p>
+              {showUsername && (
+                <p className="text-sm text-ink-muted mt-0.5">@{user!.username}</p>
+              )}
               <p className="text-sm text-ink-faint mt-0.5">{user?.email}</p>
             </div>
 
+            {/* Verification badges — email and KYC separated */}
             <div className="flex items-center gap-2 flex-wrap justify-center">
-              <span className={cn(
-                'text-xs px-3 py-1 rounded-full font-semibold',
-                kycLevel >= 2 ? 'bg-success/10 text-success border border-success/20' : 'bg-amber-100 text-amber-700 border border-amber-200'
-              )}>
-                KYC {KYC_LABELS[kycLevel] ?? 'Unknown'}
-              </span>
-              {user?.is_email_verified && (
-                <span className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-teal-100 text-teal-600 font-semibold border border-teal-200">
-                  <BadgeCheck className="h-3 w-3" /> Verified
+              {user?.is_email_verified ? (
+                <span className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-success/10 text-success font-semibold border border-success/20">
+                  <BadgeCheck className="h-3 w-3" /> Email Verified
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-danger/10 text-danger font-semibold border border-danger/20">
+                  <AlertCircle className="h-3 w-3" /> Email Not Verified
                 </span>
               )}
+              <span className={cn('flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold', kycBadgeStyle(kycLevel))}>
+                {kycLevel >= 2
+                  ? <BadgeCheck className="h-3 w-3" />
+                  : <Shield className="h-3 w-3" />}
+                KYC {KYC_LABEL[kycLevel] ?? 'Not Started'}
+              </span>
             </div>
           </div>
 
-          {/* Personal information */}
+          {/* ── Personal Information card ────────────────────────────── */}
           <div className="bg-surface-1 rounded-3xl p-5 shadow-card border border-border">
-            <p className="text-sm font-bold text-ink mb-4">Personal Information</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mb-4">
-              <div>
-                <p className="text-xs text-ink-faint mb-0.5">Full Name</p>
-                <p className="font-semibold text-ink">{displayName}</p>
-              </div>
-              <div>
-                <p className="text-xs text-ink-faint mb-0.5">Phone Number</p>
-                <p className="font-semibold text-ink">{user?.phone ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-ink-faint mb-0.5">Username</p>
-                <p className="font-semibold text-ink">{user?.username ?? '—'}</p>
-              </div>
+            <p className="text-sm font-bold text-ink mb-2">Personal Information</p>
+            <div className="divide-y divide-border">
+              <InfoRow label="Full Name"    value={fullName}       empty="Not set" />
+              <InfoRow label="Username"     value={user?.username ? `@${user.username}` : null} empty="Not set" />
+              <InfoRow label="Phone"        value={user?.phone}    empty="Not added" />
+              <InfoRow label="Email"        value={user?.email} />
               {user?.created_at && (
-                <div>
-                  <p className="text-xs text-ink-faint mb-0.5">Member Since</p>
-                  <p className="font-semibold text-ink">{fmtDate(user.created_at)}</p>
-                </div>
+                <InfoRow label="Member Since" value={fmtDate(user.created_at)} />
               )}
             </div>
             <button
               onClick={() => navigate('/profile/edit')}
-              className="w-full py-2.5 rounded-2xl border-2 border-brand-600 text-brand-600 text-sm font-semibold hover:bg-brand-50 transition-colors"
+              className="w-full mt-5 py-2.5 rounded-2xl border-2 border-brand-600 text-brand-600 text-sm font-semibold hover:bg-brand-50 dark:hover:bg-brand-600/10 transition-colors"
             >
               Edit Profile
             </button>
           </div>
 
-          {/* Referral — in left col on desktop */}
+          {/* Referral — desktop left col only */}
           {user?.referral_code && (
             <div className="hidden lg:flex bg-surface-1 rounded-3xl p-5 shadow-card border border-border items-center justify-between gap-3">
               <div>
