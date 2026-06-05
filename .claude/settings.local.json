@@ -19,7 +19,10 @@
       "Bash(node -e \"const r = require\\('ioredis'\\); const p = new r.default.prototype.constructor.prototype; console.log\\(typeof p.getdel\\)\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\Downloads\\\\vtu-backend-fixed\" -Recurse -Depth 2)",
       "Bash(Select-Object FullName)",
-      "PowerShell(head *)"
+      "PowerShell(head *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\Downloads\\\\vtu-backend-fixed\\\\admin-dashboard\\\\src\" -Recurse -Include \"*.tsx\", \"*.ts\")",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -Property FullName -AutoSize)"
     ]
   }
 }

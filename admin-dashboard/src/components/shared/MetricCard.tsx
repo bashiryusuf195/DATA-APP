@@ -36,7 +36,7 @@ export function MetricCard({ label, value, sub, trend, icon, variant = 'default'
     : trend.value > 0 ? 'text-emerald-400' : trend.value < 0 ? 'text-rose-400' : 'text-ink-faint'
 
   return (
-    <div className={cn('bg-surface-1 border rounded-xl p-5 flex items-start gap-4', borderMap[variant])}>
+    <div className={cn('bg-surface-1 border rounded-xl p-5 flex items-start gap-4 shadow-sm', borderMap[variant])}>
       {icon && (
         <div className={cn('p-2.5 rounded-lg shrink-0', iconMap[variant])}>
           {icon}

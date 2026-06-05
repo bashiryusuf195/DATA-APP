@@ -391,7 +391,7 @@ function AdminCopyButton({ text }: { text: string }) {
     } catch { /* clipboard API unavailable */ }
   }, [text])
   return (
-    <button onClick={handleCopy} className="ml-1.5 p-0.5 rounded hover:bg-white/10" title="Copy">
+    <button onClick={handleCopy} className="ml-1.5 p-0.5 rounded hover:bg-surface-3" title="Copy">
       {copied
         ? <Check className="h-3 w-3 text-emerald-400" />
         : <Copy className="h-3 w-3 text-ink-faint" />}

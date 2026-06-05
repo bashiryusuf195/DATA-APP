@@ -34,8 +34,10 @@ function fmtCharge(gw: PaymentGateway): string {
 function StatusBadge({ active }: { active: boolean }) {
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-      active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+      active
+        ? 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/20'
+        : 'bg-surface-2 text-ink-faint ring-border'
     )}>
       {active ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
       {active ? 'Active' : 'Inactive'}
@@ -46,8 +48,10 @@ function StatusBadge({ active }: { active: boolean }) {
 function ModeBadge({ live }: { live: boolean }) {
   return (
     <span className={cn(
-      'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-      live ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+      'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+      live
+        ? 'bg-accent/10 text-accent ring-accent/20'
+        : 'bg-amber-500/15 text-amber-400 ring-amber-500/20'
     )}>
       {live ? 'Live' : 'Test'}
     </span>
@@ -67,20 +71,20 @@ function KeyStatus({
 }) {
   if (inDb) {
     return (
-      <span className="text-green-600 flex items-center gap-1">
+      <span className="text-emerald-400 flex items-center gap-1">
         <CheckCircle className="h-3 w-3" /> Set
       </span>
     )
   }
   if (inEnv) {
     return (
-      <span className="text-blue-600 flex items-center gap-1" title={`Configured via ${label} environment variable`}>
+      <span className="text-accent flex items-center gap-1" title={`Configured via ${label} environment variable`}>
         <Info className="h-3 w-3" /> Via env var
       </span>
     )
   }
   return (
-    <span className="text-amber-600 flex items-center gap-1">
+    <span className="text-amber-400 flex items-center gap-1">
       <AlertTriangle className="h-3 w-3" /> Not set
     </span>
   )
@@ -210,7 +214,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
 
           {/* Server-side save error */}
           {saveError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-400">
               {saveError}
             </div>
           )}
@@ -273,7 +277,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
             <label className="block text-xs font-medium text-ink-muted mb-1">
               Public Key
               {isEdit && envPublicKeySet && !gateway.public_key && (
-                <span className="ml-1.5 text-blue-600 font-normal">(env var configured)</span>
+                <span className="ml-1.5 text-accent font-normal">(env var configured)</span>
               )}
             </label>
             <input
@@ -286,7 +290,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
               className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
             />
             {isEdit && envPublicKeySet && !gateway.public_key && (
-              <p className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+              <p className="mt-1 text-xs text-accent flex items-center gap-1">
                 <Info className="h-3 w-3" />
                 Using <code className="font-mono">{envPrefix}_PUBLIC_KEY</code> environment variable.
                 Enter a value here to store in the database.
@@ -298,10 +302,10 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
             <label className="block text-xs font-medium text-ink-muted mb-1">
               Secret Key{' '}
               {isEdit && gateway?.has_secret_key && (
-                <span className="text-green-600">(currently set in DB)</span>
+                <span className="text-emerald-400">(currently set in DB)</span>
               )}
               {isEdit && !gateway?.has_secret_key && envSecretSet && (
-                <span className="text-blue-600">(env var configured)</span>
+                <span className="text-accent">(env var configured)</span>
               )}
             </label>
             <div className="relative">
@@ -321,7 +325,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
               </button>
             </div>
             {isEdit && !gateway?.has_secret_key && envSecretSet && (
-              <p className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+              <p className="mt-1 text-xs text-accent flex items-center gap-1">
                 <Info className="h-3 w-3" />
                 Using <code className="font-mono">{envPrefix}_SECRET_KEY</code> environment variable.
                 Leave blank to continue using it.
@@ -333,10 +337,10 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
             <label className="block text-xs font-medium text-ink-muted mb-1">
               Webhook Secret{' '}
               {isEdit && gateway?.has_webhook_secret && (
-                <span className="text-green-600">(currently set in DB)</span>
+                <span className="text-emerald-400">(currently set in DB)</span>
               )}
               {isEdit && !gateway?.has_webhook_secret && envWebhookSet && (
-                <span className="text-blue-600">(env var configured)</span>
+                <span className="text-accent">(env var configured)</span>
               )}
             </label>
             <div className="relative">
@@ -356,7 +360,7 @@ function GatewayModal({ open, gateway, onClose, onSave, saving, saveError }: Gat
               </button>
             </div>
             {isEdit && !gateway?.has_webhook_secret && envWebhookSet && (
-              <p className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+              <p className="mt-1 text-xs text-accent flex items-center gap-1">
                 <Info className="h-3 w-3" />
                 Using <code className="font-mono">{envPrefix}_WEBHOOK_SECRET</code> environment variable.
                 Leave blank to continue using it.
@@ -555,7 +559,7 @@ export function PaymentGatewaysPage() {
         </div>
         <div className="rounded-xl border border-border bg-surface-1 p-4">
           <p className="text-xs text-ink-faint uppercase tracking-wide">Active</p>
-          <p className="mt-1 text-2xl font-semibold text-green-600">{activeCount}</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-400">{activeCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface-1 p-4">
           <p className="text-xs text-ink-faint uppercase tracking-wide">Default Gateway</p>
@@ -565,7 +569,7 @@ export function PaymentGatewaysPage() {
 
       {/* Not supported warning */}
       {defaultGw && !defaultGw.is_supported && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
             Default gateway <strong>{defaultGw.name}</strong> is configured but not yet implemented.
@@ -604,7 +608,7 @@ export function PaymentGatewaysPage() {
                         </span>
                       )}
                       {!gw.is_supported && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-500 px-2 py-0.5 text-xs">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 text-ink-faint ring-1 ring-border px-2 py-0.5 text-xs">
                           Not implemented
                         </span>
                       )}
@@ -647,7 +651,7 @@ export function PaymentGatewaysPage() {
                     <button
                       onClick={() => enableMutation.mutate(gw.id)}
                       disabled={enableMutation.isPending}
-                      className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors"
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                     >
                       <ToggleRight className="h-3.5 w-3.5" /> Enable
                     </button>
@@ -673,7 +677,7 @@ export function PaymentGatewaysPage() {
                     {gw.public_key
                       ? `${gw.public_key.slice(0, 12)}…`
                       : gw.env_public_key_set
-                        ? <span className="text-blue-600 font-sans font-medium not-italic flex items-center gap-1"><Info className="h-3 w-3" />Via env var</span>
+                        ? <span className="text-accent font-sans font-medium not-italic flex items-center gap-1"><Info className="h-3 w-3" />Via env var</span>
                         : '—'}
                   </p>
                 </div>

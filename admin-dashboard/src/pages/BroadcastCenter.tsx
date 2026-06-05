@@ -186,7 +186,7 @@ function AnnouncementsSection() {
           </button>
           <button
             onClick={() => setConfirmDelId(a.id)}
-            className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-rose-500/10 transition-colors"
             title="Delete"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -525,7 +525,7 @@ function SendModal({
                 ]}
               />
               {(form.type === 'email' || form.type === 'sms' || form.type === 'push') && (
-                <p className="mt-1.5 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                <p className="mt-1.5 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
                   This channel logs the job but does not deliver to customers yet. Use <strong>In-App</strong> or <strong>Broadcast</strong> to reach the customer notification inbox.
                 </p>
               )}
@@ -760,7 +760,7 @@ export function BroadcastCenterPage() {
         <button
           type="button"
           onClick={() => setConfirmDeleteId(j.id)}
-          className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-red-50 transition-colors"
+          className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-rose-500/10 transition-colors"
           title="Delete job"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -805,13 +805,11 @@ export function BroadcastCenterPage() {
           { icon: <Smartphone    className="h-5 w-5 text-purple-400"  />, label: 'Push',     desc: 'Mobile push notifications'  },
           { icon: <Bell          className="h-5 w-5 text-amber-400"   />, label: 'In-App',   desc: 'In-app notification centre' },
         ].map(({ icon, label, desc }) => (
-          <Card key={label}>
-            <div className="p-4 flex items-start gap-3">
-              <div className="h-9 w-9 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">{icon}</div>
-              <div>
-                <p className="text-sm font-medium text-ink">{label}</p>
-                <p className="text-xs text-ink-faint mt-0.5">{desc}</p>
-              </div>
+          <Card key={label} className="flex items-start gap-3">
+            <div className="h-9 w-9 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">{icon}</div>
+            <div>
+              <p className="text-sm font-medium text-ink">{label}</p>
+              <p className="text-xs text-ink-faint mt-0.5">{desc}</p>
             </div>
           </Card>
         ))}

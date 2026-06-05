@@ -59,7 +59,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'bg-surface-1 border rounded-xl p-5 flex items-start gap-4',
+        'bg-surface-1 border rounded-xl p-5 flex items-start gap-4 shadow-sm',
         variantBorder[variant],
         className
       )}

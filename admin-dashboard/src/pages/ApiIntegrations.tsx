@@ -137,8 +137,8 @@ function Badge({
         className={cn(
           'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors',
           active
-            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-            : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200',
+            ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20'
+            : 'bg-surface-2 text-ink-faint hover:bg-surface-3',
           loading && 'cursor-wait opacity-60',
         )}
       >
@@ -150,7 +150,7 @@ function Badge({
   return (
     <span className={cn(
       'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-      active ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-500',
+      active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-surface-2 text-ink-faint',
     )}>
       {icon} {label}
     </span>
@@ -170,7 +170,7 @@ function CredentialFlag({ label, present }: { label: string; present: boolean })
   return (
     <span className={cn(
       'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
-      present ? 'bg-blue-50 text-blue-700' : 'bg-zinc-100 text-zinc-400 line-through'
+      present ? 'bg-accent/10 text-accent' : 'bg-surface-2 text-ink-faint line-through'
     )}>
       {label}
     </span>
@@ -274,7 +274,7 @@ function CredSection({
   return (
     <div className="space-y-3">
       {/* Helper */}
-      <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+      <div className="flex gap-2 p-3 bg-accent/5 border border-accent/20 rounded-lg text-xs text-accent">
         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <span>
           Only fill the credentials required by this provider.
@@ -704,7 +704,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
           </div>
 
           {formError && (
-            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">{formError}</p>
+            <p className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-3 py-2 text-xs text-rose-400">{formError}</p>
           )}
 
           <div className="flex justify-end gap-2 pt-1">
@@ -847,7 +847,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
             isLive={isLive}            setIsLive={setIsLive}
           />
           {formError && (
-            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">{formError}</p>
+            <p className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-3 py-2 text-xs text-rose-400">{formError}</p>
           )}
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-ink-muted hover:text-ink border border-border">
@@ -924,8 +924,8 @@ function ProviderCard({ provider, onEdit, onEditCreds, onHealthCheck, checkingHe
               <HealthDot status={provider.health_status} />
               {provider.is_live !== null && (
                 provider.is_live
-                  ? <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">LIVE</span>
-                  : <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">SANDBOX</span>
+                  ? <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded">LIVE</span>
+                  : <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded">SANDBOX</span>
               )}
             </div>
             <span className="text-xs text-ink-faint font-mono">{provider.provider_code}</span>
@@ -1211,8 +1211,8 @@ export function ApiIntegrationsPage() {
         <div className={cn(
           'flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm border',
           healthResult.healthy
-            ? 'bg-green-50 border-green-200 text-green-800'
-            : 'bg-red-50 border-red-200 text-red-800'
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+            : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
         )}>
           {healthResult.healthy ? <Wifi className="h-4 w-4 shrink-0" /> : <WifiOff className="h-4 w-4 shrink-0" />}
           <span><strong>{healthResult.code}:</strong> {healthResult.message}</span>
@@ -1246,7 +1246,7 @@ export function ApiIntegrationsPage() {
       )}
 
       {!isLoading && error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-4 py-3 text-sm text-rose-400">
           Failed to load providers. Check that the backend is running.
         </div>
       )}

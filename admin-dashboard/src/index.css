@@ -108,3 +108,41 @@
 /* Sidebar active item — more visible on white */
 .light .bg-accent-subtle  { background-color: rgba(37, 99, 235, 0.10); }
 .light .text-accent       { color: #2563eb; }
+
+/*
+ * ── Additional text colour upgrades for light mode ──────────────────────────
+ *
+ * Tailwind "300/400" shades are tuned for dark backgrounds.
+ * On white these are too faint — upgrade to "600/700/800".
+ */
+.light .text-green-400   { color: #16a34a; }   /* green-600   */
+.light .text-green-500   { color: #15803d; }   /* green-700   */
+.light .text-yellow-400  { color: #ca8a04; }   /* yellow-600  */
+.light .text-red-400     { color: #dc2626; }   /* red-600     */
+.light .text-purple-400  { color: #7c3aed; }   /* purple-700  */
+.light .text-purple-500  { color: #6d28d9; }   /* purple-800  */
+.light .text-blue-300    { color: #1d4ed8; }   /* blue-700    */
+.light .text-blue-500    { color: #1d4ed8; }   /* blue-700    */
+.light .text-emerald-300 { color: #065f46; }   /* emerald-800 */
+.light .text-emerald-500 { color: #047857; }   /* emerald-700 */
+.light .text-amber-300   { color: #92400e; }   /* amber-800   */
+.light .text-rose-300    { color: #991b1b; }   /* rose-800    */
+
+/*
+ * ── Tinted alert / highlight box backgrounds ─────────────────────────────────
+ *
+ * The dark-mode "opacity 5-10%" trick becomes invisible on white.
+ * Use a slightly higher tint so the boxes still register on light backgrounds.
+ */
+.light .bg-emerald-500\/5 { background-color: rgba(  5, 150, 105, 0.08); }
+.light .bg-purple-500\/5  { background-color: rgba(139,  92, 246, 0.08); }
+.light .bg-blue-500\/5    { background-color: rgba( 59, 130, 246, 0.08); }
+.light .bg-amber-500\/5   { background-color: rgba(245, 158,  11, 0.08); }
+.light .bg-rose-500\/5    { background-color: rgba(244,  63,  99, 0.08); }
+.light .bg-emerald-500\/10 { background-color: rgba(  5, 150, 105, 0.10); }
+.light .bg-rose-500\/10    { background-color: rgba(244,  63,  99, 0.10); }
+
+/* Additional ring colour overrides for badge variants */
+.light .ring-purple-500\/20  { --tw-ring-color: rgba(139,  92, 246, 0.30); }
+.light .ring-blue-500\/20    { --tw-ring-color: rgba( 59, 130, 246, 0.30); }
+.light .ring-neutral-500\/20 { --tw-ring-color: rgba(100, 116, 139, 0.20); }

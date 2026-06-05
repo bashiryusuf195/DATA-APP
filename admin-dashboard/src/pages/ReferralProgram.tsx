@@ -21,9 +21,9 @@ function fmtDate(d: string) {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  completed:  'bg-green-100 text-green-700',
-  processing: 'bg-yellow-100 text-yellow-700',
-  failed:     'bg-red-100 text-red-700',
+  completed:  'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20',
+  processing: 'bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20',
+  failed:     'bg-rose-500/15 text-rose-400 ring-1 ring-rose-500/20',
 }
 
 // Shared input / select class — proper height, border, focus ring
