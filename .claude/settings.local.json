@@ -27,7 +27,9 @@
       "Bash(cat .env.development)",
       "Bash(tasklist /FI \"IMAGENAME eq node.exe\")",
       "Bash(curl -s http://localhost:3000/health)",
-      "Bash(npx @railway/cli whoami)"
+      "Bash(npx @railway/cli whoami)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
