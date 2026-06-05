@@ -240,20 +240,18 @@ class SquadGateway implements PaymentGateway {
     // Always include — squad-dva.service.ts already guards that this is non-empty.
     body.beneficiary_account = params.beneficiary_account ?? "";
 
-    // Log payload field names (never values) so Railway logs confirm presence.
-    logger.info("squad_dva_payload_fields", {
-      fields:                   Object.keys(body),
-      has_beneficiary_account:  "beneficiary_account" in body,
-      beneficiary_account_len:  String(body.beneficiary_account ?? "").length,
+    // WARN-level so this appears regardless of LOG_LEVEL setting.
+    // Confirms what is about to be sent without logging sensitive values.
+    logger.warn("squad_dva_payload_check", {
+      base_url:               config.squad.baseUrl,
+      has_beneficiary_account: !!body.beneficiary_account,
+      beneficiary_account_len: String(body.beneficiary_account ?? "").length,
+      has_bvn:                 !!body.bvn,
+      has_dob:                 !!body.dob,
+      has_gender:              !!body.gender,
+      has_address:             !!body.address,
+      mobile_num_len:          String(body.mobile_num ?? "").length,
     });
-
-    // Full payload log — BVN masked to last 4 digits only.
-    const bvnRaw = typeof body.bvn === "string" ? body.bvn : "";
-    const payload = {
-      ...body,
-      bvn: bvnRaw ? `***${bvnRaw.slice(-4)}` : undefined,
-    };
-    logger.info("squad_request_body", payload);
 
     const res = await squadFetch<SquadVirtualAccountResponse>("POST", "/virtual-account", body);
 

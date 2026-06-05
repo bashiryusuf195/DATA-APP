@@ -85,8 +85,8 @@ export async function getOrCreateSquadVirtualAccount(
   const customerIdentifier = userId;
 
   // ── 4. Guard: beneficiary_account is a merchant-level config required by Squad ─
-  // Safe diagnostic — logs presence and length only, never the account number itself.
-  logger.info("squad_beneficiary_check", {
+  // WARN-level so this appears regardless of LOG_LEVEL setting.
+  logger.warn("squad_beneficiary_check", {
     configured: !!config.squad.beneficiaryAccount,
     length:     config.squad.beneficiaryAccount?.length ?? 0,
   });
