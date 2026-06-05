@@ -122,7 +122,7 @@ export function DataPage() {
   }
 
   return (
-    <div className="space-y-4 pt-2">
+    <div className="space-y-4 pt-2 lg:max-w-2xl lg:mx-auto">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" /> Services
       </button>
@@ -208,7 +208,7 @@ export function DataPage() {
             <div>
               <p className="text-sm font-medium text-ink mb-2">Select Plan</p>
               {filteredPlans.length ? (
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-0.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-0.5">
                   {filteredPlans.map(plan => (
                     <button
                       key={plan.id}

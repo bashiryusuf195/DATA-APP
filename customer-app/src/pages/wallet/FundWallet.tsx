@@ -275,7 +275,7 @@ export function FundWalletPage() {
   // ── Main input screen ───────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4 pt-2 pb-4">
+    <div className="space-y-4 pt-2 pb-4 xl:max-w-4xl xl:mx-auto">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
@@ -335,124 +335,136 @@ export function FundWalletPage() {
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          {/* Paystack Dedicated Account */}
-          <div className="bg-surface-1 rounded-3xl p-5 shadow-card">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-sm font-bold text-ink">Paystack Transfer Account</p>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Paystack</span>
-            </div>
-            <p className="text-xs text-ink-faint mb-4">Wallet credited automatically within seconds.</p>
+          {/* Permanent accounts — side by side on lg+ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
-            {dvaLoading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex justify-between">
-                    <div className="h-4 w-24 bg-surface-2 rounded animate-pulse" />
-                    <div className="h-4 w-32 bg-surface-2 rounded animate-pulse" />
+            {/* Paystack Dedicated Account */}
+            <div className="bg-surface-1 rounded-3xl p-5 shadow-card border border-border flex flex-col">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-bold text-ink">Paystack Account</p>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Paystack</span>
+              </div>
+              <p className="text-xs text-ink-faint mb-4">Credited automatically within seconds.</p>
+
+              {dvaLoading ? (
+                <div className="space-y-3 flex-1">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex justify-between">
+                      <div className="h-4 w-24 bg-surface-2 rounded animate-pulse" />
+                      <div className="h-4 w-32 bg-surface-2 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : dva ? (
+                <>
+                  <div className="space-y-3 text-sm flex-1">
+                    <div className="flex justify-between items-center py-2 border-b border-border">
+                      <span className="text-ink-faint">Bank</span>
+                      <span className="font-semibold text-ink">{dva.bank_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-border">
+                      <span className="text-ink-faint">Account Name</span>
+                      <span className="font-semibold text-ink text-right">{dva.account_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-ink-faint">Account No.</span>
+                      <button onClick={handleCopy} className="flex items-center gap-2 group">
+                        <span className="font-mono font-bold text-lg tracking-widest text-ink group-hover:text-brand-600 transition-colors">
+                          {dva.account_number}
+                        </span>
+                        {copied
+                          ? <CheckCheck className="h-4 w-4 text-success" />
+                          : <Copy className="h-4 w-4 text-ink-faint group-hover:text-brand-600 transition-colors" />}
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : dva ? (
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-ink-faint">Bank</span>
-                  <span className="font-semibold text-ink">{dva.bank_name}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-ink-faint">Account Name</span>
-                  <span className="font-semibold text-ink">{dva.account_name}</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-ink-faint">Account Number</span>
-                  <button onClick={handleCopy} className="flex items-center gap-2 group">
-                    <span className="font-mono font-bold text-lg tracking-widest text-ink group-hover:text-brand-600 transition-colors">
-                      {dva.account_number}
-                    </span>
-                    {copied
-                      ? <CheckCheck className="h-4 w-4 text-success" />
-                      : <Copy className="h-4 w-4 text-ink-faint group-hover:text-brand-600 transition-colors" />}
+                  <button
+                    onClick={handleCopy}
+                    className="mt-4 w-full py-2.5 rounded-2xl bg-brand-600 text-white text-sm font-bold shadow-brand hover:bg-brand-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {copied ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
                   </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-ink-muted text-center py-4">
-                Complete your profile (name &amp; phone) to activate your dedicated bank account.
-              </p>
-            )}
-          </div>
-
-          {dva && (
-            <button
-              onClick={handleCopy}
-              className="w-full py-3.5 rounded-2xl bg-brand-600 text-white text-sm font-bold shadow-brand hover:bg-brand-700 transition-colors flex items-center justify-center gap-2"
-            >
-              {copied ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Paystack Account Number</>}
-            </button>
-          )}
-
-          {/* Squad Transfer Account */}
-          <div className="bg-surface-1 rounded-3xl p-5 shadow-card">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-sm font-bold text-ink">Squad Transfer Account</p>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">Squad</span>
-            </div>
-            <p className="text-xs text-ink-faint mb-4">Wallet credited automatically within seconds.</p>
-
-            {squadLoading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex justify-between">
-                    <div className="h-4 w-24 bg-surface-2 rounded animate-pulse" />
-                    <div className="h-4 w-32 bg-surface-2 rounded animate-pulse" />
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
+                  <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-ink-faint" />
                   </div>
-                ))}
-              </div>
-            ) : squadAccount ? (
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-ink-faint">Bank</span>
-                  <span className="font-semibold text-ink">{squadAccount.bank_name}</span>
+                  <p className="text-sm text-ink-muted">Complete your profile to activate your Paystack account.</p>
+                  <Link to="/profile/edit" className="text-xs font-semibold text-brand-600 hover:underline">
+                    Complete Profile →
+                  </Link>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-ink-faint">Account Name</span>
-                  <span className="font-semibold text-ink">{squadAccount.account_name}</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-ink-faint">Account Number</span>
-                  <button onClick={handleCopySquad} className="flex items-center gap-2 group">
-                    <span className="font-mono font-bold text-lg tracking-widest text-ink group-hover:text-violet-600 transition-colors">
-                      {squadAccount.virtual_account_number}
-                    </span>
-                    {copiedSquad
-                      ? <CheckCheck className="h-4 w-4 text-success" />
-                      : <Copy className="h-4 w-4 text-ink-faint group-hover:text-violet-600 transition-colors" />}
-                  </button>
-                </div>
-              </div>
-            ) : squadProfileIncomplete ? (
-              <div className="text-center py-4 space-y-2">
-                <p className="text-sm text-ink-muted">
-                  Your Squad account needs a complete profile to activate.
-                </p>
-                <Link to="/profile/edit" className="text-sm font-semibold text-violet-600 hover:underline">
-                  Complete Profile →
-                </Link>
-              </div>
-            ) : (
-              <p className="text-sm text-ink-muted text-center py-4">
-                Squad transfer account is temporarily unavailable.
-              </p>
-            )}
-          </div>
+              )}
+            </div>
 
-          {squadAccount && (
-            <button
-              onClick={handleCopySquad}
-              className="w-full py-3.5 rounded-2xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-colors flex items-center justify-center gap-2"
-            >
-              {copiedSquad ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Squad Account Number</>}
-            </button>
-          )}
+            {/* Squad Transfer Account */}
+            <div className="bg-surface-1 rounded-3xl p-5 shadow-card border border-border flex flex-col">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-bold text-ink">Squad Account</p>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">Squad</span>
+              </div>
+              <p className="text-xs text-ink-faint mb-4">Credited automatically within seconds.</p>
+
+              {squadLoading ? (
+                <div className="space-y-3 flex-1">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex justify-between">
+                      <div className="h-4 w-24 bg-surface-2 rounded animate-pulse" />
+                      <div className="h-4 w-32 bg-surface-2 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : squadAccount ? (
+                <>
+                  <div className="space-y-3 text-sm flex-1">
+                    <div className="flex justify-between items-center py-2 border-b border-border">
+                      <span className="text-ink-faint">Bank</span>
+                      <span className="font-semibold text-ink">{squadAccount.bank_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-border">
+                      <span className="text-ink-faint">Account Name</span>
+                      <span className="font-semibold text-ink text-right">{squadAccount.account_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-ink-faint">Account No.</span>
+                      <button onClick={handleCopySquad} className="flex items-center gap-2 group">
+                        <span className="font-mono font-bold text-lg tracking-widest text-ink group-hover:text-violet-600 transition-colors">
+                          {squadAccount.virtual_account_number}
+                        </span>
+                        {copiedSquad
+                          ? <CheckCheck className="h-4 w-4 text-success" />
+                          : <Copy className="h-4 w-4 text-ink-faint group-hover:text-violet-600 transition-colors" />}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCopySquad}
+                    className="mt-4 w-full py-2.5 rounded-2xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {copiedSquad ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
+                  </button>
+                </>
+              ) : squadProfileIncomplete ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
+                  <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-ink-faint" />
+                  </div>
+                  <p className="text-sm text-ink-muted">Complete your profile to activate your Squad account.</p>
+                  <Link to="/profile/edit" className="text-xs font-semibold text-violet-600 hover:underline">
+                    Complete Profile →
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
+                  <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-ink-faint" />
+                  </div>
+                  <p className="text-sm text-ink-muted">Squad transfer account is temporarily unavailable.</p>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
             <p className="text-xs text-amber-700 font-semibold mb-1">How permanent accounts work</p>

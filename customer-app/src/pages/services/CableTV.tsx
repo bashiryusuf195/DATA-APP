@@ -103,7 +103,7 @@ export function CableTvPage() {
   }
 
   return (
-    <div className="space-y-4 pt-2 pb-4">
+    <div className="space-y-4 pt-2 pb-4 lg:max-w-2xl lg:mx-auto">
       {/* Back */}
       <button
         onClick={() => navigate(-1)}

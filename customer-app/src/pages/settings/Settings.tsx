@@ -254,21 +254,26 @@ export function SettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
-      <Card>
-        <div className="flex items-center gap-2.5 mb-5">
-          <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center">
-            <SlidersHorizontal className="h-5 w-5 text-slate-600" />
-          </div>
-          <p className="text-base font-semibold text-ink">Settings</p>
+      <div className="flex items-center gap-2.5 mb-1">
+        <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+          <SlidersHorizontal className="h-5 w-5 text-slate-600 dark:text-slate-400" />
         </div>
+        <p className="text-xl font-bold text-ink">Settings</p>
+      </div>
+
+      {/* Desktop 2-col / mobile single-col */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-5 lg:items-start space-y-4 lg:space-y-0">
+
+      {/* LEFT card: PIN + Biometric */}
+      <Card>
 
         {/* ── Transaction PIN ───────────────────────────────────────────────── */}
         <div className="mb-6 pb-6 border-b border-border">
           <div className="flex items-center gap-2 mb-4">
             <ShieldCheck className="h-4 w-4 text-ink-muted" />
             <p className="text-sm font-semibold text-ink">Transaction PIN</p>
-            <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${
-              pinSet ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+            <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full border ${
+              pinSet ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
             }`}>
               {pinSet ? 'Active' : 'Not set'}
             </span>
@@ -399,8 +404,8 @@ export function SettingsPage() {
           )}
         </div>
 
-        {/* ── Biometric Login ───────────────────────────────────────────────── */}
-        <div className="mb-6 pb-6 border-b border-border">
+        {/* ── Biometric Login ──────────────────────────────────────────────── */}
+        <div className="mb-0">
           <div className="flex items-center gap-2 mb-4">
             <Fingerprint className="h-4 w-4 text-ink-muted" />
             <p className="text-sm font-semibold text-ink">Biometric Login</p>
@@ -484,8 +489,13 @@ export function SettingsPage() {
           )}
         </div>
 
+      </Card>
+
+      {/* RIGHT card: Change password + Notification preferences */}
+      <Card>
+
         {/* ── Change password ───────────────────────────────────────────────── */}
-        <div className="mb-6">
+        <div className="mb-6 pb-6 border-b border-border">
           <div className="flex items-center gap-2 mb-4">
             <Lock className="h-4 w-4 text-ink-muted" />
             <p className="text-sm font-semibold text-ink">Change Password</p>
@@ -564,7 +574,10 @@ export function SettingsPage() {
             <p className="text-sm text-ink-muted">Unable to load preferences.</p>
           )}
         </div>
+
       </Card>
+
+      </div>{/* end desktop 2-col grid */}
 
       {/* PIN setup modal (opened from Settings) */}
       {pinSection === 'setup' && (

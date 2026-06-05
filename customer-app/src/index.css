@@ -8,13 +8,13 @@
    needing to add dark: variants to every component.
 ────────────────────────────────────────────────────────────────────────────── */
 :root {
-  --surface-0: #EEEEF5;
+  --surface-0: #ECEEF6;
   --surface-1: #FFFFFF;
-  --surface-2: #F5F5FB;
-  --ink:       #111827;
-  --ink-muted: #6B7280;
-  --ink-faint: #9CA3AF;
-  --border:    #E5E7EB;
+  --surface-2: #F3F5FB;
+  --ink:       #0F172A;
+  --ink-muted: #475569;
+  --ink-faint: #8895A8;
+  --border:    #D4DBE9;
 }
 
 html.dark {

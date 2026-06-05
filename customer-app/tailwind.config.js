@@ -55,7 +55,8 @@ export default {
         '4xl': '2rem',
       },
       boxShadow: {
-        card:   '0 2px 8px 0 rgb(0 0 0 / 0.06)',
+        card:   '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
+        'card-md': '0 4px 12px 0 rgb(0 0 0 / 0.10), 0 2px 4px -1px rgb(0 0 0 / 0.06)',
         wallet: '0 8px 32px 0 rgb(30 78 126 / 0.30)',
         brand:  '0 4px 16px 0 rgb(53 53 217 / 0.28)',
         modal:  '0 20px 60px -10px rgb(0 0 0 / 0.25)',

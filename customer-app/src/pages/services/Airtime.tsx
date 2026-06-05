@@ -54,7 +54,7 @@ export function AirtimePage() {
   }
 
   return (
-    <div className="space-y-4 pt-2">
+    <div className="space-y-4 pt-2 lg:max-w-2xl lg:mx-auto">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" /> Services
       </button>

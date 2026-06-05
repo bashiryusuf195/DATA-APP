@@ -12,26 +12,26 @@
   --border-strong: #2d4060;
   --ink: #e2e8f4;
   --ink-muted: #7b92b2;
-  --ink-faint: #3d5270;
+  --ink-faint: #4d6585;
   --accent: #4f8ef7;
   --accent-hover: #3a7be8;
-  --accent-subtle: rgba(79, 142, 247, 0.12);
+  --accent-subtle: rgba(79, 142, 247, 0.15);
 }
 
 /* ── Light theme ── */
 .light {
-  --surface-0: #f8fafc;
+  --surface-0: #eef1f6;
   --surface-1: #ffffff;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --surface-2: #f4f6fa;
+  --surface-3: #e8ecf3;
+  --border: #c9d4e2;
+  --border-strong: #9fb0c8;
   --ink: #0f172a;
-  --ink-muted: #475569;
-  --ink-faint: #94a3b8;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-subtle: rgba(59, 130, 246, 0.1);
+  --ink-muted: #334155;
+  --ink-faint: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-subtle: rgba(37, 99, 235, 0.12);
 }
 
 @layer base {
@@ -75,3 +75,36 @@
   .bg-accent       { background-color: var(--accent); }
   .bg-accent-subtle { background-color: var(--accent-subtle); }
 }
+
+/*
+ * ── Light-mode status colour overrides ──────────────────────────────────────
+ *
+ * The "400" Tailwind shades are tuned for dark backgrounds and are too
+ * light on white (contrast ~2–3:1).  Upgrade to "600/700" in light mode
+ * so status badges, stat-card icons, and alerts remain readable.
+ *
+ * These rules are scoped to .light so dark mode is completely unchanged.
+ */
+.light .text-emerald-400 { color: #059669; }   /* emerald-600 */
+.light .text-amber-400   { color: #b45309; }   /* amber-700   */
+.light .text-rose-400    { color: #dc2626; }   /* rose-600    */
+.light .text-cyan-400    { color: #0891b2; }   /* cyan-600    */
+.light .text-blue-400    { color: #2563eb; }   /* blue-600    */
+
+/* Tint badge/icon backgrounds so they're visible on white */
+.light .bg-emerald-500\/15 { background-color: rgba(  5, 150, 105, 0.10); }
+.light .bg-amber-500\/15   { background-color: rgba(180,  83,   9, 0.10); }
+.light .bg-rose-500\/15    { background-color: rgba(220,  38,  38, 0.10); }
+.light .bg-cyan-500\/15    { background-color: rgba(  8, 145, 178, 0.10); }
+.light .bg-amber-500\/10   { background-color: rgba(180,  83,   9, 0.08); }
+.light .bg-rose-500\/10    { background-color: rgba(220,  38,  38, 0.08); }
+
+/* Ring colors used by Badge */
+.light .ring-emerald-500\/20 { --tw-ring-color: rgba(  5, 150, 105, 0.25); }
+.light .ring-amber-500\/20   { --tw-ring-color: rgba(180,  83,   9, 0.25); }
+.light .ring-rose-500\/20    { --tw-ring-color: rgba(220,  38,  38, 0.25); }
+.light .ring-cyan-500\/20    { --tw-ring-color: rgba(  8, 145, 178, 0.25); }
+
+/* Sidebar active item — more visible on white */
+.light .bg-accent-subtle  { background-color: rgba(37, 99, 235, 0.10); }
+.light .text-accent       { color: #2563eb; }

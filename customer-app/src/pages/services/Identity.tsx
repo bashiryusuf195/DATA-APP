@@ -235,7 +235,7 @@ export function IdentityPage() {
   const totalSteps = category === 'bvn' ? 4 : 5  // BVN skips method step
 
   return (
-    <div className="space-y-4 pt-2">
+    <div className="space-y-4 pt-2 lg:max-w-2xl lg:mx-auto">
       <button
         onClick={() => (step === 1 ? navigate(-1) : goBack())}
         className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink"

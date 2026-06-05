@@ -44,7 +44,7 @@ export function AppLayout() {
         {tickers.length > 0 && <AnnouncementTicker items={tickers} />}
 
         {/* Page content */}
-        <main className={`flex-1 px-4 pb-24 md:pt-8 md:pb-8 md:px-8 max-w-lg w-full mx-auto md:max-w-2xl ${tickers.length > 0 ? 'pt-[80px]' : 'pt-[72px]'}`}>
+        <main className={`flex-1 px-4 pb-24 md:pt-8 md:pb-8 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'pt-[80px]' : 'pt-[72px]'}`}>
           <Outlet />
         </main>
       </div>

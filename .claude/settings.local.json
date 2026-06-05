@@ -16,7 +16,10 @@
       "Bash(node -e \"console.log\\(require\\('./node_modules/@simplewebauthn/browser/package.json'\\).version\\)\")",
       "Bash(node -e \"const s = require\\('@simplewebauthn/server'\\); console.log\\(Object.keys\\(s\\).join\\('\\\\n'\\)\\)\")",
       "Bash(node --input-type=module -e ' *)",
-      "Bash(node -e \"const r = require\\('ioredis'\\); const p = new r.default.prototype.constructor.prototype; console.log\\(typeof p.getdel\\)\")"
+      "Bash(node -e \"const r = require\\('ioredis'\\); const p = new r.default.prototype.constructor.prototype; console.log\\(typeof p.getdel\\)\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\Downloads\\\\vtu-backend-fixed\" -Recurse -Depth 2)",
+      "Bash(Select-Object FullName)",
+      "PowerShell(head *)"
     ]
   }
 }

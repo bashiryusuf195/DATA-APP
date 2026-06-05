@@ -8,7 +8,7 @@ import { fmtCurrency, fmtRelativeTime } from '@/utils/format'
 import { StatusBadge } from './StatusBadge'
 import type { Transaction } from '@/types'
 
-const TYPE_ICON: Record<string, React.FC<{ className?: string }>> = {
+export const TYPE_ICON: Record<string, React.FC<{ className?: string }>> = {
   airtime:               Phone,
   data:                  Wifi,
   electricity:           Zap,
@@ -19,7 +19,7 @@ const TYPE_ICON: Record<string, React.FC<{ className?: string }>> = {
   transfer:              ArrowUpRight,
 }
 
-const TYPE_LABEL: Record<string, string> = {
+export const TYPE_LABEL: Record<string, string> = {
   airtime:               'Airtime',
   data:                  'Data',
   electricity:           'Electricity',
@@ -30,8 +30,7 @@ const TYPE_LABEL: Record<string, string> = {
   transfer:              'Transfer',
 }
 
-// Icon bg color per service type
-const TYPE_BG: Record<string, string> = {
+export const TYPE_BG: Record<string, string> = {
   airtime:               'bg-emerald-100',
   data:                  'bg-blue-100',
   electricity:           'bg-amber-100',
@@ -42,7 +41,7 @@ const TYPE_BG: Record<string, string> = {
   transfer:              'bg-surface-2',
 }
 
-const TYPE_COLOR: Record<string, string> = {
+export const TYPE_COLOR: Record<string, string> = {
   airtime:               'text-emerald-600',
   data:                  'text-blue-600',
   electricity:           'text-amber-600',
@@ -92,10 +91,11 @@ export function TransactionCard({ tx, compact = false }: TransactionCardProps) {
         )}>
           {isCredit ? '+' : '-'}{fmtCurrency(tx.amount)}
         </p>
-        {!compact && (
+        {compact ? (
+          <StatusBadge status={tx.status} />
+        ) : (
           <p className="text-[10px] text-ink-faint mt-0.5">{fmtRelativeTime(tx.created_at)}</p>
         )}
-        {compact && <StatusBadge status={tx.status} />}
       </div>
     </Link>
   )
