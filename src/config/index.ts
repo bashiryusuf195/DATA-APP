@@ -105,11 +105,14 @@ export const config = {
   // Sandbox: https://sandbox-api-d.squadco.com
   // Production: see Squad dashboard for the live base URL.
   squad: {
-    secretKey:     optional('SQUAD_SECRET_KEY',     ''),
-    publicKey:     optional('SQUAD_PUBLIC_KEY',     ''),
-    baseUrl:       optional('SQUAD_BASE_URL',        'https://sandbox-api-d.squadco.com'),
-    callbackUrl:   optional('SQUAD_CALLBACK_URL',   ''),
-    webhookSecret: optional('SQUAD_WEBHOOK_SECRET', ''),
+    secretKey:          optional('SQUAD_SECRET_KEY',          ''),
+    publicKey:          optional('SQUAD_PUBLIC_KEY',          ''),
+    baseUrl:            optional('SQUAD_BASE_URL',             'https://sandbox-api-d.squadco.com'),
+    callbackUrl:        optional('SQUAD_CALLBACK_URL',        ''),
+    webhookSecret:      optional('SQUAD_WEBHOOK_SECRET',      ''),
+    // Settlement account: the merchant bank account where DVA inflows settle.
+    // Required for POST /virtual-account — set in Squad dashboard then copy here.
+    beneficiaryAccount: optional('SQUAD_BENEFICIARY_ACCOUNT', ''),
   },
 
   // ── WebAuthn / Passkeys ────────────────────────────────────────────────────

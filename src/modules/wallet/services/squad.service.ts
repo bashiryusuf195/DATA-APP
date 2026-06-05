@@ -41,15 +41,16 @@ export interface SquadVirtualAccountDetails {
 }
 
 export interface CreateVirtualAccountParams {
-  customer_identifier: string;
-  first_name:          string;
-  last_name:           string;
-  mobile_num:          string;
-  email:               string;
-  bvn?:                string;
-  dob?:                string;   // MM/DD/YYYY
-  address?:            string;
-  gender?:             string;   // "1" = male, "2" = female
+  customer_identifier:  string;
+  first_name:           string;
+  last_name:            string;
+  mobile_num:           string;
+  email:                string;
+  bvn?:                 string;
+  dob?:                 string;   // MM/DD/YYYY
+  address?:             string;
+  gender?:              string;   // "1" = male, "2" = female
+  beneficiary_account?: string;   // merchant settlement account (required by Squad)
 }
 
 interface SquadInitializeResponse {
@@ -232,10 +233,11 @@ class SquadGateway implements PaymentGateway {
       mobile_num:          params.mobile_num,
       email:               params.email,
     };
-    if (params.bvn)     body.bvn     = params.bvn;
-    if (params.dob)     body.dob     = params.dob;
-    if (params.address) body.address = params.address;
-    if (params.gender)  body.gender  = params.gender;
+    if (params.bvn)                  body.bvn                  = params.bvn;
+    if (params.dob)                  body.dob                  = params.dob;
+    if (params.address)              body.address              = params.address;
+    if (params.gender)               body.gender               = params.gender;
+    if (params.beneficiary_account)  body.beneficiary_account  = params.beneficiary_account;
 
     const res = await squadFetch<SquadVirtualAccountResponse>("POST", "/virtual-account", body);
 

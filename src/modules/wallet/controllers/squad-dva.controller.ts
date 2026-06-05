@@ -22,7 +22,7 @@ export async function getSquadAccountController(
       return;
     }
 
-    const ACTIONABLE_CODES = new Set(["PROFILE_INCOMPLETE", "MISSING_BVN", "INVALID_BVN"]);
+    const ACTIONABLE_CODES = new Set(["PROFILE_INCOMPLETE", "MISSING_BVN", "INVALID_BVN", "PROVIDER_NOT_CONFIGURED"]);
 
     let account;
     try {

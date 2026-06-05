@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getDbInstance } from "../../../db/knex";
+import { config } from "../../../config";
 import { squadGateway } from "./squad.service";
 import { logger } from "../../../lib/logger";
 import { AppError } from "../../../shared/errors/AppError";
@@ -83,7 +84,16 @@ export async function getOrCreateSquadVirtualAccount(
 
   const customerIdentifier = userId;
 
-  // ── 4. Check if account already exists on Squad side ────────────────────────
+  // ── 4. Guard: beneficiary_account is a merchant-level config required by Squad ─
+  if (!config.squad.beneficiaryAccount) {
+    throw new AppError(
+      503,
+      "PROVIDER_NOT_CONFIGURED",
+      "Squad beneficiary account is not configured. Contact support.",
+    );
+  }
+
+  // ── 5. Check if account already exists on Squad side ────────────────────────
   const existingOnSquad = await squadGateway.fetchVirtualAccount(customerIdentifier);
 
   let details: { virtual_account_number: string; account_name: string; bank_name: string; bank_code: string };
@@ -95,7 +105,7 @@ export async function getOrCreateSquadVirtualAccount(
       virtual_account_number: existingOnSquad.virtual_account_number,
     });
   } else {
-    // ── 5. Create new virtual account on Squad ─────────────────────────────────
+    // ── 6. Create new virtual account on Squad ─────────────────────────────────
     // Squad's mobile_num expects local Nigerian format (09XXXXXXXXX).
     // Phones stored in DB are E.164 (+2349XXXXXXXXX) — convert before sending.
     const rawPhone = user.phone as string;
@@ -119,10 +129,11 @@ export async function getOrCreateSquadVirtualAccount(
         last_name:           user.last_name     as string,
         mobile_num:          mobileNum,
         email:               user.email         as string,
-        bvn:                 user.bvn           as string,
+        bvn:                 user.bvn           as string,  // never logged
         dob:                 squadDob,
         address:             user.address_line1 as string,
         gender:              SQUAD_GENDER[user.gender as string],
+        beneficiary_account: config.squad.beneficiaryAccount,
       });
       details = created;
     } catch (err) {
@@ -149,7 +160,7 @@ export async function getOrCreateSquadVirtualAccount(
     });
   }
 
-  // ── 6. Persist in our DB (race-safe: ON CONFLICT DO NOTHING) ─────────────────
+  // ── 7. Persist in our DB (race-safe: ON CONFLICT DO NOTHING) ─────────────────
   const now = new Date();
   const [record] = await db("squad_virtual_accounts")
     .insert({

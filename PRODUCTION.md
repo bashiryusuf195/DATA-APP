@@ -31,6 +31,7 @@
 | `SQUAD_PUBLIC_KEY` | Squad public key |
 | `SQUAD_BASE_URL` | `https://api-d.squadco.com` (live) or `https://sandbox-api-d.squadco.com` (sandbox) |
 | `SQUAD_WEBHOOK_SECRET` | Optional; falls back to `SQUAD_SECRET_KEY` |
+| `SQUAD_BENEFICIARY_ACCOUNT` | Bank account number for DVA settlement (Squad dashboard → Virtual Accounts → Beneficiary). Required for DVA creation. |
 
 ### VTPass (service purchases)
 
