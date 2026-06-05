@@ -319,13 +319,26 @@ export function KycPage() {
         </Card>
       )}
 
-      {/* BVN submission — needed for Tier 2, only show after Tier 1 */}
-      {!isLoading && kyc && currentLevelNum >= 1 && currentLevelNum < 2 && (
+      {/* BVN submission — show whenever BVN is not yet verified (required for Squad transfer account + Tier 2) */}
+      {!isLoading && kyc && !kyc.bvn_verified && currentLevelNum < 2 && (
         <Card>
           <div className="flex items-center gap-2 mb-4">
             {latestBvn ? STATUS_ICON[latestBvn.status] : <ShieldAlert className="h-4 w-4 text-ink-muted" />}
-            <p className="text-sm font-semibold text-ink">Step 2 — BVN Verification</p>
+            <p className="text-sm font-semibold text-ink">
+              {currentLevelNum >= 1 ? 'Step 2 — BVN Verification' : 'BVN Verification'}
+            </p>
           </div>
+
+          {/* Explain why BVN is needed when user hasn't reached Tier 1 yet */}
+          {currentLevelNum < 1 && (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 mb-4">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">
+                Your BVN is needed to activate your <strong>Squad transfer account</strong> for wallet funding.
+                It will also count towards Tier 2 verification once your NIN is verified.
+              </p>
+            </div>
+          )}
 
           {latestBvn && (
             <div className="flex items-center gap-2 mb-4 p-2.5 rounded-lg bg-surface-2">
@@ -342,7 +355,8 @@ export function KycPage() {
 
           <p className="text-xs text-ink-muted mb-3">
             Your BVN is an 11-digit number tied to your bank accounts in Nigeria.
-            Dial *565*0# on any registered number to retrieve it.
+            Dial <strong>*565*0#</strong> on any registered number to retrieve it.
+            It is stored securely and used only for identity and account verification.
           </p>
 
           <VerificationForm

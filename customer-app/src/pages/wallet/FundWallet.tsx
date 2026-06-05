@@ -36,8 +36,10 @@ export function FundWalletPage() {
   const initFunding        = useInitializeFunding()
   const verifyFunding      = useVerifyFunding()
 
-  const squadAccount = squadData?.account ?? null
+  const squadAccount           = squadData?.account           ?? null
   const squadProfileIncomplete = squadData?.profileIncomplete ?? false
+  const squadInvalidBvn        = squadData?.invalidBvn        ?? false
+  const squadBvnMessage        = squadData?.bvnMessage        ?? null
 
   const handleCopy = () => {
     if (!dva?.account_number) return
@@ -445,6 +447,18 @@ export function FundWalletPage() {
                     {copiedSquad ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
                   </button>
                 </>
+              ) : squadInvalidBvn ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
+                  <div className="h-10 w-10 rounded-full bg-danger/10 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-danger" />
+                  </div>
+                  <p className="text-sm text-ink-muted">
+                    {squadBvnMessage ?? 'Invalid BVN. Please enter a valid BVN that matches your profile details.'}
+                  </p>
+                  <Link to="/kyc" className="text-xs font-semibold text-violet-600 hover:underline">
+                    Update BVN →
+                  </Link>
+                </div>
               ) : squadProfileIncomplete ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-4 gap-2">
                   <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center">

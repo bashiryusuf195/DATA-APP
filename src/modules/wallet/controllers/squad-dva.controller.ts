@@ -22,15 +22,17 @@ export async function getSquadAccountController(
       return;
     }
 
+    const ACTIONABLE_CODES = new Set(["PROFILE_INCOMPLETE", "INVALID_BVN"]);
+
     let account;
     try {
       account = await getOrCreateSquadVirtualAccount(userId);
     } catch (err) {
-      if (err instanceof AppError && err.code === "PROFILE_INCOMPLETE") {
+      if (err instanceof AppError && ACTIONABLE_CODES.has(err.code)) {
         res.status(200).json({
           success: true,
           data:    null,
-          code:    "PROFILE_INCOMPLETE",
+          code:    err.code,
           message: err.message,
         });
         return;

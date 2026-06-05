@@ -30,7 +30,8 @@ export async function getOrCreateSquadVirtualAccount(
     throw new Error("Squad is not configured — virtual accounts unavailable");
   }
 
-  // ── 2. Load user profile ────────────────────────────────────────────────────
+  // ── 2. Load user profile ─────────────────────────────────────────────────────
+  // bvn is selected here but NEVER logged — it is only forwarded to Squad.
   const user = await db("users")
     .leftJoin("user_profiles as p", "p.user_id", "users.id")
     .where("users.id", userId)
@@ -43,6 +44,7 @@ export async function getOrCreateSquadVirtualAccount(
       "p.address_line1",
       "p.gender",
       "p.date_of_birth",
+      "p.bvn",
     )
     .first();
 
@@ -55,6 +57,7 @@ export async function getOrCreateSquadVirtualAccount(
   if (!user.phone)         missingFields.push("phone number");
   if (!user.date_of_birth) missingFields.push("date of birth");
   if (!user.address_line1) missingFields.push("address");
+  if (!user.bvn)           missingFields.push("BVN (Bank Verification Number)");
 
   // Squad only accepts "1" (male) or "2" (female) — any other value is treated as missing.
   const SQUAD_GENDER: Record<string, string> = { male: "1", female: "2" };
@@ -99,23 +102,41 @@ export async function getOrCreateSquadVirtualAccount(
     const [yyyy, mm, dd] = dobIso.split("-");
     const squadDob = `${mm}/${dd}/${yyyy}`;
 
-    const created = await squadGateway.createVirtualAccount({
-      customer_identifier: customerIdentifier,
-      first_name:          user.first_name    as string,
-      last_name:           user.last_name     as string,
-      mobile_num:          mobileNum,
-      email:               user.email         as string,
-      dob:                 squadDob,
-      address:             user.address_line1 as string,
-      gender:              SQUAD_GENDER[user.gender as string],
-    });
+    // bvn is forwarded to Squad but never appears in logs (see logger.info below)
+    try {
+      const created = await squadGateway.createVirtualAccount({
+        customer_identifier: customerIdentifier,
+        first_name:          user.first_name    as string,
+        last_name:           user.last_name     as string,
+        mobile_num:          mobileNum,
+        email:               user.email         as string,
+        bvn:                 user.bvn           as string,
+        dob:                 squadDob,
+        address:             user.address_line1 as string,
+        gender:              SQUAD_GENDER[user.gender as string],
+      });
+      details = created;
+    } catch (err) {
+      // Map Squad BVN validation errors to a structured 422 so the frontend can guide the user.
+      // The error text from squadFetch is: "Squad POST /virtual-account failed: <Squad message>"
+      const msg = (err as Error).message ?? "";
+      const lmsg = msg.toLowerCase();
+      if (lmsg.includes("invalid bvn") || (lmsg.includes("validation") && lmsg.includes("bvn"))) {
+        throw new AppError(
+          422,
+          "INVALID_BVN",
+          "Invalid BVN. Please enter a valid 11-digit BVN that matches your registered bank details.",
+        );
+      }
+      throw err;
+    }
 
-    details = created;
     logger.info("squad_dva_created", {
       user_id:                userId,
       customer_identifier:    customerIdentifier,
-      virtual_account_number: created.virtual_account_number,
-      bank_name:              created.bank_name,
+      virtual_account_number: details.virtual_account_number,
+      bank_name:              details.bank_name,
+      // bvn intentionally omitted from logs
     });
   }
 

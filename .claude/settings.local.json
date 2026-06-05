@@ -22,7 +22,12 @@
       "PowerShell(head *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\Downloads\\\\vtu-backend-fixed\\\\admin-dashboard\\\\src\" -Recurse -Include \"*.tsx\", \"*.ts\")",
       "Bash(Sort-Object FullName)",
-      "Bash(Format-Table -Property FullName -AutoSize)"
+      "Bash(Format-Table -Property FullName -AutoSize)",
+      "Bash(cat .env.local)",
+      "Bash(cat .env.development)",
+      "Bash(tasklist /FI \"IMAGENAME eq node.exe\")",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(npx @railway/cli whoami)"
     ]
   }
 }

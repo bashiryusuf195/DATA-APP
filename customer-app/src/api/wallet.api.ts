@@ -13,6 +13,8 @@ export interface SquadAccountResult {
   account:           SquadAccount | null
   profileIncomplete: boolean
   incompleteMessage: string | null
+  invalidBvn:        boolean
+  bvnMessage:        string | null
 }
 
 // Raw shape the backend may return (balance could be a nested object on older
@@ -102,19 +104,25 @@ export const walletApi = {
       .then((r) => r.data.data ?? null),
 
   getSquadAccount: async (): Promise<SquadAccountResult> => {
+    const EMPTY: SquadAccountResult = {
+      account: null, profileIncomplete: false, incompleteMessage: null,
+      invalidBvn: false, bvnMessage: null,
+    }
     try {
       const r = await apiClient.get<
         ApiResponse<SquadAccount | null> & { code?: string; message?: string }
       >('/wallet/squad-account')
-      const incomplete = r.data.code === 'PROFILE_INCOMPLETE'
+      const code = r.data.code
       return {
         account:           r.data.data ?? null,
-        profileIncomplete: incomplete,
-        incompleteMessage: incomplete ? (r.data.message ?? null) : null,
+        profileIncomplete: code === 'PROFILE_INCOMPLETE',
+        incompleteMessage: code === 'PROFILE_INCOMPLETE' ? (r.data.message ?? null) : null,
+        invalidBvn:        code === 'INVALID_BVN',
+        bvnMessage:        code === 'INVALID_BVN'        ? (r.data.message ?? null) : null,
       }
     } catch {
-      // 503 = Squad not configured; any other error — silently return null
-      return { account: null, profileIncomplete: false, incompleteMessage: null }
+      // 503 = Squad not configured; any other error — silently degrade
+      return EMPTY
     }
   },
 }
