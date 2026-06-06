@@ -110,32 +110,33 @@ export function SettingsPage() {
   // ── Push notifications ─────────────────────────────────────────────────────
   const push = usePushNotifications()
 
-  const handlePushToggle = async (enable: boolean) => {
-    if (enable) {
-      if (push.permission === 'unsupported') {
-        toast.error('Push notifications are not supported in this browser')
-        return
-      }
-      if (push.permission === 'unconfigured') {
-        toast.error('Push notifications are not configured on this server')
-        return
-      }
-      if (push.permission === 'denied') {
-        toast.error('Notification permission denied. Enable it in your browser settings.')
-        return
-      }
+  const handlePushToggle = async (shouldEnable: boolean) => {
+    console.log('[Settings] Push toggle →', shouldEnable ? 'ON' : 'OFF', '| current permission:', push.permission)
+
+    if (shouldEnable) {
+      // Always delegate to push.enable() — it handles every failure case
+      // (unconfigured, unsupported, denied, missing VAPID key, getToken errors)
+      // and emits [PUSH] logs at each step.
       const ok = await push.enable()
       if (ok) {
         toast.success('Push notifications enabled')
-        // Attach foreground listener in case it's not already set up
         attachForegroundListener(() => {})
         updatePrefsMutation.mutate({ push: true })
-      } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
-        // push.permission is narrowed by the guards above; read the live browser
-        // value instead to detect a denial that happened during the permission prompt.
-        toast.error('Notification permission denied. Enable it in your browser settings.')
+      } else {
+        // push.permission in this closure is the pre-toggle snapshot; use
+        // Notification.permission directly to detect a mid-flow denial.
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+          toast.error('Notification permission denied. Enable it in your browser settings.')
+        } else if (push.permission === 'unsupported') {
+          toast.error('Push notifications are not supported in this browser.')
+        } else if (push.permission === 'unconfigured') {
+          toast.error('Push notifications are not configured on this server.')
+        } else {
+          toast.error('Could not enable push notifications. Check the browser console for details.')
+        }
       }
     } else {
+      console.log('[Settings] Calling push.disable()')
       await push.disable()
       toast.success('Push notifications disabled')
       updatePrefsMutation.mutate({ push: false })
