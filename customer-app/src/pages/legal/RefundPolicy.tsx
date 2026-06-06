@@ -15,12 +15,12 @@ function PolicyCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/8 rounded-xl p-5 space-y-3">
+    <div className="bg-surface-1 border border-border rounded-xl p-5 space-y-3">
       <div className="flex items-center gap-3">
         <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
-        <h3 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h3>
+        <h3 className="text-sm font-bold text-ink">{title}</h3>
       </div>
-      <div className="text-sm text-gray-500 dark:text-white/55 leading-relaxed space-y-2 pl-8">
+      <div className="text-sm text-ink-muted leading-relaxed space-y-2 pl-8">
         {children}
       </div>
     </div>
@@ -32,11 +32,11 @@ export function RefundPolicyPage() {
     <div className="space-y-10">
 
       <div className="space-y-3 pt-4">
-        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-ink">
           Refund Policy
         </h1>
-        <p className="text-sm text-gray-400 dark:text-white/40">Effective: {EFFECTIVE_DATE}</p>
-        <p className="text-base text-gray-500 dark:text-white/50 leading-relaxed max-w-xl">
+        <p className="text-sm text-ink-faint">Effective: {EFFECTIVE_DATE}</p>
+        <p className="text-base text-ink-muted leading-relaxed max-w-xl">
           We strive to deliver every service successfully. When something goes wrong, this policy
           explains when and how you are entitled to a refund.
         </p>
@@ -106,27 +106,27 @@ export function RefundPolicyPage() {
       </div>
 
       {/* Service-specific notes */}
-      <section className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/8 rounded-2xl p-7 space-y-4">
-        <h2 className="text-base font-bold text-gray-900 dark:text-white">Service-specific notes</h2>
-        <div className="space-y-4 text-sm text-gray-500 dark:text-white/55 leading-relaxed">
+      <section className="bg-surface-1 border border-border rounded-2xl p-7 space-y-4">
+        <h2 className="text-base font-bold text-ink">Service-specific notes</h2>
+        <div className="space-y-4 text-sm text-ink-muted leading-relaxed">
           <div>
-            <p className="font-medium text-gray-700 dark:text-white/80 mb-1">Airtime and data</p>
+            <p className="font-medium text-ink mb-1">Airtime and data</p>
             <p>Delivery is near-instant. If not received within 5 minutes and the network is not experiencing a known outage, contact support.</p>
           </div>
           <div>
-            <p className="font-medium text-gray-700 dark:text-white/80 mb-1">Electricity tokens</p>
+            <p className="font-medium text-ink mb-1">Electricity tokens</p>
             <p>Tokens are delivered via SMS to the phone number registered on the meter. If the SMS is not received, the token may still be retrieved from your transaction detail page. Contact support if the token is absent.</p>
           </div>
           <div>
-            <p className="font-medium text-gray-700 dark:text-white/80 mb-1">Cable TV</p>
+            <p className="font-medium text-ink mb-1">Cable TV</p>
             <p>Subscription renewals are usually active within a few minutes. Provider-side delays do occasionally occur, especially around payment dates.</p>
           </div>
           <div>
-            <p className="font-medium text-gray-700 dark:text-white/80 mb-1">Exam PINs</p>
+            <p className="font-medium text-ink mb-1">Exam PINs</p>
             <p>PINs are generated and displayed on-screen and stored in your transaction history. A PIN that has been generated and displayed is considered delivered and is not refundable.</p>
           </div>
           <div>
-            <p className="font-medium text-gray-700 dark:text-white/80 mb-1">Identity verification</p>
+            <p className="font-medium text-ink mb-1">Identity verification</p>
             <p>Verification charges apply regardless of whether the record is found, as the query itself consumes a provider API call. Refunds are not available for verification attempts.</p>
           </div>
         </div>
@@ -134,7 +134,7 @@ export function RefundPolicyPage() {
 
       {/* Contact prompt */}
       <div className="text-center pt-2 space-y-3">
-        <p className="text-sm text-gray-400 dark:text-white/40">Need to raise a dispute or report a failed transaction?</p>
+        <p className="text-sm text-ink-faint">Need to raise a dispute or report a failed transaction?</p>
         <Link
           to="/contact"
           className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold px-6 py-3 rounded-xl text-sm transition-colors shadow-brand"

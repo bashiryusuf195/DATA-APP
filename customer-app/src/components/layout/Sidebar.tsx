@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import {
   Home, Wallet, ArrowLeftRight, Bell,
   Gift, User, Settings, Zap, LogOut, Headphones,
@@ -66,8 +66,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 pb-5 pt-2 border-t border-border">
+      {/* Legal links + Logout */}
+      <div className="px-3 pb-5 pt-2 border-t border-border space-y-1">
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-ink-muted hover:text-danger hover:bg-danger/10 transition-colors"
@@ -75,6 +75,13 @@ export function Sidebar() {
           <LogOut className="h-4.5 w-4.5 shrink-0" />
           Sign out
         </button>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-3 pt-1">
+          <Link to="/about"            className="text-[10px] text-ink-faint hover:text-ink-muted transition-colors">About</Link>
+          <Link to="/privacy-policy"   className="text-[10px] text-ink-faint hover:text-ink-muted transition-colors">Privacy</Link>
+          <Link to="/terms-of-service" className="text-[10px] text-ink-faint hover:text-ink-muted transition-colors">Terms</Link>
+          <Link to="/refund-policy"    className="text-[10px] text-ink-faint hover:text-ink-muted transition-colors">Refunds</Link>
+          <Link to="/contact"          className="text-[10px] text-ink-faint hover:text-ink-muted transition-colors">Contact</Link>
+        </div>
       </div>
     </aside>
   )

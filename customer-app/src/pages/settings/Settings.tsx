@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle, Fingerprint, Trash2, Plus } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle, Fingerprint, Trash2, Plus, ChevronRight, FileText } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Button, Card, Input } from '@/components/ui'
@@ -578,6 +578,32 @@ export function SettingsPage() {
       </Card>
 
       </div>{/* end desktop 2-col grid */}
+
+      {/* Legal & Support */}
+      <Card>
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="h-4 w-4 text-ink-muted" />
+          <p className="text-sm font-semibold text-ink">Legal &amp; Support</p>
+        </div>
+        <div className="-mx-5 divide-y divide-border">
+          {[
+            { to: '/about',           label: 'About Hive Data'  },
+            { to: '/contact',         label: 'Contact Support'  },
+            { to: '/privacy-policy',  label: 'Privacy Policy'   },
+            { to: '/terms-of-service',label: 'Terms of Service' },
+            { to: '/refund-policy',   label: 'Refund Policy'    },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className="flex items-center justify-between px-5 py-3.5 hover:bg-surface-2 transition-colors"
+            >
+              <span className="text-sm text-ink">{label}</span>
+              <ChevronRight className="h-4 w-4 text-ink-faint shrink-0" />
+            </Link>
+          ))}
+        </div>
+      </Card>
 
       {/* PIN setup modal (opened from Settings) */}
       {pinSection === 'setup' && (

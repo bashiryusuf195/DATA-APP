@@ -3,8 +3,8 @@ const EFFECTIVE_DATE = 'June 2025'
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-base font-bold text-gray-900 dark:text-white">{title}</h2>
-      <div className="text-sm text-gray-500 dark:text-white/55 leading-relaxed space-y-3">
+      <h2 className="text-base font-bold text-ink">{title}</h2>
+      <div className="text-sm text-ink-muted leading-relaxed space-y-3">
         {children}
       </div>
     </section>
@@ -16,17 +16,17 @@ export function PrivacyPolicyPage() {
     <div className="space-y-10">
 
       <div className="space-y-3 pt-4">
-        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-ink">
           Privacy Policy
         </h1>
         <p className="text-sm text-gray-400 dark:text-white/40">Effective: {EFFECTIVE_DATE}</p>
-        <p className="text-base text-gray-500 dark:text-white/50 leading-relaxed max-w-xl">
+        <p className="text-base text-ink-muted leading-relaxed max-w-xl">
           Hive Data ("we", "us", "our") is committed to protecting your personal information.
           This policy explains what we collect, why we collect it, and how we use it.
         </p>
       </div>
 
-      <div className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/8 rounded-2xl p-7 space-y-8">
+      <div className="bg-surface-1 border border-border rounded-2xl p-7 space-y-8">
 
         <Section title="1. Information we collect">
           <p>We collect the following categories of information when you use Hive Data:</p>

@@ -61,17 +61,17 @@ export function NotificationsPage() {
                 key={n.id}
                 className={cn(
                   'flex items-start gap-3 px-5 py-4 transition-colors',
-                  !n.is_read && 'bg-brand-50/50'
+                  !n.is_read && 'bg-brand-50/60 dark:bg-brand-500/10'
                 )}
               >
                 <div className={cn(
                   'h-9 w-9 rounded-full flex items-center justify-center shrink-0 mt-0.5',
-                  n.is_read ? 'bg-surface-2' : 'bg-brand-100'
+                  n.is_read ? 'bg-surface-2' : 'bg-brand-100 dark:bg-brand-500/20'
                 )}>
-                  <Bell className={cn('h-4 w-4', n.is_read ? 'text-ink-muted' : 'text-brand-600')} />
+                  <Bell className={cn('h-4 w-4', n.is_read ? 'text-ink-muted' : 'text-brand-600 dark:text-brand-400')} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={cn('text-sm', n.is_read ? 'text-ink-muted font-normal' : 'text-ink font-medium')}>
+                  <p className={cn('text-sm text-ink', n.is_read ? 'font-normal' : 'font-semibold')}>
                     {n.title}
                   </p>
                   <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">{n.body}</p>

@@ -1,4 +1,5 @@
-import { Mail, MessageCircle, Phone, ChevronRight, HelpCircle } from 'lucide-react'
+import { Mail, MessageCircle, Phone, ChevronRight, HelpCircle, Scale } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { contentApi, type SupportContact, type SupportContent } from '@/api/content.api'
 
@@ -98,6 +99,32 @@ export function SupportPage() {
           </div>
         </div>
       )}
+      {/* Legal & Trust */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Scale className="h-4 w-4 text-ink-muted" />
+          <p className="text-sm font-bold text-ink">Legal &amp; Trust</p>
+        </div>
+        <div className="bg-surface-1 rounded-3xl shadow-card border border-border overflow-hidden divide-y divide-border">
+          {[
+            { to: '/about',            label: 'About Hive Data'  },
+            { to: '/privacy-policy',   label: 'Privacy Policy'   },
+            { to: '/terms-of-service', label: 'Terms of Service' },
+            { to: '/refund-policy',    label: 'Refund Policy'    },
+            { to: '/contact',          label: 'Contact Support'  },
+          ].map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-surface-2 transition-colors"
+            >
+              <span className="text-sm font-medium text-ink">{label}</span>
+              <ChevronRight className="h-4 w-4 text-ink-faint shrink-0" />
+            </Link>
+          ))}
+        </div>
+      </div>
+
     </div>
   )
 }

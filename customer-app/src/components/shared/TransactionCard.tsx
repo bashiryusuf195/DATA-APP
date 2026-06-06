@@ -31,24 +31,24 @@ export const TYPE_LABEL: Record<string, string> = {
 }
 
 export const TYPE_BG: Record<string, string> = {
-  airtime:               'bg-emerald-100',
-  data:                  'bg-blue-100',
-  electricity:           'bg-amber-100',
-  cable_tv:              'bg-purple-100',
-  exam_pin:              'bg-rose-100',
-  identity_verification: 'bg-brand-100',
-  wallet_funding:        'bg-teal-100',
+  airtime:               'bg-emerald-100 dark:bg-emerald-900/30',
+  data:                  'bg-blue-100 dark:bg-blue-900/30',
+  electricity:           'bg-amber-100 dark:bg-amber-900/30',
+  cable_tv:              'bg-purple-100 dark:bg-purple-900/30',
+  exam_pin:              'bg-rose-100 dark:bg-rose-900/30',
+  identity_verification: 'bg-brand-100 dark:bg-brand-500/20',
+  wallet_funding:        'bg-teal-100 dark:bg-teal-900/30',
   transfer:              'bg-surface-2',
 }
 
 export const TYPE_COLOR: Record<string, string> = {
-  airtime:               'text-emerald-600',
-  data:                  'text-blue-600',
-  electricity:           'text-amber-600',
-  cable_tv:              'text-purple-600',
-  exam_pin:              'text-rose-600',
-  identity_verification: 'text-brand-600',
-  wallet_funding:        'text-teal-600',
+  airtime:               'text-emerald-600 dark:text-emerald-400',
+  data:                  'text-blue-600 dark:text-blue-400',
+  electricity:           'text-amber-600 dark:text-amber-400',
+  cable_tv:              'text-purple-600 dark:text-purple-400',
+  exam_pin:              'text-rose-600 dark:text-rose-400',
+  identity_verification: 'text-brand-600 dark:text-brand-400',
+  wallet_funding:        'text-teal-600 dark:text-teal-400',
   transfer:              'text-ink-muted',
 }
 

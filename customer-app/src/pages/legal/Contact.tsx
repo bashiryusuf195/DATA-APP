@@ -14,12 +14,12 @@ function ContactCard({
   note?: string
 }) {
   return (
-    <div className="flex gap-4 items-start bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/8 rounded-xl p-5">
+    <div className="flex gap-4 items-start bg-surface-1 border border-border rounded-xl p-5">
       <div className="h-10 w-10 rounded-xl bg-brand-50 dark:bg-brand-500/10 flex items-center justify-center shrink-0">
         <Icon className="h-5 w-5 text-brand-600 dark:text-brand-400" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-gray-400 dark:text-white/40 uppercase tracking-wide mb-1">{label}</p>
+        <p className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-1">{label}</p>
         {href ? (
           <a
             href={href}
@@ -30,9 +30,9 @@ function ContactCard({
             {value}
           </a>
         ) : (
-          <p className="text-sm font-semibold text-gray-900 dark:text-white">{value}</p>
+          <p className="text-sm font-semibold text-ink">{value}</p>
         )}
-        {note && <p className="text-xs text-gray-400 dark:text-white/40 mt-1 leading-relaxed">{note}</p>}
+        {note && <p className="text-xs text-ink-faint mt-1 leading-relaxed">{note}</p>}
       </div>
     </div>
   )
@@ -43,10 +43,10 @@ export function ContactPage() {
     <div className="space-y-10">
 
       <div className="space-y-2 pt-4">
-        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-ink">
           Contact Us
         </h1>
-        <p className="text-base text-gray-500 dark:text-white/50 leading-relaxed max-w-xl">
+        <p className="text-base text-ink-muted leading-relaxed max-w-xl">
           We are here to help. Reach our support team through any of the channels below and
           we will get back to you as quickly as possible.
         </p>
@@ -77,14 +77,14 @@ export function ContactPage() {
       </section>
 
       {/* What to include in email */}
-      <section className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/8 rounded-2xl p-7 space-y-4">
-        <h2 className="text-base font-bold text-gray-900 dark:text-white">
+      <section className="bg-surface-1 border border-border rounded-2xl p-7 space-y-4">
+        <h2 className="text-base font-bold text-ink">
           When emailing about a transaction
         </h2>
-        <p className="text-sm text-gray-500 dark:text-white/55 leading-relaxed">
+        <p className="text-sm text-ink-muted leading-relaxed">
           To speed up your request, please include the following in your email:
         </p>
-        <ul className="space-y-2 text-sm text-gray-500 dark:text-white/55 leading-relaxed list-disc list-inside marker:text-brand-500">
+        <ul className="space-y-2 text-sm text-ink-muted leading-relaxed list-disc list-inside marker:text-brand-500">
           <li>Your registered email address</li>
           <li>The transaction reference number (visible in your transaction history)</li>
           <li>A brief description of the issue (e.g. "Airtime was not delivered", "Meter token not received")</li>
@@ -94,7 +94,7 @@ export function ContactPage() {
 
       {/* Common issues */}
       <section className="space-y-4">
-        <h2 className="text-base font-bold text-gray-900 dark:text-white">Common issues & quick answers</h2>
+        <h2 className="text-base font-bold text-ink">Common issues & quick answers</h2>
         <div className="space-y-3">
           {[
             {
@@ -116,13 +116,13 @@ export function ContactPage() {
           ].map(({ q, a }) => (
             <div
               key={q}
-              className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/8 rounded-xl p-5 space-y-2"
+              className="bg-surface-1 border border-border rounded-xl p-5 space-y-2"
             >
               <div className="flex gap-2 items-start">
                 <MessageCircle className="h-4 w-4 text-brand-500 mt-0.5 shrink-0" />
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{q}</p>
+                <p className="text-sm font-semibold text-ink">{q}</p>
               </div>
-              <p className="text-sm text-gray-500 dark:text-white/50 leading-relaxed pl-6">{a}</p>
+              <p className="text-sm text-ink-muted leading-relaxed pl-6">{a}</p>
             </div>
           ))}
         </div>

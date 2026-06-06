@@ -59,13 +59,13 @@ export function AppLayout() {
         </main>
 
         {/* Desktop legal footer */}
-        <footer className="hidden md:flex border-t border-gray-200 dark:border-white/5 py-4 px-8 lg:px-10 xl:px-12">
+        <footer className="hidden md:flex border-t border-border py-4 px-8 lg:px-10 xl:px-12">
           <div className="w-full flex flex-wrap items-center gap-x-5 gap-y-1">
-            <Link to="/about"            className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">About</Link>
-            <Link to="/contact"          className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Contact</Link>
-            <Link to="/privacy-policy"   className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Privacy</Link>
-            <Link to="/terms-of-service" className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Terms</Link>
-            <Link to="/refund-policy"    className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Refunds</Link>
+            <Link to="/about"            className="text-xs text-ink-faint hover:text-ink-muted transition-colors">About</Link>
+            <Link to="/contact"          className="text-xs text-ink-faint hover:text-ink-muted transition-colors">Contact</Link>
+            <Link to="/privacy-policy"   className="text-xs text-ink-faint hover:text-ink-muted transition-colors">Privacy</Link>
+            <Link to="/terms-of-service" className="text-xs text-ink-faint hover:text-ink-muted transition-colors">Terms</Link>
+            <Link to="/refund-policy"    className="text-xs text-ink-faint hover:text-ink-muted transition-colors">Refunds</Link>
           </div>
         </footer>
       </div>

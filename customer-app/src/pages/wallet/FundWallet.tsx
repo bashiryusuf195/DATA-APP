@@ -237,9 +237,9 @@ export function FundWalletPage() {
           {copiedTransfer ? <><CheckCheck className="h-4 w-4" /> Copied!</> : <><Copy className="h-4 w-4" /> Copy Account Number</>}
         </button>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-          <p className="text-xs text-amber-700 font-semibold mb-1">How it works</p>
-          <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-4 py-3">
+          <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold mb-1">How it works</p>
+          <ul className="text-xs text-amber-600 dark:text-amber-400/80 space-y-1 list-disc list-inside">
             <li>Transfer <strong>{fmtCurrency(transferAmount ?? 0)}</strong> from your bank app to the account above</li>
             <li>Your wallet will be credited automatically once the transfer is confirmed</li>
             <li>This account is for this transaction only — do not reuse it</li>

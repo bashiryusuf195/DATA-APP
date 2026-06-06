@@ -45,8 +45,8 @@ function SecurityRow({ icon: Icon, label, hint, onClick }: {
       onClick={onClick}
       className="w-full flex items-center gap-4 py-3.5 px-1 text-left hover:bg-surface-2/50 transition-colors rounded-xl"
     >
-      <div className="h-9 w-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-        <Icon className="h-4 w-4 text-brand-600" />
+      <div className="h-9 w-9 rounded-xl bg-brand-50 dark:bg-brand-500/10 flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 text-brand-600 dark:text-brand-400" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-ink">{label}</p>
@@ -176,8 +176,8 @@ export function ProfilePage() {
           <div className="bg-surface-1 rounded-3xl p-6 shadow-card border border-border flex flex-col items-center text-center gap-3">
             {/* Avatar with edit button */}
             <div className="relative">
-              <div className="h-20 w-20 rounded-full bg-brand-100 border-4 border-brand-200 flex items-center justify-center">
-                <span className="text-2xl font-bold text-brand-700">{initials}</span>
+              <div className="h-20 w-20 rounded-full bg-brand-100 dark:bg-brand-500/20 border-4 border-brand-200 dark:border-brand-500/30 flex items-center justify-center">
+                <span className="text-2xl font-bold text-brand-700 dark:text-brand-300">{initials}</span>
               </div>
               <button
                 onClick={() => navigate('/profile/edit')}
