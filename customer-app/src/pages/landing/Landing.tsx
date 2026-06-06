@@ -247,20 +247,26 @@ export function LandingPage() {
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer className="border-t border-gray-200 dark:border-white/5 py-10 px-5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-brand-600 flex items-center justify-center">
               <Zap className="h-4 w-4 text-white" />
             </div>
             <span className="font-black text-sm text-gray-900 dark:text-white">{appName}</span>
           </div>
-          <p className="text-xs text-gray-400 dark:text-white/30">
-            &copy; {new Date().getFullYear()} {appName}. All rights reserved.
-          </p>
-          <div className="flex gap-5">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <Link to="/about"           className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">About</Link>
+            <Link to="/contact"         className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">Contact</Link>
+            <Link to="/privacy-policy"  className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">Terms of Service</Link>
+            <Link to="/refund-policy"   className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">Refund Policy</Link>
+            <span className="text-gray-200 dark:text-white/10 select-none">|</span>
             <Link to="/login"    className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">Login</Link>
             <Link to="/register" className="text-xs text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors">Sign up</Link>
           </div>
+          <p className="text-xs text-gray-400 dark:text-white/30">
+            &copy; {new Date().getFullYear()} {appName}. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>

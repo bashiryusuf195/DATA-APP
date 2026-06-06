@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import { Sidebar }                from './Sidebar'
 import { BottomNav }              from './BottomNav'
 import { AppHeader }              from './AppHeader'
@@ -54,9 +54,20 @@ export function AppLayout() {
         {tickers.length > 0 && <AnnouncementTicker items={tickers} />}
 
         {/* Page content */}
-        <main className={`flex-1 px-4 pb-24 md:pt-8 md:pb-8 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'pt-[80px]' : 'pt-[72px]'}`}>
+        <main className={`flex-1 px-4 pb-24 md:pt-8 md:pb-4 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'pt-[80px]' : 'pt-[72px]'}`}>
           <Outlet />
         </main>
+
+        {/* Desktop legal footer */}
+        <footer className="hidden md:flex border-t border-gray-200 dark:border-white/5 py-4 px-8 lg:px-10 xl:px-12">
+          <div className="w-full flex flex-wrap items-center gap-x-5 gap-y-1">
+            <Link to="/about"            className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">About</Link>
+            <Link to="/contact"          className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Contact</Link>
+            <Link to="/privacy-policy"   className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Privacy</Link>
+            <Link to="/terms-of-service" className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Terms</Link>
+            <Link to="/refund-policy"    className="text-xs text-gray-300 dark:text-white/25 hover:text-gray-600 dark:hover:text-white/50 transition-colors">Refunds</Link>
+          </div>
+        </footer>
       </div>
 
       {/* Mobile bottom nav */}

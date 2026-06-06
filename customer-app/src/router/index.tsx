@@ -8,6 +8,14 @@ import { RouteError } from '@/components/shared/RouteError'
 import { LandingPage }    from '@/pages/landing/Landing'
 import { OnboardingPage } from '@/pages/onboarding/Onboarding'
 
+// Legal pages
+import { LegalLayout }        from '@/pages/legal/LegalLayout'
+import { AboutPage }          from '@/pages/legal/About'
+import { ContactPage }        from '@/pages/legal/Contact'
+import { PrivacyPolicyPage }  from '@/pages/legal/PrivacyPolicy'
+import { TermsOfServicePage } from '@/pages/legal/TermsOfService'
+import { RefundPolicyPage }   from '@/pages/legal/RefundPolicy'
+
 // Auth pages
 import { LoginPage }          from '@/pages/auth/Login'
 import { RegisterPage }       from '@/pages/auth/Register'
@@ -89,6 +97,19 @@ export const router = createBrowserRouter([
       { path: '/notifications',  element: <NotificationsPage /> },
       { path: '/referrals',      element: <ReferralsPage /> },
       { path: '/support',        element: <SupportPage /> },
+    ],
+  },
+
+  // ── Legal (public) ───────────────────────────────────────────────────────────
+  {
+    element:      <LegalLayout />,
+    errorElement: <RouteError />,
+    children: [
+      { path: '/about',           element: <AboutPage /> },
+      { path: '/contact',         element: <ContactPage /> },
+      { path: '/privacy-policy',  element: <PrivacyPolicyPage /> },
+      { path: '/terms-of-service', element: <TermsOfServicePage /> },
+      { path: '/refund-policy',   element: <RefundPolicyPage /> },
     ],
   },
 
