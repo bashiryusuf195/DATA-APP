@@ -13,6 +13,7 @@ import { notificationsApi } from '@/api/notifications.api'
 import { fmtDate } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import type { NotificationPreferences } from '@/types'
+import { usePushNotifications, attachForegroundListener } from '@/hooks/usePushNotifications'
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
@@ -135,6 +136,8 @@ export function ProfilePage() {
     window.location.href = '/login'
   }
 
+  const push = usePushNotifications()
+
   const { data: prefs, isLoading: prefsLoading } = useQuery({
     queryKey: ['notification-prefs'],
     queryFn:  notificationsApi.getPreferences,
@@ -157,6 +160,41 @@ export function ProfilePage() {
       { [key]: newValue },
       { onError: () => qc.setQueryData(['notification-prefs'], prefs) }
     )
+  }
+
+  const handlePushToggle = async () => {
+    if (!prefs) return
+    const shouldEnable = !prefs.push
+    console.log('[Profile] Push toggle →', shouldEnable ? 'ON' : 'OFF', '| current permission:', push.permission)
+
+    if (shouldEnable) {
+      const ok = await push.enable()
+      if (ok) {
+        attachForegroundListener(() => {})
+        qc.setQueryData(['notification-prefs'], { ...prefs, push: true })
+        updatePrefsMutation.mutate(
+          { push: true },
+          { onError: () => qc.setQueryData(['notification-prefs'], prefs) }
+        )
+      } else {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+          toast.error('Notification permission denied. Enable it in your browser settings.')
+        } else if (push.permission === 'unsupported') {
+          toast.error('Push notifications are not supported in this browser.')
+        } else if (push.permission === 'unconfigured') {
+          toast.error('Push notifications are not configured on this server.')
+        } else {
+          toast.error('Could not enable push notifications. Check the browser console for details.')
+        }
+      }
+    } else {
+      await push.disable()
+      qc.setQueryData(['notification-prefs'], { ...prefs, push: false })
+      updatePrefsMutation.mutate(
+        { push: false },
+        { onError: () => qc.setQueryData(['notification-prefs'], prefs) }
+      )
+    }
   }
 
   return (
@@ -305,7 +343,7 @@ export function ProfilePage() {
                   label="Push Notifications"
                   hint="Receive transaction alerts"
                   checked={prefs.push}
-                  onChange={() => togglePref('push')}
+                  onChange={handlePushToggle}
                 />
                 <PrefRow
                   icon={Mail}
