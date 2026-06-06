@@ -4,9 +4,12 @@ import type { Knex } from "knex";
 // to the Postgres audit_action enum, causing constraint violations on every
 // token_refresh, 2FA event, and transaction_pin operation.
 //
-// ALTER TYPE ... ADD VALUE is transactional in Postgres 12+ but cannot be
-// executed inside a transaction block. Knex wraps migrations in a transaction
-// by default, so we disable that here.
+// ALTER TYPE ... ADD VALUE cannot be executed with parameterized placeholders
+// ($1, ?, etc.) — PostgreSQL rejects them for DDL. Values must be string
+// literals in the SQL text itself. All values here are hardcoded constants
+// so direct interpolation is safe (no user input involved).
+//
+// ALTER TYPE ... ADD VALUE cannot run inside a Knex-managed transaction.
 export const config = { transaction: false };
 
 const MISSING_VALUES = [
@@ -26,7 +29,9 @@ const MISSING_VALUES = [
 
 export async function up(knex: Knex): Promise<void> {
   for (const value of MISSING_VALUES) {
-    await knex.raw(`ALTER TYPE audit_action ADD VALUE IF NOT EXISTS ?`, [value]);
+    // Literal interpolation required — Postgres does not accept $1 placeholders
+    // in ALTER TYPE ... ADD VALUE. Values are compile-time constants; no injection risk.
+    await knex.raw(`ALTER TYPE audit_action ADD VALUE IF NOT EXISTS '${value}'`);
   }
 }
 
