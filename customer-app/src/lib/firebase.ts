@@ -27,6 +27,7 @@ export function getFirebaseApp(): FirebaseApp | null {
   const existing = getApps().find((a) => a.name === "[DEFAULT]");
   if (existing) { _app = existing; return _app; }
   _app = initializeApp({ apiKey, authDomain, projectId, messagingSenderId, appId });
+  console.log('[FIREBASE] App initialised | project:', projectId);
   return _app;
 }
 

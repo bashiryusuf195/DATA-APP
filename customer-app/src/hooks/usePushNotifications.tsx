@@ -13,7 +13,6 @@ function useHandleDeepLink() {
   const navigate = useNavigate()
   return useCallback((deepLink?: string) => {
     if (!deepLink) return
-    // Only follow same-origin paths; ignore external URLs.
     try {
       const url = new URL(deepLink, window.location.origin)
       if (url.origin === window.location.origin) {
@@ -27,7 +26,7 @@ function useHandleDeepLink() {
 
 // ── Foreground message listener ───────────────────────────────────────────────
 
-let _foregroundListenerAttached = false;
+let _foregroundListenerAttached = false
 
 export function attachForegroundListener(onDeepLink: (link: string) => void): void {
   if (_foregroundListenerAttached) return
@@ -38,12 +37,10 @@ export function attachForegroundListener(onDeepLink: (link: string) => void): vo
   onMessage(messaging, (payload) => {
     const notification = payload.notification
     const data         = payload.data ?? {}
+    const title        = notification?.title ?? 'Hive Data'
+    const body         = notification?.body  ?? ''
+    const deepLink     = data['deep_link'] ?? ''
 
-    const title    = notification?.title ?? 'Hive Data'
-    const body     = notification?.body  ?? ''
-    const deepLink = data['deep_link'] ?? ''
-
-    // Show a dismissible toast with optional navigation on click
     toast(
       (t) => (
         <button
@@ -59,6 +56,26 @@ export function attachForegroundListener(onDeepLink: (link: string) => void): vo
   })
 }
 
+// ── SW registration helper ────────────────────────────────────────────────────
+
+async function getSwRegistration(): Promise<ServiceWorkerRegistration | undefined> {
+  if (!('serviceWorker' in navigator)) return undefined
+  try {
+    // Wait for the controller to be ready — this resolves once the SW is active.
+    const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
+    console.log(
+      '[PUSH] SW registration:',
+      reg
+        ? `scope=${reg.scope} active=${reg.active?.state ?? 'none'} installing=${reg.installing?.state ?? 'none'}`
+        : 'not found',
+    )
+    return reg
+  } catch (err) {
+    console.warn('[PUSH] Could not read SW registration:', err)
+    return undefined
+  }
+}
+
 // ── Main hook ─────────────────────────────────────────────────────────────────
 
 export function usePushNotifications() {
@@ -67,41 +84,94 @@ export function usePushNotifications() {
     if (!getFirebaseMessaging())             return 'unconfigured'
     return Notification.permission as PermissionState
   })
-  const [loading,     setLoading]     = useState(false)
-  const currentToken                  = useRef<string | null>(null)
-  const handleDeepLink                = useHandleDeepLink()
+  const [loading,  setLoading]  = useState(false)
+  const currentToken            = useRef<string | null>(null)
+  const handleDeepLink          = useHandleDeepLink()
 
   const enable = useCallback(async (): Promise<boolean> => {
+    console.log(
+      '[PUSH] enable() called | browser permission =',
+      typeof Notification !== 'undefined' ? Notification.permission : 'N/A (unsupported)',
+    )
+
     const messaging = getFirebaseMessaging()
-    if (!messaging) { setPermission('unconfigured'); return false }
-    if (typeof Notification === 'undefined') { setPermission('unsupported'); return false }
+    if (!messaging) {
+      console.warn('[PUSH] Firebase Messaging is null — check VITE_FIREBASE_* build-time env vars')
+      setPermission('unconfigured')
+      return false
+    }
+    console.log('[PUSH] Firebase Messaging OK')
+
+    if (typeof Notification === 'undefined') {
+      console.warn('[PUSH] Notification API not available in this browser')
+      setPermission('unsupported')
+      return false
+    }
 
     setLoading(true)
     try {
+      // ── 1. Request permission ─────────────────────────────────────────────
+      console.log('[PUSH] Requesting notification permission…')
       const perm = await Notification.requestPermission()
-      if (perm !== 'granted') { setPermission('denied'); return false }
+      console.log('[PUSH] Permission result:', perm)
+      if (perm !== 'granted') {
+        setPermission('denied')
+        return false
+      }
       setPermission('granted')
 
+      // ── 2. VAPID key check ────────────────────────────────────────────────
       if (!VAPID_KEY) {
-        console.warn('[PUSH] VITE_FIREBASE_VAPID_KEY not set — cannot get FCM token')
+        console.warn('[PUSH] VITE_FIREBASE_VAPID_KEY is empty — cannot call getToken()')
+        return false
+      }
+      console.log('[PUSH] VAPID key present (length:', VAPID_KEY.length, ')')
+
+      // ── 3. Get SW registration (passed explicitly to avoid getToken having
+      //       to discover it — prevents a race on first-install where the SW
+      //       may still be installing when getToken is called). ──────────────
+      const swRegistration = await getSwRegistration()
+
+      // ── 4. Get FCM token ──────────────────────────────────────────────────
+      console.log('[PUSH] Calling getToken()…')
+      let token: string
+      try {
+        token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          ...(swRegistration ? { serviceWorkerRegistration: swRegistration } : {}),
+        })
+      } catch (tokenErr) {
+        console.error('[PUSH] getToken() threw:', tokenErr)
         return false
       }
 
-      const token = await getToken(messaging, { vapidKey: VAPID_KEY })
+      if (!token) {
+        console.error('[PUSH] getToken() returned empty string — check VAPID key and Firebase project config')
+        return false
+      }
+      console.log('[PUSH] getToken() success | token prefix:', token.slice(0, 20) + '…')
       currentToken.current = token
 
-      await notificationsApi.registerPushToken({
-        token,
-        platform:    'web',
-        browser:     navigator.userAgent.slice(0, 100),
-        device_name: navigator.platform ?? null,
-      })
+      // ── 5. Register token with backend ────────────────────────────────────
+      console.log('[PUSH] POST /notifications/push-token …')
+      try {
+        await notificationsApi.registerPushToken({
+          token,
+          platform:    'web',
+          browser:     navigator.userAgent.slice(0, 100),
+          device_name: navigator.platform ?? null,
+        })
+        console.log('[PUSH] Token registered with backend ✓')
+      } catch (regErr) {
+        console.error('[PUSH] Backend token registration failed:', regErr)
+        return false
+      }
 
-      // Attach foreground listener
       attachForegroundListener(handleDeepLink)
       return true
+
     } catch (err) {
-      console.error('[PUSH] Failed to enable push notifications:', err)
+      console.error('[PUSH] Unexpected error in enable():', err)
       return false
     } finally {
       setLoading(false)
