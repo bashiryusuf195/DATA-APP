@@ -130,7 +130,9 @@ export function SettingsPage() {
         // Attach foreground listener in case it's not already set up
         attachForegroundListener(() => {})
         updatePrefsMutation.mutate({ push: true })
-      } else if (push.permission === 'denied') {
+      } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        // push.permission is narrowed by the guards above; read the live browser
+        // value instead to detect a denial that happened during the permission prompt.
         toast.error('Notification permission denied. Enable it in your browser settings.')
       }
     } else {
