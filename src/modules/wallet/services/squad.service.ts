@@ -277,7 +277,7 @@ class SquadGateway implements PaymentGateway {
     try {
       const res = await squadFetch<SquadVirtualAccountResponse>(
         "GET",
-        `/virtual-account/customer/${encodeURIComponent(customerIdentifier)}`
+        `/virtual-account/${encodeURIComponent(customerIdentifier)}`
       );
 
       if (!res.success || !res.data?.virtual_account_number) return null;
