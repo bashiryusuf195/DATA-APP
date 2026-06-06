@@ -64,7 +64,16 @@ for (const tpl of ['NIN Information.png', 'NIN Standard.png', 'NIN Premium.png',
     bvn_bvn_y:            _bvn.fields['bvn'].y,
     bvn_photo_x:          _bvn.photo?.x,
   }));
-  console.log(`[STARTUP] git commit           : ${process.env['RAILWAY_GIT_COMMIT_SHA'] ?? process.env['COMMIT_SHA'] ?? 'unknown'}`);
+  const deployCommit = process.env['RAILWAY_GIT_COMMIT_SHA'] ?? process.env['COMMIT_SHA'] ?? 'unknown';
+  const deployId     = process.env['RAILWAY_DEPLOYMENT_ID'] ?? 'unknown';
+  console.log(`[STARTUP] git commit           : ${deployCommit}`);
+  // WARN level so this appears regardless of LOG_LEVEL — confirms which build is running.
+  logger.warn('server_startup_build', {
+    commit:        deployCommit,
+    deployment_id: deployId,
+    node_env:      config.env,
+    version:       config.appVersion,
+  });
 }
 
 // Top-level process safety nets — registered before any async work so nothing
