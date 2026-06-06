@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react'
+import { CmsPageContent } from './CmsPageContent'
 
 const EFFECTIVE_DATE = 'June 2025'
 
@@ -29,6 +30,7 @@ function PolicyCard({
 
 export function RefundPolicyPage() {
   return (
+    <CmsPageContent slug="refund-policy">
     <div className="space-y-10">
 
       <div className="space-y-3 pt-4">
@@ -143,5 +145,6 @@ export function RefundPolicyPage() {
         </Link>
       </div>
     </div>
+    </CmsPageContent>
   )
 }

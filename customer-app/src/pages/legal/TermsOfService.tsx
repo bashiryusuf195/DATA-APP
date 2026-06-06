@@ -1,3 +1,5 @@
+import { CmsPageContent } from './CmsPageContent'
+
 const EFFECTIVE_DATE = 'June 2025'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -13,6 +15,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function TermsOfServicePage() {
   return (
+    <CmsPageContent slug="terms-of-service">
     <div className="space-y-10">
 
       <div className="space-y-3 pt-4">
@@ -143,5 +146,6 @@ export function TermsOfServicePage() {
 
       </div>
     </div>
+    </CmsPageContent>
   )
 }

@@ -62,6 +62,15 @@ export const DEFAULT_APP_CONTENT: AppContent = {
   support:    null,
 }
 
+export interface SitePage {
+  slug:         string
+  title:        string
+  content:      string
+  is_published: boolean
+  version:      number
+  updated_at:   string
+}
+
 export const contentApi = {
   // Never throws — returns DEFAULT_APP_CONTENT on any error so pages always
   // receive a value from React Query and can fall back to their local defaults.
@@ -71,6 +80,16 @@ export const contentApi = {
       return res.data ?? DEFAULT_APP_CONTENT
     } catch {
       return DEFAULT_APP_CONTENT
+    }
+  },
+
+  // Returns null on any error so legal pages can fall back to hardcoded content.
+  getSitePage: async (slug: string): Promise<SitePage | null> => {
+    try {
+      const res = await apiClient.get<{ success: boolean; data: SitePage }>(`/content/${slug}`)
+      return res.data?.data ?? null
+    } catch {
+      return null
     }
   },
 }

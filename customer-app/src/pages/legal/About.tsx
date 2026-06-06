@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Zap, Phone, Wifi, Tv, Shield, CreditCard, FileText, UserCheck } from 'lucide-react'
+import { CmsPageContent } from './CmsPageContent'
 
 const SERVICES = [
   { icon: Phone,     label: 'Airtime Top-up',          desc: 'Instant recharge for MTN, Airtel, Glo and 9mobile.' },
@@ -14,6 +15,7 @@ const SERVICES = [
 
 export function AboutPage() {
   return (
+    <CmsPageContent slug="about">
     <div className="space-y-12">
 
       {/* Hero */}
@@ -88,5 +90,6 @@ export function AboutPage() {
         </Link>
       </div>
     </div>
+    </CmsPageContent>
   )
 }

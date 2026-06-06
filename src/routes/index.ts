@@ -15,6 +15,7 @@ import { notificationsRouter }   from '../modules/notifications/routes/notificat
 import { webhookRouter }         from '../modules/webhooks/routes/webhook.routes';
 import { userReferralRouter }    from '../modules/referral/routes/user-referral.routes';
 import { announcementRouter }    from '../modules/announcements/routes/announcement.routes';
+import { cmsRouter }            from '../modules/cms/routes/cms.routes';
 import { customerKycRouter }     from '../modules/compliance/routes/customer-kyc.routes';
 import { adminRouter }           from './admin.routes';
 import { publicRouter }          from '../modules/public/routes/public.routes';
@@ -35,3 +36,4 @@ rootRouter.use('/kyc',                       customerKycRouter);
 rootRouter.use('/admin',                     adminRouter);
 rootRouter.use('/public',                    publicRouter);
 rootRouter.use('/security/transaction-pin',  transactionPinRouter);
+rootRouter.use('/content',                   cmsRouter);

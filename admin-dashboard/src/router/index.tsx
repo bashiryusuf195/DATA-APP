@@ -55,6 +55,8 @@ import { PaymentGatewaysPage }        from '@/pages/PaymentGateways'
 import { ApiIntegrationsPage }        from '@/pages/ApiIntegrations'
 import { ReferralProgramPage }        from '@/pages/ReferralProgram'
 import { AppContentPage }            from '@/pages/AppContent'
+import { CmsPagesPage }             from '@/pages/CmsPages'
+import { CmsEditorPage }            from '@/pages/CmsEditor'
 
 import {
   Landmark,
@@ -242,6 +244,10 @@ export const router = createBrowserRouter([
       // ── System ─────────────────────────────────────────────────────────────
       { path: '/wallets',              element: <WalletPage /> },
       { path: '/app-content',          element: <AppContentPage /> },
+
+      // ── Content Management ─────────────────────────────────────────────────
+      { path: '/cms/pages',            element: <CmsPagesPage /> },
+      { path: '/cms/pages/:slug',      element: <CmsEditorPage /> },
       { path: '/settings',             element: <SettingsPage /> },
       { path: '/system/wallet-adjust', element: <ManualWalletOpsPage /> },
 

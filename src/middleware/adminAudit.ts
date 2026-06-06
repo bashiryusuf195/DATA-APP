@@ -80,6 +80,12 @@ function resolveAction(req: Request): string {
   const path   = req.path.toLowerCase();
   const method = req.method.toUpperCase();
 
+  if (path.includes("/content")) {
+    if (path.includes("/publish")) return "content_publish";
+    if (method === "POST")   return "content_create";
+    if (method === "DELETE") return "content_delete";
+    return "content_update";
+  }
   if (path.includes("/providers") && !path.includes("routing") && !path.includes("health") && !path.includes("attempt")) {
     if (method === "POST")   return "provider_create";
     if (method === "DELETE") return "provider_delete";
@@ -138,6 +144,10 @@ function resolveDescription(action: string, req: Request): string {
     catalog_create:         `Catalog entry created`,
     catalog_update:         `Catalog entry updated${id}`,
     catalog_delete:         `Catalog entry deleted${id}`,
+    content_create:         `Site page created (${req.body?.slug ?? req.params.slug ?? ""})`,
+    content_update:         `Site page updated${id}`,
+    content_publish:        `Site page publish-state changed${id}`,
+    content_delete:         `Site page deleted${id}`,
     admin_create:           `Admin resource created via ${req.path}`,
     admin_update:           `Admin resource updated via ${req.path}${id}`,
     admin_delete:           `Admin resource deleted via ${req.path}${id}`,
@@ -157,5 +167,6 @@ function resolveResourceType(req: Request): string | null {
   if (path.includes("/journal-batches")) return "journal_batch";
   if (path.includes("/wallet"))          return "wallet";
   if (path.includes("/catalog") || path.includes("/services") || path.includes("/plans")) return "service";
+  if (path.includes("/content")) return "site_page";
   return null;
 }

@@ -9,7 +9,7 @@ import {
   ClipboardList, SlidersHorizontal, ArrowUpDown, Radio, ShieldCheck,
   Gift, MessageSquare, Flag, PackageX, Webhook, Layout, MonitorDot,
   HeartHandshake, HardDrive, KeyRound, TrendingUp, AlertTriangle,
-  BookOpen, Tag, RefreshCcw,
+  BookOpen, Tag, RefreshCcw, FileText, Plus,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -107,6 +107,14 @@ const nav: NavSection[] = [
       { to: '/finance/reconciliation-issues',  label: 'Recon Issues',   icon: <AlertTriangle className="h-4 w-4" /> },
       { to: '/audit-logs',                     label: 'Audit Logs',     icon: <ClipboardList className="h-4 w-4" /> },
       { to: '/referral-program',               label: 'Referral Program',icon: <Gift         className="h-4 w-4" /> },
+    ],
+  },
+  {
+    key:   'cms',
+    title: 'Content Management',
+    items: [
+      { to: '/cms/pages',     label: 'Pages',    icon: <FileText className="h-4 w-4" /> },
+      { to: '/cms/pages/new', label: 'New Page', icon: <Plus     className="h-4 w-4" /> },
     ],
   },
   {

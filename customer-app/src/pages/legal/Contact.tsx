@@ -1,4 +1,5 @@
 import { Mail, Globe, MessageCircle, Clock } from 'lucide-react'
+import { CmsPageContent } from './CmsPageContent'
 
 function ContactCard({
   icon: Icon,
@@ -40,6 +41,7 @@ function ContactCard({
 
 export function ContactPage() {
   return (
+    <CmsPageContent slug="contact">
     <div className="space-y-10">
 
       <div className="space-y-2 pt-4">
@@ -128,5 +130,6 @@ export function ContactPage() {
         </div>
       </section>
     </div>
+    </CmsPageContent>
   )
 }
