@@ -290,7 +290,12 @@ class SquadGateway implements PaymentGateway {
         bank_name:              d.bank_name,
         bank_code:              d.bank_code,
       };
-    } catch {
+    } catch (err) {
+      // 404 is expected when no account exists yet — anything else is worth logging.
+      const msg = (err as Error).message ?? "";
+      if (!msg.includes("404") && !msg.toLowerCase().includes("not found")) {
+        logger.warn("squad_dva_lookup_error", { customer_identifier: customerIdentifier, error: msg });
+      }
       return null;
     }
   }

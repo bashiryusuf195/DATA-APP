@@ -25,6 +25,16 @@ export async function getOrCreateSquadVirtualAccount(
 ): Promise<SquadVirtualAccountRecord> {
   // ── 1. Return existing record if already provisioned ────────────────────────
   const existing = await db("squad_virtual_accounts").where({ user_id: userId }).first();
+
+  // Count total records so Railway logs show whether any account was ever created.
+  const [{ count: totalRecords }] = await db("squad_virtual_accounts").count("id as count");
+  logger.warn("squad_dva_local_lookup", {
+    customer_identifier:       userId,          // UUID — not a sensitive field
+    has_existing_local_record: !!existing,
+    total_squad_accounts_in_db: Number(totalRecords),
+    created_at: existing ? (existing.created_at as Date).toISOString() : null,
+  });
+
   if (existing) return coerce(existing);
 
   if (!squadGateway.isConfigured()) {
@@ -102,13 +112,20 @@ export async function getOrCreateSquadVirtualAccount(
   // ── 5. Check if account already exists on Squad side ────────────────────────
   const existingOnSquad = await squadGateway.fetchVirtualAccount(customerIdentifier);
 
+  logger.warn("squad_dva_remote_lookup", {
+    customer_identifier:  customerIdentifier,
+    squad_lookup_result:  existingOnSquad ? "found" : "not_found",
+    // If found, confirm the account exists so we skip creation.
+    has_existing_remote:  !!existingOnSquad,
+  });
+
   let details: { virtual_account_number: string; account_name: string; bank_name: string; bank_code: string };
 
   if (existingOnSquad) {
     details = existingOnSquad;
-    logger.info("squad_dva_existing_found", {
+    logger.warn("squad_dva_existing_found", {
       user_id:                userId,
-      virtual_account_number: existingOnSquad.virtual_account_number,
+      virtual_account_number: `****${existingOnSquad.virtual_account_number.slice(-4)}`,
     });
   } else {
     // ── 6. Create new virtual account on Squad ─────────────────────────────────
@@ -127,7 +144,20 @@ export async function getOrCreateSquadVirtualAccount(
     const [yyyy, mm, dd] = dobIso.split("-");
     const squadDob = `${mm}/${dd}/${yyyy}`;
 
-    // bvn is forwarded to Squad but never appears in logs (see logger.info below)
+    // bvn is forwarded to Squad but never appears in logs.
+    logger.warn("squad_dva_create_attempt", {
+      customer_identifier: customerIdentifier,
+      // Confirm the fields Squad requires are present (values not logged).
+      has_first_name:  !!user.first_name,
+      has_last_name:   !!user.last_name,
+      has_phone:       !!user.phone,
+      has_dob:         !!user.date_of_birth,
+      has_address:     !!user.address_line1,
+      has_gender:      !!SQUAD_GENDER[user.gender as string],
+      has_bvn:         !!user.bvn,
+      has_beneficiary: !!config.squad.beneficiaryAccount,
+    });
+
     try {
       const created = await squadGateway.createVirtualAccount({
         customer_identifier: customerIdentifier,
