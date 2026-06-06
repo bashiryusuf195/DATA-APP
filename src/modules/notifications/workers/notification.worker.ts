@@ -68,6 +68,12 @@ export const notificationWorker = createWorker(
           icon:              "/icons/icon-192x192.png",
         };
 
+        console.log(
+          `[NOTIFICATION WORKER] PUSH payload | title="${payload.title}"` +
+          ` | body="${payload.body.slice(0, 80)}"` +
+          ` | deep_link=${payload.deep_link} | recipient_type=${recipientType}`,
+        );
+
         let pushResult;
         if (recipientType === "all") {
           pushResult = await sendPushToAll(payload);

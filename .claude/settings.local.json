@@ -32,7 +32,12 @@
       "Bash(git commit -m ' *)",
       "Bash(git rm *)",
       "Bash(node -e \"require\\('firebase-admin'\\)\" --prefix \"C:/Users/USER/Downloads/vtu-backend-fixed\")",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(node -e \"const s = require\\('serve'\\); console.log\\(s.version ?? require\\('./node_modules/serve/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/serve/package.json'\\).version\\)\")",
+      "Bash(node_modules\\\\.bin\\\\serve --version)",
+      "Bash(npx serve *)",
+      "Bash(docker build *)"
     ]
   }
 }

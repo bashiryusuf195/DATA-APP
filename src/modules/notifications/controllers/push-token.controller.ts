@@ -34,6 +34,8 @@ export async function registerPushTokenController(
     // Upsert: update if token already exists, insert otherwise.
     const existing = await db("user_push_tokens").where("token", body.token).first();
 
+    const tokenPrefix = body.token.slice(0, 20);
+
     if (existing) {
       await db("user_push_tokens").where("token", body.token).update({
         user_id:      userId,
@@ -44,6 +46,10 @@ export async function registerPushTokenController(
         last_seen_at: now,
         updated_at:   now,
       });
+      console.log(
+        `[PUSH TOKEN] Updated token for user=${userId}` +
+        ` | platform=${body.platform} | browser=${body.browser ?? "?"} | token=${tokenPrefix}...`,
+      );
     } else {
       await db("user_push_tokens").insert({
         user_id:      userId,
@@ -56,6 +62,10 @@ export async function registerPushTokenController(
         created_at:   now,
         updated_at:   now,
       });
+      console.log(
+        `[PUSH TOKEN] Inserted token for user=${userId}` +
+        ` | platform=${body.platform} | browser=${body.browser ?? "?"} | token=${tokenPrefix}...`,
+      );
     }
 
     res.json({ success: true, message: "Push token registered" });
@@ -74,6 +84,7 @@ export async function deregisterPushTokenController(
       .where({ token, user_id: userId })
       .update({ is_active: false, updated_at: new Date() });
 
+    console.log(`[PUSH TOKEN] Deregistered token for user=${userId} | token=${token.slice(0, 20)}...`);
     res.json({ success: true, message: "Push token deregistered" });
   } catch (err) { next(err); }
 }

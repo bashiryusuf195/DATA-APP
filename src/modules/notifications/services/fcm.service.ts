@@ -61,9 +61,14 @@ export interface PushResult {
 
 async function markTokensInactive(tokens: string[]): Promise<void> {
   if (!tokens.length) return;
+  console.log(
+    `[FCM] Deactivating ${tokens.length} invalid token(s): ` +
+    tokens.map((t) => t.slice(0, 20) + "...").join(", "),
+  );
   await db("user_push_tokens")
     .whereIn("token", tokens)
     .update({ is_active: false, updated_at: new Date() });
+  console.log(`[FCM] ${tokens.length} token(s) marked inactive`);
 }
 
 // ── Core send ─────────────────────────────────────────────────────────────────
@@ -120,7 +125,12 @@ async function sendBatch(
     },
   };
 
+  console.log(`[FCM] Dispatching batch of ${tokens.length} token(s) | title="${payload.title}"`);
   const response = await messaging.sendEachForMulticast(message);
+  console.log(
+    `[FCM] FCM response | successCount=${response.successCount}` +
+    ` failureCount=${response.failureCount} batchSize=${tokens.length}`,
+  );
 
   let sent = 0;
   const invalidTokens: string[] = [];
@@ -129,7 +139,12 @@ async function sendBatch(
     if (r.success) {
       sent++;
     } else {
-      const code = r.error?.code ?? "";
+      const code    = r.error?.code    ?? "unknown";
+      const message = r.error?.message ?? "";
+      console.warn(
+        `[FCM] Token failed | code=${code} | message=${message}` +
+        ` | token=${tokens[i].slice(0, 20)}...`,
+      );
       // These codes mean the token is no longer valid and should be deactivated.
       if (
         code === "messaging/invalid-registration-token" ||
@@ -158,6 +173,9 @@ export async function sendPushToUsers(
     .where("is_active", true)
     .select("token");
 
+  console.log(
+    `[FCM] sendPushToUsers | userIds=${userIds.length} | active_tokens=${rows.length}`,
+  );
   if (!rows.length) return { sent: 0, failed: 0, disabled: false };
 
   const tokens     = rows.map((r: { token: string }) => r.token);
@@ -188,6 +206,7 @@ export async function sendPushToAll(payload: PushPayload): Promise<PushResult> {
     .where("is_active", true)
     .select("token");
 
+  console.log(`[FCM] sendPushToAll | active_tokens=${rows.length}`);
   if (!rows.length) return { sent: 0, failed: 0, disabled: false };
 
   const tokens     = rows.map((r: { token: string }) => r.token);
