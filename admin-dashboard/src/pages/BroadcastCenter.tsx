@@ -398,12 +398,18 @@ interface SendForm {
   body:              string
   template_id:       string
   scheduled_at:      string
+  // Push-specific fields — only used when type === 'push'
+  push_title:        string
+  push_body:         string
+  deep_link:         string
+  image_url:         string
 }
 
 const BLANK: SendForm = {
-  type: 'email', notification_type: '', recipient_type: 'all',
+  type: 'in_app', notification_type: '', recipient_type: 'all',
   recipient_id: '', recipient_email: '', subject: '', body: '',
   template_id: '', scheduled_at: '',
+  push_title: '', push_body: '', deep_link: '', image_url: '',
 }
 
 function SendModal({
@@ -433,20 +439,29 @@ function SendModal({
     }))
   }
 
+  const isPush = form.type === 'push'
+
   const sendMutation = useMutation({
-    mutationFn: () =>
-      notificationsApi.sendNotification({
+    mutationFn: () => {
+      const pushMeta = isPush ? {
+        deep_link: form.deep_link || '/notifications',
+        image_url: form.image_url || undefined,
+      } : undefined
+
+      return notificationsApi.sendNotification({
         type:              form.type,
         notification_type: form.notification_type,
         recipient_type:    form.recipient_type,
         recipient_id:      form.recipient_type === 'user' && form.recipient_id ? form.recipient_id : undefined,
         recipient_email:   form.recipient_type === 'user' && form.recipient_email ? form.recipient_email : undefined,
-        subject:           form.subject || undefined,
-        body:              form.body,
+        subject:           isPush ? (form.push_title || form.subject || undefined) : (form.subject || undefined),
+        body:              isPush ? (form.push_body  || form.body)                 : form.body,
         template_id:       form.template_id || undefined,
         scheduled_at:      form.scheduled_at || undefined,
         idempotency_key:   `broadcast-${Date.now()}`,
-      }),
+        metadata:          pushMeta,
+      })
+    },
     onSuccess: () => {
       toast.success('Notification queued for delivery')
       void qc.invalidateQueries({ queryKey: ['broadcast-jobs'] })
@@ -459,7 +474,7 @@ function SendModal({
 
   const canSend =
     form.notification_type &&
-    form.body &&
+    (isPush ? (form.push_title && form.push_body) : form.body) &&
     (form.recipient_type !== 'user' || form.recipient_id || form.recipient_email)
 
   return (
@@ -519,14 +534,14 @@ function SendModal({
                 options={[
                   { value: 'in_app',    label: 'In-App (customer inbox)' },
                   { value: 'broadcast', label: 'Broadcast — In-App to all' },
+                  { value: 'push',      label: 'Push (FCM — web & mobile)' },
                   { value: 'email',     label: 'Email (not yet integrated)' },
                   { value: 'sms',       label: 'SMS (not yet integrated)' },
-                  { value: 'push',      label: 'Push (not yet integrated)' },
                 ]}
               />
-              {(form.type === 'email' || form.type === 'sms' || form.type === 'push') && (
+              {(form.type === 'email' || form.type === 'sms') && (
                 <p className="mt-1.5 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
-                  This channel logs the job but does not deliver to customers yet. Use <strong>In-App</strong> or <strong>Broadcast</strong> to reach the customer notification inbox.
+                  This channel logs the job but does not deliver to customers yet. Use <strong>In-App</strong>, <strong>Broadcast</strong>, or <strong>Push</strong> for immediate delivery.
                 </p>
               )}
             </div>
@@ -587,7 +602,7 @@ function SendModal({
             )}
           </div>
 
-          {/* Subject (email) */}
+          {/* Subject (email / broadcast) */}
           {(form.type === 'email' || form.type === 'broadcast') && (
             <div>
               <label className="block text-xs font-medium text-ink-muted mb-1.5">Subject</label>
@@ -595,17 +610,83 @@ function SendModal({
             </div>
           )}
 
-          {/* Body */}
-          <div>
-            <label className="block text-xs font-medium text-ink-muted mb-1.5">Message Body *</label>
-            <textarea
-              value={form.body}
-              onChange={(e) => set('body', e.target.value)}
-              rows={5}
-              placeholder="Message body… Use {{variable_name}} for personalization."
-              className="w-full rounded-lg border border-border bg-surface-2 text-ink text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-y"
-            />
-          </div>
+          {/* Push-specific fields */}
+          {isPush && (
+            <div className="space-y-3 rounded-lg border border-accent/20 bg-accent-subtle/10 p-4">
+              <p className="text-xs font-semibold text-accent flex items-center gap-1.5">
+                <Smartphone className="h-3.5 w-3.5" /> Push Notification
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-ink-muted mb-1.5">Title *</label>
+                <Input
+                  value={form.push_title}
+                  onChange={(e) => set('push_title', e.target.value)}
+                  placeholder="e.g. Your transaction was successful"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-ink-muted mb-1.5">Body *</label>
+                <textarea
+                  value={form.push_body}
+                  onChange={(e) => set('push_body', e.target.value)}
+                  rows={3}
+                  placeholder="Notification body text…"
+                  className="w-full rounded-lg border border-border bg-surface-2 text-ink text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-y"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-1.5">Deep Link (optional)</label>
+                  <Input
+                    value={form.deep_link}
+                    onChange={(e) => set('deep_link', e.target.value)}
+                    placeholder="/wallet/fund"
+                  />
+                  <p className="text-[10px] text-ink-faint mt-1">App path to open on tap</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-muted mb-1.5">Image URL (optional)</label>
+                  <Input
+                    value={form.image_url}
+                    onChange={(e) => set('image_url', e.target.value)}
+                    placeholder="https://…/banner.png"
+                  />
+                </div>
+              </div>
+
+              {/* Push preview card */}
+              {(form.push_title || form.push_body) && (
+                <div className="mt-1 rounded-xl bg-surface-1 border border-border p-3 flex items-start gap-3 shadow-sm">
+                  <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                    <Bell className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-ink leading-tight truncate">
+                      {form.push_title || 'Title…'}
+                    </p>
+                    <p className="text-[11px] text-ink-muted mt-0.5 line-clamp-2 leading-snug">
+                      {form.push_body || 'Body…'}
+                    </p>
+                    <p className="text-[10px] text-ink-faint mt-1">Hive Data · now</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Body (non-push channels) */}
+          {!isPush && (
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Message Body *</label>
+              <textarea
+                value={form.body}
+                onChange={(e) => set('body', e.target.value)}
+                rows={5}
+                placeholder="Message body… Use {{variable_name}} for personalization."
+                className="w-full rounded-lg border border-border bg-surface-2 text-ink text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-y"
+              />
+            </div>
+          )}
 
           {/* Schedule */}
           <div>
@@ -626,12 +707,32 @@ function SendModal({
             Review the message below before sending. This action will enqueue the notification for delivery.
           </div>
 
+          {/* Push notification visual preview */}
+          {isPush && (
+            <div className="rounded-xl border border-border bg-surface-2 p-4">
+              <p className="text-xs text-ink-faint mb-3 font-medium">Push notification preview</p>
+              <div className="flex items-start gap-3 bg-surface-1 rounded-xl p-3 border border-border shadow-sm">
+                <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                  <Bell className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-ink">{form.push_title}</p>
+                  <p className="text-[11px] text-ink-muted mt-0.5 line-clamp-3">{form.push_body}</p>
+                  {form.deep_link && (
+                    <p className="text-[10px] text-ink-faint mt-1">↗ {form.deep_link}</p>
+                  )}
+                  <p className="text-[10px] text-ink-faint mt-0.5">Hive Data · now</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-lg border border-border bg-surface-2 p-4 space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-ink-faint">{CHANNEL_ICONS[form.type]}</span>
               <div>
                 <p className="text-xs text-ink-faint">Channel</p>
-                <p className="text-sm font-medium text-ink capitalize">{form.type}</p>
+                <p className="text-sm font-medium text-ink capitalize">{form.type.replace('_', ' ')}</p>
               </div>
               <div className="ml-auto">
                 <Badge variant={form.recipient_type === 'all' ? 'info' : 'neutral'}>
@@ -639,16 +740,43 @@ function SendModal({
                 </Badge>
               </div>
             </div>
-            {form.subject && (
-              <div>
-                <p className="text-xs text-ink-faint">Subject</p>
-                <p className="text-sm text-ink font-medium">{form.subject}</p>
-              </div>
+            {isPush ? (
+              <>
+                <div>
+                  <p className="text-xs text-ink-faint">Title</p>
+                  <p className="text-sm text-ink font-medium">{form.push_title}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-ink-faint">Body</p>
+                  <p className="text-sm text-ink whitespace-pre-wrap">{form.push_body}</p>
+                </div>
+                {form.deep_link && (
+                  <div>
+                    <p className="text-xs text-ink-faint">Deep Link</p>
+                    <p className="text-sm text-ink font-mono">{form.deep_link}</p>
+                  </div>
+                )}
+                {form.image_url && (
+                  <div>
+                    <p className="text-xs text-ink-faint">Image URL</p>
+                    <p className="text-sm text-ink break-all">{form.image_url}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {form.subject && (
+                  <div>
+                    <p className="text-xs text-ink-faint">Subject</p>
+                    <p className="text-sm text-ink font-medium">{form.subject}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-ink-faint mb-1">Message</p>
+                  <p className="text-sm text-ink whitespace-pre-wrap rounded bg-surface-1 p-3 border border-border">{form.body}</p>
+                </div>
+              </>
             )}
-            <div>
-              <p className="text-xs text-ink-faint mb-1">Message</p>
-              <p className="text-sm text-ink whitespace-pre-wrap rounded bg-surface-1 p-3 border border-border">{form.body}</p>
-            </div>
             {form.notification_type && (
               <div>
                 <p className="text-xs text-ink-faint">Type</p>

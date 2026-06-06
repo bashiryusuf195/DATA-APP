@@ -4,6 +4,13 @@ import type { Notification, NotificationPreferences, ApiResponse } from '@/types
 // Backend notification row shape (uses status enum, not is_read boolean)
 type RawNotification = Omit<Notification, 'is_read'> & { status: string }
 
+export interface PushTokenInput {
+  token:       string
+  platform:    'web' | 'android' | 'ios'
+  device_name?: string | null
+  browser?:    string | null
+}
+
 export const notificationsApi = {
   // Backend returns { success, data: RawNotification[], meta } — flat array, no
   // unread_count.  Normalize: map status === 'read' to is_read and count unread.
@@ -44,6 +51,21 @@ export const notificationsApi = {
       push:   Boolean(d.push_enabled  ?? false),
       sms:    Boolean(d.sms_enabled   ?? false),
       in_app: true,
+    }
+  },
+
+  registerPushToken: (input: PushTokenInput): Promise<void> =>
+    apiClient.post('/notifications/push-token', input).then(() => undefined),
+
+  deregisterPushToken: (token: string): Promise<void> =>
+    apiClient.delete('/notifications/push-token', { data: { token } }).then(() => undefined),
+
+  getPushStatus: async (): Promise<{ has_active_token: boolean; configured: boolean }> => {
+    try {
+      const r = await apiClient.get<ApiResponse<{ has_active_token: boolean; configured: boolean }>>('/notifications/push-status')
+      return r.data.data ?? { has_active_token: false, configured: false }
+    } catch {
+      return { has_active_token: false, configured: false }
     }
   },
 }

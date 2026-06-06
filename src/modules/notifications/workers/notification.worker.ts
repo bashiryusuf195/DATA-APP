@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { createWorker } from "../../queue/config/queue.config";
 import { getDbInstance } from "../../../db/knex";
+import { sendPushToUsers, sendPushToAll } from "../services/fcm.service";
 
 const db = getDbInstance();
 
@@ -57,8 +58,43 @@ export const notificationWorker = createWorker(
       }
 
       if (channel === "push") {
-        // Plug in FCM / APNs here
-        console.log(`[NOTIFICATION WORKER] PUSH → user ${String(notifJob.recipient_id ?? "all")}`);
+        const meta     = (notifJob.metadata ?? {}) as Record<string, unknown>;
+        const payload  = {
+          title:             String(notifJob.subject ?? "Hive Data"),
+          body:              String(notifJob.body    ?? ""),
+          notification_type: notification_type,
+          deep_link:         typeof meta.deep_link === "string" ? meta.deep_link : "/notifications",
+          image:             typeof meta.image_url  === "string" ? meta.image_url : undefined,
+          icon:              "/icons/icon-192x192.png",
+        };
+
+        let pushResult;
+        if (recipientType === "all") {
+          pushResult = await sendPushToAll(payload);
+          console.log(
+            `[NOTIFICATION WORKER] PUSH broadcast — sent=${pushResult.sent} failed=${pushResult.failed}` +
+            (pushResult.disabled ? " (FCM not configured)" : "")
+          );
+        } else if (recipientType === "user" && notifJob.recipient_id) {
+          pushResult = await sendPushToUsers([String(notifJob.recipient_id)], payload);
+          console.log(
+            `[NOTIFICATION WORKER] PUSH → user ${String(notifJob.recipient_id)}` +
+            ` sent=${pushResult.sent} failed=${pushResult.failed}`
+          );
+        } else {
+          console.warn(`[NOTIFICATION WORKER] PUSH: unhandled recipient_type=${recipientType}`);
+          pushResult = { sent: 0, failed: 0, disabled: false };
+        }
+
+        // Store delivery stats in metadata for the admin to see
+        await db("notification_jobs").where({ id: jobId }).update({
+          metadata: JSON.stringify({
+            ...((notifJob.metadata ?? {}) as Record<string, unknown>),
+            push_sent:     pushResult.sent,
+            push_failed:   pushResult.failed,
+            push_disabled: pushResult.disabled,
+          }),
+        });
       }
 
       // Fan out: write a notifications row per user so the customer app can display it.

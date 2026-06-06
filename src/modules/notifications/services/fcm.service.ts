@@ -1,0 +1,216 @@
+// FCM service — wraps Firebase Admin SDK for push notification delivery.
+// All exported functions return gracefully when Firebase credentials are not
+// configured so the rest of the app is never blocked by missing env vars.
+
+import type { App as FirebaseApp } from "firebase-admin/app";
+import { config } from "../../../config";
+import { getDbInstance } from "../../../db/knex";
+
+const db = getDbInstance();
+
+// ── Lazy Firebase initialisation ──────────────────────────────────────────────
+
+let _app: FirebaseApp | null = null;
+let _initAttempted = false;
+
+function getFirebaseApp(): FirebaseApp | null {
+  if (_initAttempted) return _app;
+  _initAttempted = true;
+
+  const { projectId, clientEmail, privateKey } = config.firebase;
+  if (!projectId || !clientEmail || !privateKey) {
+    console.warn("[FCM] Firebase credentials not configured — push notifications disabled");
+    return null;
+  }
+
+  try {
+    const { initializeApp, getApps, cert } = require("firebase-admin/app") as typeof import("firebase-admin/app");
+    const existing = getApps().find((a) => a.name === "hive-fcm");
+    if (existing) { _app = existing; return _app; }
+    _app = initializeApp(
+      { credential: cert({ projectId, clientEmail, privateKey }) },
+      "hive-fcm",
+    );
+    console.log("[FCM] Firebase Admin SDK initialised");
+  } catch (err) {
+    console.error("[FCM] Failed to initialise Firebase Admin SDK:", (err as Error).message);
+    _app = null;
+  }
+  return _app;
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface PushPayload {
+  title:             string;
+  body:              string;
+  icon?:             string;
+  image?:            string;
+  deep_link?:        string;
+  notification_type: string;
+  metadata?:         Record<string, string>;
+}
+
+export interface PushResult {
+  sent:     number;
+  failed:   number;
+  disabled: boolean; // true when Firebase not configured
+}
+
+// ── Token management ──────────────────────────────────────────────────────────
+
+async function markTokensInactive(tokens: string[]): Promise<void> {
+  if (!tokens.length) return;
+  await db("user_push_tokens")
+    .whereIn("token", tokens)
+    .update({ is_active: false, updated_at: new Date() });
+}
+
+// ── Core send ─────────────────────────────────────────────────────────────────
+
+// Send to up to 500 tokens at once (FCM limit for sendEachForMulticast).
+async function sendBatch(
+  app: FirebaseApp,
+  tokens: string[],
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; invalidTokens: string[] }> {
+  const { getMessaging } = require("firebase-admin/messaging") as typeof import("firebase-admin/messaging");
+  const messaging = getMessaging(app);
+
+  const message = {
+    tokens,
+    notification: {
+      title: payload.title,
+      body:  payload.body,
+      ...(payload.image ? { imageUrl: payload.image } : {}),
+    },
+    webpush: {
+      notification: {
+        title: payload.title,
+        body:  payload.body,
+        icon:  payload.icon ?? "/icons/icon-192x192.png",
+        ...(payload.image ? { image: payload.image } : {}),
+        data: {
+          deep_link:         payload.deep_link         ?? "/notifications",
+          notification_type: payload.notification_type ?? "broadcast",
+        },
+      },
+      fcmOptions: {
+        link: payload.deep_link ?? "/notifications",
+      },
+    },
+    android: {
+      notification: {
+        title:        payload.title,
+        body:         payload.body,
+        icon:         payload.icon ?? "ic_notification",
+        clickAction:  "FLUTTER_NOTIFICATION_CLICK",
+        ...(payload.image ? { imageUrl: payload.image } : {}),
+      },
+      data: {
+        deep_link:         payload.deep_link         ?? "/notifications",
+        notification_type: payload.notification_type ?? "broadcast",
+        ...(payload.metadata ?? {}),
+      },
+    },
+    data: {
+      deep_link:         payload.deep_link         ?? "/notifications",
+      notification_type: payload.notification_type ?? "broadcast",
+      ...(payload.metadata ?? {}),
+    },
+  };
+
+  const response = await messaging.sendEachForMulticast(message);
+
+  let sent = 0;
+  const invalidTokens: string[] = [];
+
+  response.responses.forEach((r, i) => {
+    if (r.success) {
+      sent++;
+    } else {
+      const code = r.error?.code ?? "";
+      // These codes mean the token is no longer valid and should be deactivated.
+      if (
+        code === "messaging/invalid-registration-token" ||
+        code === "messaging/registration-token-not-registered" ||
+        code === "messaging/invalid-argument"
+      ) {
+        invalidTokens.push(tokens[i]);
+      }
+    }
+  });
+
+  return { sent, failed: response.failureCount, invalidTokens };
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+export async function sendPushToUsers(
+  userIds: string[],
+  payload: PushPayload,
+): Promise<PushResult> {
+  const app = getFirebaseApp();
+  if (!app) return { sent: 0, failed: 0, disabled: true };
+
+  const rows = await db("user_push_tokens")
+    .whereIn("user_id", userIds)
+    .where("is_active", true)
+    .select("token");
+
+  if (!rows.length) return { sent: 0, failed: 0, disabled: false };
+
+  const tokens     = rows.map((r: { token: string }) => r.token);
+  const BATCH_SIZE = 500;
+
+  let totalSent   = 0;
+  let totalFailed = 0;
+  const allInvalid: string[] = [];
+
+  for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+    const batch = tokens.slice(i, i + BATCH_SIZE);
+    const res   = await sendBatch(app, batch, payload);
+    totalSent   += res.sent;
+    totalFailed += res.failed;
+    allInvalid.push(...res.invalidTokens);
+  }
+
+  if (allInvalid.length) await markTokensInactive(allInvalid);
+
+  return { sent: totalSent, failed: totalFailed, disabled: false };
+}
+
+export async function sendPushToAll(payload: PushPayload): Promise<PushResult> {
+  const app = getFirebaseApp();
+  if (!app) return { sent: 0, failed: 0, disabled: true };
+
+  const rows = await db("user_push_tokens")
+    .where("is_active", true)
+    .select("token");
+
+  if (!rows.length) return { sent: 0, failed: 0, disabled: false };
+
+  const tokens     = rows.map((r: { token: string }) => r.token);
+  const BATCH_SIZE = 500;
+
+  let totalSent   = 0;
+  let totalFailed = 0;
+  const allInvalid: string[] = [];
+
+  for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+    const batch = tokens.slice(i, i + BATCH_SIZE);
+    const res   = await sendBatch(app, batch, payload);
+    totalSent   += res.sent;
+    totalFailed += res.failed;
+    allInvalid.push(...res.invalidTokens);
+  }
+
+  if (allInvalid.length) await markTokensInactive(allInvalid);
+
+  return { sent: totalSent, failed: totalFailed, disabled: false };
+}
+
+export function isFcmConfigured(): boolean {
+  const { projectId, clientEmail, privateKey } = config.firebase;
+  return Boolean(projectId && clientEmail && privateKey);
+}

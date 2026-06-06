@@ -125,6 +125,18 @@ export const config = {
     origin:   optional("WEBAUTHN_ORIGIN",    "http://localhost:5174"),
   },
 
+  // ── Firebase / FCM ────────────────────────────────────────────────────────
+  // All optional — push notifications are silently skipped when absent.
+  // Set FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY
+  // (and FIREBASE_VAPID_KEY for web push) to enable FCM.
+  firebase: {
+    projectId:   optional('FIREBASE_PROJECT_ID',   ''),
+    clientEmail: optional('FIREBASE_CLIENT_EMAIL', ''),
+    // Railway/Render store multi-line values URL-encoded; restore newlines.
+    privateKey:  optional('FIREBASE_PRIVATE_KEY',  '').replace(/\\n/g, '\n'),
+    vapidKey:    optional('FIREBASE_VAPID_KEY',    ''),
+  },
+
   // ── Workers ───────────────────────────────────────────────────────────────
   // Set DISABLE_WORKERS=true to prevent BullMQ workers from starting.
   // Useful when developing the frontend against the API without local Redis.

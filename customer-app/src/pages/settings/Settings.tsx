@@ -11,6 +11,7 @@ import { passkeyApi } from '@/api/passkey.api'
 import { PinSetupModal } from '@/components/shared/PinSetupModal'
 import { useAuthStore } from '@/store/auth.store'
 import { isWebAuthnSupported, isPlatformAuthenticatorAvailable, registerPasskey } from '@/hooks/usePasskey'
+import { usePushNotifications, attachForegroundListener } from '@/hooks/usePushNotifications'
 import type { NotificationPreferences } from '@/types'
 import { fmtDateTime } from '@/utils/format'
 
@@ -104,6 +105,39 @@ export function SettingsPage() {
   const toggle = (key: keyof NotificationPreferences) => {
     if (!prefs) return
     updatePrefsMutation.mutate({ [key]: !prefs[key] })
+  }
+
+  // ── Push notifications ─────────────────────────────────────────────────────
+  const push = usePushNotifications()
+
+  const handlePushToggle = async (enable: boolean) => {
+    if (enable) {
+      if (push.permission === 'unsupported') {
+        toast.error('Push notifications are not supported in this browser')
+        return
+      }
+      if (push.permission === 'unconfigured') {
+        toast.error('Push notifications are not configured on this server')
+        return
+      }
+      if (push.permission === 'denied') {
+        toast.error('Notification permission denied. Enable it in your browser settings.')
+        return
+      }
+      const ok = await push.enable()
+      if (ok) {
+        toast.success('Push notifications enabled')
+        // Attach foreground listener in case it's not already set up
+        attachForegroundListener(() => {})
+        updatePrefsMutation.mutate({ push: true })
+      } else if (push.permission === 'denied') {
+        toast.error('Notification permission denied. Enable it in your browser settings.')
+      }
+    } else {
+      await push.disable()
+      toast.success('Push notifications disabled')
+      updatePrefsMutation.mutate({ push: false })
+    }
   }
 
   // ── Transaction PIN ────────────────────────────────────────────────────────
@@ -566,8 +600,15 @@ export function SettingsPage() {
               />
               <ToggleRow
                 label="Push notifications"
-                checked={prefs.push}
-                onChange={() => toggle('push')}
+                hint={
+                  push.permission === 'denied'      ? 'Blocked — enable in browser settings' :
+                  push.permission === 'unsupported'  ? 'Not supported in this browser' :
+                  push.permission === 'unconfigured' ? 'Not configured on this server' :
+                  push.permission === 'granted'      ? 'Active on this device' :
+                  'Receive alerts even when app is closed'
+                }
+                checked={prefs.push && push.permission === 'granted'}
+                onChange={handlePushToggle}
               />
             </div>
           ) : (

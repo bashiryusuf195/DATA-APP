@@ -30,7 +30,9 @@
       "Bash(npx @railway/cli whoami)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(node -e \"require\\('firebase-admin'\\)\" --prefix \"C:/Users/USER/Downloads/vtu-backend-fixed\")",
+      "Bash(npx vite *)"
     ]
   }
 }
