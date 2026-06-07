@@ -37,7 +37,12 @@
       "Bash(node -e \"console.log\\(require\\('./node_modules/serve/package.json'\\).version\\)\")",
       "Bash(node_modules\\\\.bin\\\\serve --version)",
       "Bash(npx serve *)",
-      "Bash(docker build *)"
+      "Bash(docker build *)",
+      "Bash(git push *)",
+      "Bash(grep -o '.\\\\{0,10\\\\}\\\\[PrefRow\\\\].\\\\{0,60\\\\}' dist/assets/index-BwqQ59hG.js)",
+      "Bash(grep -o '.\\\\{0,10\\\\}\\\\[Profile\\\\] handlePushToggle.\\\\{0,60\\\\}' dist/assets/index-BwqQ59hG.js)",
+      "Bash(grep -o '.\\\\{0,10\\\\}\\\\[ProfilePage\\\\] mounted push build v2.\\\\{0,10\\\\}' dist/assets/index-BwqQ59hG.js)",
+      "Bash(grep -oP 'Receive transaction alerts.{0,200}' dist/assets/index-BwqQ59hG.js)"
     ]
   }
 }
