@@ -65,6 +65,11 @@ function PrefRow({ icon: Icon, label, hint, checked, onChange }: {
   checked: boolean
   onChange: () => void
 }) {
+  // TEMP diagnostic — remove after push notification debugging
+  const wrappedOnChange = () => {
+    console.log('[PrefRow] onChange fired, label =', label, '| fn =', onChange.name || '(anonymous)')
+    onChange()
+  }
   return (
     <div className="flex items-center gap-4 py-3.5 px-1">
       <div className="h-9 w-9 rounded-xl bg-surface-2 flex items-center justify-center shrink-0">
@@ -74,7 +79,7 @@ function PrefRow({ icon: Icon, label, hint, checked, onChange }: {
         <p className="text-sm font-semibold text-ink">{label}</p>
         <p className="text-xs text-ink-faint mt-0.5">{hint}</p>
       </div>
-      <Toggle checked={checked} onChange={onChange} />
+      <Toggle checked={checked} onChange={wrappedOnChange} />
     </div>
   )
 }
@@ -163,6 +168,7 @@ export function ProfilePage() {
   }
 
   const handlePushToggle = async () => {
+    console.log('[Profile] handlePushToggle called | prefs =', prefs, '| permission =', push.permission)
     if (!prefs) return
     const shouldEnable = !prefs.push
     console.log('[Profile] Push toggle →', shouldEnable ? 'ON' : 'OFF', '| current permission:', push.permission)
