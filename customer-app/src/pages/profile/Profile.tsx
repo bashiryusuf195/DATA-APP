@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight, Lock, Shield, Hash,
@@ -117,6 +117,9 @@ function kycBadgeStyle(level: number): string {
 }
 
 export function ProfilePage() {
+  // TEMP diagnostic — remove after push notification debugging
+  useEffect(() => { console.log('[ProfilePage] mounted push build v2') }, [])
+
   const navigate  = useNavigate()
   const user      = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
