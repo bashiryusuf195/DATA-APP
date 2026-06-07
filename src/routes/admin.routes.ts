@@ -39,6 +39,7 @@ import { adminReferralRouter }         from "../modules/referral/routes/admin-re
 import { adminAnnouncementRouter }    from "../modules/announcements/routes/admin-announcement.routes";
 import { adminTransactionsRouter }     from "../modules/transactions/routes/admin-transactions.routes";
 import { adminCmsRouter }              from "../modules/cms/routes/admin-cms.routes";
+import { squadUatRouter }              from "../modules/wallet/routes/squad-uat.routes";
 
 const router = Router();
 
@@ -77,5 +78,6 @@ router.use("/", adminReferralRouter);
 router.use("/", adminAnnouncementRouter);
 router.use("/", adminTransactionsRouter);
 router.use("/", adminCmsRouter);
+router.use("/squad-uat", squadUatRouter);
 
 export { router as adminRouter };

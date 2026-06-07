@@ -100,10 +100,9 @@ export const config = {
     webhookSecret: optional('PAYSTACK_WEBHOOK_SECRET', ''),
   },
 
-  // ── Squad ──────────────────────────────────────────────────────────────────
+  // ── Squad (production) ────────────────────────────────────────────────────
   // All optional — wallet funding endpoint will return 503 if absent.
-  // Sandbox: https://sandbox-api-d.squadco.com
-  // Production: see Squad dashboard for the live base URL.
+  // Production base URL: see Squad dashboard.
   squad: {
     secretKey:          optional('SQUAD_SECRET_KEY',          ''),
     publicKey:          optional('SQUAD_PUBLIC_KEY',          ''),
@@ -113,6 +112,18 @@ export const config = {
     // Settlement account: the merchant bank account where DVA inflows settle.
     // Required for POST /virtual-account — set in Squad dashboard then copy here.
     beneficiaryAccount: optional('SQUAD_BENEFICIARY_ACCOUNT', ''),
+  },
+
+  // ── Squad sandbox (UAT only) ───────────────────────────────────────────────
+  // Separate credentials for UAT testing against Squad's sandbox environment.
+  // Both SQUAD_SANDBOX_SECRET_KEY and SQUAD_SANDBOX_BASE_URL MUST be explicitly
+  // set — there is no fallback to production values. UAT endpoints return 503
+  // (SQUAD_SANDBOX_NOT_CONFIGURED) if either variable is absent.
+  squadSandbox: {
+    secretKey:          optional('SQUAD_SANDBOX_SECRET_KEY',          ''),
+    publicKey:          optional('SQUAD_SANDBOX_PUBLIC_KEY',          ''),
+    baseUrl:            optional('SQUAD_SANDBOX_BASE_URL',            ''),
+    beneficiaryAccount: optional('SQUAD_SANDBOX_BENEFICIARY_ACCOUNT', ''),
   },
 
   // ── WebAuthn / Passkeys ────────────────────────────────────────────────────
