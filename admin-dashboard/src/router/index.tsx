@@ -57,6 +57,7 @@ import { ReferralProgramPage }        from '@/pages/ReferralProgram'
 import { AppContentPage }            from '@/pages/AppContent'
 import { CmsPagesPage }             from '@/pages/CmsPages'
 import { CmsEditorPage }            from '@/pages/CmsEditor'
+import { SquadUATPage }             from '@/pages/SquadUAT'
 
 import {
   Landmark,
@@ -257,6 +258,9 @@ export const router = createBrowserRouter([
       { path: '/compliance/reports',         element: <ComplianceReportsPage /> },
       { path: '/compliance/blacklist',       element: <BlacklistPage /> },
       { path: '/compliance/frozen-accounts', element: <FrozenAccountsPage /> },
+
+      // ── UAT (temporary — remove after Squad UAT sign-off) ─────────────────
+      { path: '/squad-uat', element: <SquadUATPage /> },
 
       // ── Catch-all ──────────────────────────────────────────────────────────
       { path: '*', element: <NotFoundPage /> },

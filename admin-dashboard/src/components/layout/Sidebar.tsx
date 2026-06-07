@@ -9,7 +9,7 @@ import {
   ClipboardList, SlidersHorizontal, ArrowUpDown, Radio, ShieldCheck,
   Gift, MessageSquare, Flag, PackageX, Webhook, Layout, MonitorDot,
   HeartHandshake, HardDrive, KeyRound, TrendingUp, AlertTriangle,
-  BookOpen, Tag, RefreshCcw, FileText, Plus,
+  BookOpen, Tag, RefreshCcw, FileText, Plus, FlaskConical,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -85,8 +85,9 @@ const nav: NavSection[] = [
     key:   'payments',
     title: 'Payments',
     items: [
-      { to: '/payment-gateways',    label: 'Payment Gateways', icon: <CreditCard className="h-4 w-4" /> },
-      { to: '/operations/webhooks', label: 'Webhook Events',   icon: <Webhook    className="h-4 w-4" /> },
+      { to: '/payment-gateways',    label: 'Payment Gateways', icon: <CreditCard     className="h-4 w-4" /> },
+      { to: '/operations/webhooks', label: 'Webhook Events',   icon: <Webhook        className="h-4 w-4" /> },
+      { to: '/squad-uat',           label: 'Squad UAT ⚗',     icon: <FlaskConical   className="h-4 w-4 text-amber-400" /> },
     ],
   },
   {
