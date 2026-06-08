@@ -19,9 +19,7 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
 function safeRoute(raw) {
   if (!raw || typeof raw !== 'string') return '/notifications'
   try {
-    // Must be an absolute path (leading /)
     if (!raw.startsWith('/')) return '/notifications'
-    // Reject paths whose final segment contains a dot (static file heuristic)
     const lastSegment = raw.split('/').pop() ?? ''
     if (lastSegment.includes('.')) {
       console.warn('[SW] deep_link looks like a file, ignoring:', raw)
@@ -48,9 +46,28 @@ function isAppClient(client) {
 
 // ── Background push handler ───────────────────────────────────────────────────
 // Fires when a push message arrives and the app is not in the foreground.
-// The FCM payload is a JSON object with optional `notification` and `data` fields.
-// Firebase Admin SDK puts custom fields in both payload.data (top-level) and
-// payload.notification.data (webpush-specific); we check both.
+// Standard payload shape (set by fcm.service.ts sendBatch):
+//
+//   wallet_funded:
+//     { notification: { title: "Wallet Funded", body: "₦5,000 via Paystack" },
+//       data: { deep_link: "/wallet", notification_type: "wallet_funded",
+//               reference: "REF-…", tag: "wallet_funded:REF-…" } }
+//
+//   purchase_successful:
+//     { notification: { title: "Transaction Successful", body: "Your airtime purchase was successful." },
+//       data: { deep_link: "/history", notification_type: "purchase_successful",
+//               reference: "REF-…", tag: "purchase_successful:REF-…" } }
+//
+//   purchase_failed:
+//     { notification: { title: "Transaction Failed", body: "Your data purchase failed and has been refunded." },
+//       data: { deep_link: "/history", notification_type: "purchase_failed",
+//               reference: "REF-…", tag: "purchase_failed:REF-…" } }
+//
+//   admin_broadcast:
+//     { notification: { title: "…", body: "…" },
+//       data: { deep_link: "/notifications", notification_type: "admin_broadcast",
+//               tag: "admin_broadcast:JOB-ID" } }
+
 self.addEventListener('push', (event) => {
   if (!event.data) return
 
@@ -65,26 +82,36 @@ self.addEventListener('push', (event) => {
   // FCM may put custom data in payload.data (top-level) or notification.data
   const data = payload.data ?? notification.data ?? {}
 
-  const title = notification.title ?? data.title ?? 'Hive Data'
-  const body  = notification.body  ?? data.body  ?? ''
-  const icon  = notification.icon  ?? data.icon  ?? '/icons/icon-192x192.png'
-  const image = notification.image ?? data.image
+  const title     = notification.title ?? data.title ?? 'Hive Data'
+  const body      = notification.body  ?? data.body  ?? ''
+  const icon      = notification.icon  ?? data.icon  ?? '/icons/icon-192x192.png'
+  const badge     = data.badge ?? '/icons/badge-72x72.png'
+  const image     = notification.image ?? data.image
+  const route     = safeRoute(data.deep_link)
+  const tag       = data.tag       ?? data.notification_type ?? 'hive-data'
+  const reference = data.reference ?? ''
 
-  const route = safeRoute(data.deep_link)
-
-  console.log('[SW push] title:', title, '| deep_link:', data.deep_link, '| route:', route)
+  console.log(
+    '[SW push] title:', title,
+    '| notification_type:', data.notification_type,
+    '| deep_link:', data.deep_link, '→', route,
+    '| tag:', tag,
+    '| reference:', reference,
+  )
 
   // Browsers require a user-visible notification in response to a push event.
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
       icon,
-      badge: '/icons/badge-72x72.png',
+      badge,
+      tag,        // replaces any existing notification with the same tag
+      ...(image ? { image } : {}),
       data: {
         deep_link:         route,
         notification_type: data.notification_type ?? '',
+        reference,
       },
-      ...(image ? { image } : {}),
       requireInteraction: false,
       vibrate: [200, 100, 200],
     })
@@ -102,7 +129,9 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = self.location.origin + route
 
   console.log(
-    '[SW notificationclick] raw deep_link:', event.notification.data?.deep_link,
+    '[SW notificationclick]',
+    '| notification_type:', event.notification.data?.notification_type,
+    '| reference:', event.notification.data?.reference,
     '| safe route:', route,
     '| targetUrl:', targetUrl,
   )

@@ -439,6 +439,7 @@ export async function verifyFundingController(
         body:              `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? gatewayCode}.`,
         deep_link:         "/wallet",
         notification_type: "wallet_funded",
+        reference,
       }).catch(() => {/* logged inside sendTransactionPush */});
 
       logger.info("wallet_fund_credited", {

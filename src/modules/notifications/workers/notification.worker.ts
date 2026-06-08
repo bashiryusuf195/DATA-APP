@@ -66,6 +66,8 @@ export const notificationWorker = createWorker(
           deep_link:         typeof meta.deep_link === "string" ? meta.deep_link : "/notifications",
           image:             typeof meta.image_url  === "string" ? meta.image_url : undefined,
           icon:              "/icons/icon-192x192.png",
+          badge:             "/icons/badge-72x72.png",
+          tag:               `${notification_type}:${String(jobId)}`,
         };
 
         console.log(

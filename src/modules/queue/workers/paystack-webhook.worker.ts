@@ -190,6 +190,7 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
     body:              `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? "Paystack"}.`,
     deep_link:         "/wallet",
     notification_type: "wallet_funded",
+    reference,
   }).catch(() => {/* logged inside sendTransactionPush */});
 
   // 8. Mark webhook processed

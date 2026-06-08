@@ -46,9 +46,12 @@ export interface PushPayload {
   title:             string;
   body:              string;
   icon?:             string;
+  badge?:            string;
   image?:            string;
   deep_link?:        string;
   notification_type: string;
+  tag?:              string; // collapses duplicate notifications for the same event
+  reference?:        string; // transaction / funding reference for deep-link context
   metadata?:         Record<string, string>;
 }
 
@@ -83,6 +86,9 @@ async function sendBatch(
   const { getMessaging } = require("firebase-admin/messaging") as typeof import("firebase-admin/messaging");
   const messaging = getMessaging(app);
 
+  const deepLink = payload.deep_link ?? "/notifications";
+  const tag      = payload.tag ?? `${payload.notification_type}${payload.reference ? `:${payload.reference}` : ""}`;
+
   const message = {
     tokens,
     notification: {
@@ -94,15 +100,19 @@ async function sendBatch(
       notification: {
         title: payload.title,
         body:  payload.body,
-        icon:  payload.icon ?? "/icons/icon-192x192.png",
+        icon:  payload.icon  ?? "/icons/icon-192x192.png",
+        badge: payload.badge ?? "/icons/badge-72x72.png",
+        tag,
         ...(payload.image ? { image: payload.image } : {}),
-        data: {
-          deep_link:         payload.deep_link         ?? "/notifications",
-          notification_type: payload.notification_type ?? "broadcast",
-        },
+      },
+      data: {
+        deep_link:         deepLink,
+        notification_type: payload.notification_type ?? "broadcast",
+        reference:         payload.reference ?? "",
+        tag,
       },
       fcmOptions: {
-        link: payload.deep_link ?? "/notifications",
+        link: deepLink,
       },
     },
     android: {
@@ -114,14 +124,18 @@ async function sendBatch(
         ...(payload.image ? { imageUrl: payload.image } : {}),
       },
       data: {
-        deep_link:         payload.deep_link         ?? "/notifications",
+        deep_link:         deepLink,
         notification_type: payload.notification_type ?? "broadcast",
+        reference:         payload.reference ?? "",
+        tag,
         ...(payload.metadata ?? {}),
       },
     },
     data: {
-      deep_link:         payload.deep_link         ?? "/notifications",
+      deep_link:         deepLink,
       notification_type: payload.notification_type ?? "broadcast",
+      reference:         payload.reference ?? "",
+      tag,
       ...(payload.metadata ?? {}),
     },
   };

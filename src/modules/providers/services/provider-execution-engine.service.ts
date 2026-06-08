@@ -160,6 +160,7 @@ class ProviderExecutionEngine {
           body:              `Your ${service_type} purchase was successful.`,
           deep_link:         "/history",
           notification_type: "purchase_successful",
+          reference:         transaction_reference,
         }).catch(() => {/* logged inside sendTransactionPush */});
       }
 
@@ -680,6 +681,7 @@ class ProviderExecutionEngine {
       body:              `Your ${params.service_type} purchase was successful.`,
       deep_link:         "/history",
       notification_type: "purchase_successful",
+      reference:         params.transaction_reference,
     }).catch(() => {/* logged inside sendTransactionPush */});
   }
 
@@ -845,6 +847,7 @@ class ProviderExecutionEngine {
       body:              `Your ${service_type} purchase failed and has been refunded.`,
       deep_link:         "/history",
       notification_type: "purchase_failed",
+      reference:         transaction_reference,
     }).catch(() => {/* logged inside sendTransactionPush */});
   }
 
