@@ -12,6 +12,7 @@ import {
   getTransactionByReference,
 } from "../../transactions/services/transaction.service";
 import { createNotification } from "../../notifications/services/notification.service";
+import { sendTransactionPush } from "../../notifications/services/fcm.service";
 import { markWebhookProcessed } from "../../webhooks/services/webhook.service";
 import { getDedicatedAccountByCustomerCode } from "../../wallet/services/dva.service";
 import { getDbInstance } from "../../../db/knex";
@@ -183,6 +184,13 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
       error: (notifErr as Error).message,
     });
   }
+
+  sendTransactionPush(fundingTx.user_id, "wallet_funded", {
+    title:             "Wallet Funded",
+    body:              `Your wallet has been credited ₦${amountNgn.toLocaleString("en-NG", { minimumFractionDigits: 2 })} via ${verifyResult.channel ?? "Paystack"}.`,
+    deep_link:         "/wallet",
+    notification_type: "wallet_funded",
+  }).catch(() => {/* logged inside sendTransactionPush */});
 
   // 8. Mark webhook processed
   await markWebhookProcessed(webhook_event_id).catch((e: unknown) => {

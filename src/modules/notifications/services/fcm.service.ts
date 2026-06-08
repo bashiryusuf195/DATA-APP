@@ -5,6 +5,7 @@
 import type { App as FirebaseApp } from "firebase-admin/app";
 import { config } from "../../../config";
 import { getDbInstance } from "../../../db/knex";
+import { shouldNotify } from "./notification-preferences.service";
 
 const db = getDbInstance();
 
@@ -232,4 +233,29 @@ export async function sendPushToAll(payload: PushPayload): Promise<PushResult> {
 export function isFcmConfigured(): boolean {
   const { projectId, clientEmail, privateKey } = config.firebase;
   return Boolean(projectId && clientEmail && privateKey);
+}
+
+// Send a push notification to a single user, gated by their notification preferences.
+// Safe to call fire-and-forget — catches all errors internally.
+export async function sendTransactionPush(
+  userId: string,
+  type:   string,
+  payload: PushPayload,
+): Promise<void> {
+  try {
+    const allowed = await shouldNotify(userId, type, "push");
+    if (!allowed) {
+      console.log(`[FCM] push skipped | user=${userId} type=${type} reason=preference_gate`);
+      return;
+    }
+    const result = await sendPushToUsers([userId], payload);
+    console.log(
+      `[FCM] transaction push | user=${userId} type=${type}` +
+      ` sent=${result.sent} failed=${result.failed} disabled=${result.disabled}`,
+    );
+  } catch (err) {
+    console.error(
+      `[FCM] sendTransactionPush error | user=${userId} type=${type}: ${(err as Error).message}`,
+    );
+  }
 }

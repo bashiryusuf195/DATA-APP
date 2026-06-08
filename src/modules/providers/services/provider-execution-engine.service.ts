@@ -14,6 +14,7 @@ import {
   getTransactionByReference,
 } from "../../transactions/services/transaction.service";
 import { createNotification } from "../../notifications/services/notification.service";
+import { sendTransactionPush } from "../../notifications/services/fcm.service";
 import {
   recordSuccess as metricsRecordSuccess,
   recordFailure as metricsRecordFailure,
@@ -153,6 +154,13 @@ class ProviderExecutionEngine {
         }).catch((err: Error) =>
           logger.warn("engine_replay_notification_failed", { error: err.message })
         );
+
+        sendTransactionPush(transaction.user_id, "purchase_successful", {
+          title:             "Transaction Successful",
+          body:              `Your ${service_type} purchase was successful.`,
+          deep_link:         "/history",
+          notification_type: "purchase_successful",
+        }).catch(() => {/* logged inside sendTransactionPush */});
       }
 
       return this.idempotentResult(true, existingSuccess.provider_code);
@@ -666,6 +674,13 @@ class ProviderExecutionEngine {
     }).catch((err) =>
       logger.warn("engine_success_notification_failed", { error: (err as Error).message })
     );
+
+    sendTransactionPush(params.transaction.user_id, "purchase_successful", {
+      title:             "Transaction Successful",
+      body:              `Your ${params.service_type} purchase was successful.`,
+      deep_link:         "/history",
+      notification_type: "purchase_successful",
+    }).catch(() => {/* logged inside sendTransactionPush */});
   }
 
   // ── Pending handler ───────────────────────────────────────────────────────
@@ -824,6 +839,13 @@ class ProviderExecutionEngine {
     }).catch((err) =>
       logger.warn("engine_failure_notification_failed", { error: (err as Error).message })
     );
+
+    sendTransactionPush(transaction.user_id, "purchase_failed", {
+      title:             "Transaction Failed",
+      body:              `Your ${service_type} purchase failed and has been refunded.`,
+      deep_link:         "/history",
+      notification_type: "purchase_failed",
+    }).catch(() => {/* logged inside sendTransactionPush */});
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
