@@ -31,14 +31,8 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-surface-1 border-r border-border shrink-0">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-border shrink-0">
-        <div className="h-9 w-9 rounded-2xl bg-brand-600 flex items-center justify-center shrink-0 shadow-brand">
-          <Zap className="h-4.5 w-4.5 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-ink leading-none">VTU Platform</p>
-          <p className="text-[10px] text-ink-faint mt-0.5 leading-none">Fast & Reliable</p>
-        </div>
+      <div className="flex items-center px-5 h-16 border-b border-border shrink-0">
+        <img src="/logo-horizontal.png" alt="Hive Data" className="h-7 object-contain" />
       </div>
 
       {/* Nav */}

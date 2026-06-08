@@ -82,7 +82,7 @@ export function RegisterPage() {
   return (
     <Card>
       <h1 className="text-xl font-bold text-ink mb-1">Create account</h1>
-      <p className="text-sm text-ink-muted mb-6">Join millions using VTU Platform.</p>
+      <p className="text-sm text-ink-muted mb-6">Join millions using Hive Data.</p>
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <div className="grid grid-cols-2 gap-3">
           <Input label="First name" value={form.first_name} onChange={set('first_name')} placeholder="John" error={errors.first_name} prefix={<User className="h-4 w-4" />} />

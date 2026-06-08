@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Bell, Zap, Sun, Moon } from 'lucide-react'
+import { Bell, Sun, Moon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { notificationsApi } from '@/api/notifications.api'
 import { useAuthStore } from '@/store/auth.store'
@@ -22,11 +22,8 @@ export function AppHeader() {
   return (
     <header className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between h-14 px-4 bg-surface-1 border-b border-border">
       {/* Brand */}
-      <Link to="/dashboard" className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-xl bg-brand-600 flex items-center justify-center shadow-brand">
-          <Zap className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-sm font-bold text-ink">VTU Platform</span>
+      <Link to="/dashboard" className="flex items-center">
+        <img src="/logo-horizontal.png" alt="Hive Data" className="h-8 object-contain" />
       </Link>
 
       {/* Right: theme + bell + avatar */}

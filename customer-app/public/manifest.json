@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Hive Data",
   "short_name": "Hive Data",
   "description": "Buy Data, Airtime, Electricity, Cable TV and more",
@@ -18,6 +19,12 @@
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
