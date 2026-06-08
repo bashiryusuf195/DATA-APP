@@ -34,20 +34,31 @@ const QUICK_ACTIONS = [
 
 function ReferralBanner() {
   return (
-    <div className="rounded-3xl p-4 flex items-center justify-between gap-3"
-      style={{ background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' }}>
-      <div>
-        <p className="text-white font-bold text-sm flex items-center gap-1.5">
-          <Gift className="h-4 w-4" /> Refer &amp; Earn ₦200
-        </p>
-        <p className="text-white/80 text-xs mt-0.5">Get ₦200 for every friend you refer</p>
+    <div
+      className="relative overflow-hidden rounded-3xl p-4"
+      style={{ background: 'linear-gradient(135deg, #F59E0B 0%, #EA8C00 45%, #D97706 100%)' }}
+    >
+      {/* Decorative circles */}
+      <div className="absolute -top-5 -right-5 h-24 w-24 rounded-full bg-white/10 pointer-events-none" />
+      <div className="absolute -bottom-4 right-12 h-16 w-16 rounded-full bg-white/10 pointer-events-none" />
+
+      <div className="relative flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-white/80 text-xs font-semibold uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
+            <Gift className="h-3.5 w-3.5" /> Refer &amp; Earn
+          </p>
+          <p className="text-white font-black text-xl leading-none">
+            ₦200 <span className="text-sm font-semibold text-white/70">per friend</span>
+          </p>
+          <p className="text-white/60 text-xs mt-1">Invite friends, earn instantly</p>
+        </div>
+        <Link
+          to="/referrals"
+          className="shrink-0 bg-white text-amber-700 text-xs font-black px-4 py-2.5 rounded-2xl hover:bg-amber-50 active:scale-95 transition-all shadow-md"
+        >
+          Get Link
+        </Link>
       </div>
-      <Link
-        to="/referrals"
-        className="shrink-0 bg-white text-amber-700 text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-amber-50 transition-colors"
-      >
-        Get My Link
-      </Link>
     </div>
   )
 }
@@ -197,12 +208,24 @@ export function DashboardPage() {
   )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" style={{ background: 'linear-gradient(180deg, rgba(53,53,217,0.04) 0%, transparent 14rem)' }}>
       {/* ── Greeting row (desktop only) ─────────────────────────────────── */}
       <div className="hidden md:flex items-center justify-between pt-1">
         <div>
-          <p className="text-ink-muted text-sm">{getGreeting()},</p>
-          <h1 className="text-2xl font-bold text-ink">{firstName} 👋</h1>
+          <p className="text-ink-faint text-xs font-medium tracking-widest uppercase">{getGreeting()}</p>
+          <h1 className="text-2xl font-bold text-ink mt-0.5">{firstName} 👋</h1>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+              Account Active
+            </span>
+            {unread > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-ink-faint">
+                <Bell className="h-3 w-3" />
+                {unread} unread
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2.5">
           <button
@@ -226,10 +249,48 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Mobile greeting ───────────────────────────────────────────── */}
-      <div className="md:hidden pt-1">
-        <p className="text-ink-muted text-sm">{getGreeting()},</p>
-        <h1 className="text-xl font-bold text-ink">{firstName} 👋</h1>
+      {/* ── Desktop quick stats strip ────────────────────────────────────── */}
+      <div className="hidden md:flex gap-3 -mt-1">
+        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3">
+          <div className="h-8 w-8 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+            <span className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-ink-faint uppercase tracking-wider">Status</p>
+            <p className="text-sm font-bold text-ink">Account Active</p>
+          </div>
+        </div>
+        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3">
+          <div className="h-8 w-8 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+            <ArrowLeftRight className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-ink-faint uppercase tracking-wider">Activity</p>
+            <p className="text-sm font-bold text-ink">{recentTxs.length} Recent Txs</p>
+          </div>
+        </div>
+        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3">
+          <div className={cn(
+            'h-8 w-8 rounded-xl flex items-center justify-center shrink-0',
+            unread > 0 ? 'bg-danger/10' : 'bg-surface-2'
+          )}>
+            <Bell className={cn('h-4 w-4', unread > 0 ? 'text-danger' : 'text-ink-faint')} />
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-ink-faint uppercase tracking-wider">Notifications</p>
+            <p className="text-sm font-bold text-ink">{unread > 0 ? `${unread} Unread` : 'All Read'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Mobile greeting + wallet hero ─────────────────────────────── */}
+      <div
+        className="md:hidden -mx-4 px-4 pt-2 pb-5"
+        style={{ background: 'linear-gradient(180deg, rgba(53,53,217,0.09) 0%, rgba(53,53,217,0.03) 55%, transparent 100%)' }}
+      >
+        <p className="text-ink-faint text-xs font-medium tracking-widest uppercase mb-0.5">{getGreeting()}</p>
+        <h1 className="text-xl font-bold text-ink mb-4">{firstName} 👋</h1>
+        <WalletBalanceCard balance={balance?.balance} currency={balance?.currency} isLoading={balanceLoading} />
       </div>
 
       {/* ── KYC banner — full width ───────────────────────────────────── */}
@@ -240,11 +301,14 @@ export function DashboardPage() {
 
         {/* LEFT column: wallet balance + bank transfer + referral (desktop) */}
         <div className="space-y-4">
-          <WalletBalanceCard
-            balance={balance?.balance}
-            currency={balance?.currency}
-            isLoading={balanceLoading}
-          />
+          {/* Wallet card shown in the mobile hero above — desktop only here */}
+          <div className="hidden md:block">
+            <WalletBalanceCard
+              balance={balance?.balance}
+              currency={balance?.currency}
+              isLoading={balanceLoading}
+            />
+          </div>
 
           {bankTransferCard}
 
@@ -265,9 +329,9 @@ export function DashboardPage() {
                 <Link
                   key={`${s.to}-${s.label}`}
                   to={s.to}
-                  className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-surface-1 shadow-card border border-border hover:border-brand-200 hover:shadow-card-md active:scale-95 transition-all duration-100"
+                  className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-surface-1 shadow-card border border-border hover:border-brand-200 hover:shadow-card-md active:scale-95 transition-all duration-150"
                 >
-                  <div className={cn('h-11 w-11 rounded-2xl flex items-center justify-center', s.bg)}>
+                  <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110', s.bg)}>
                     <s.icon className={cn('h-5 w-5', s.color)} />
                   </div>
                   <span className="text-[11px] font-semibold text-ink text-center leading-tight">{s.label}</span>

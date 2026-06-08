@@ -12,34 +12,40 @@ const NAV = [
 
 export function BottomNav() {
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-surface-1 border-t border-border safe-bottom md:hidden">
-      <ul className="flex h-16">
-        {NAV.map(({ to, label, icon: Icon }) => (
-          <li key={to} className="flex-1">
-            <NavLink
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  'flex flex-col items-center justify-center gap-1 h-full text-[10px] font-semibold transition-colors',
-                  isActive ? 'text-brand-600' : 'text-ink-faint'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <Icon
-                    className={cn(
-                      'h-5 w-5 transition-all',
-                      isActive ? 'stroke-[2.5px] text-brand-600' : 'stroke-[1.5px]'
-                    )}
-                  />
-                  {label}
-                </>
-              )}
-            </NavLink>
-          </li>
-        ))}
-      </ul>
+    <nav className="fixed bottom-4 inset-x-4 z-40 md:hidden">
+      <div className="bg-white/85 dark:bg-[#161B22]/90 backdrop-blur-xl border border-border rounded-[2rem] shadow-modal">
+        <ul className="flex items-center h-[62px] px-2">
+          {NAV.map(({ to, label, icon: Icon }) => (
+            <li key={to} className="flex-1">
+              <NavLink
+                to={to}
+                className="flex flex-col items-center justify-center gap-0.5 h-full"
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className={cn(
+                      'flex items-center justify-center h-8 w-8 rounded-2xl transition-all duration-200',
+                      isActive ? 'bg-brand-600 shadow-brand' : ''
+                    )}>
+                      <Icon className={cn(
+                        'transition-all duration-200',
+                        'h-[18px] w-[18px]',
+                        isActive ? 'stroke-[2.5px] text-white' : 'stroke-[1.5px] text-ink-faint'
+                      )} />
+                    </div>
+                    <span className={cn(
+                      'text-[10px] font-semibold transition-colors duration-200',
+                      isActive ? 'text-brand-600' : 'text-ink-faint'
+                    )}>
+                      {label}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </div>
     </nav>
   )
 }
