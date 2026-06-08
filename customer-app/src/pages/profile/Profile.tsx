@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight, Lock, Shield, Hash,
@@ -15,8 +15,6 @@ import { cn } from '@/utils/cn'
 import type { NotificationPreferences } from '@/types'
 import { usePushNotifications, attachForegroundListener } from '@/hooks/usePushNotifications'
 
-// Module-level build marker — fires when this JS chunk is first executed
-console.log('[PROFILE_BUILD_MARKER] ea27b66')
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
@@ -68,11 +66,6 @@ function PrefRow({ icon: Icon, label, hint, checked, onChange }: {
   checked: boolean
   onChange: () => void
 }) {
-  // TEMP diagnostic — remove after push notification debugging
-  const wrappedOnChange = () => {
-    console.log('[PrefRow] onChange fired, label =', label, '| fn =', onChange.name || '(anonymous)')
-    onChange()
-  }
   return (
     <div className="flex items-center gap-4 py-3.5 px-1">
       <div className="h-9 w-9 rounded-xl bg-surface-2 flex items-center justify-center shrink-0">
@@ -82,7 +75,7 @@ function PrefRow({ icon: Icon, label, hint, checked, onChange }: {
         <p className="text-sm font-semibold text-ink">{label}</p>
         <p className="text-xs text-ink-faint mt-0.5">{hint}</p>
       </div>
-      <Toggle checked={checked} onChange={wrappedOnChange} />
+      <Toggle checked={checked} onChange={onChange} />
     </div>
   )
 }
@@ -120,9 +113,6 @@ function kycBadgeStyle(level: number): string {
 }
 
 export function ProfilePage() {
-  // TEMP diagnostic — remove after push notification debugging
-  useEffect(() => { console.log('[ProfilePage] mounted push build v2') }, [])
-
   const navigate  = useNavigate()
   const user      = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
@@ -174,10 +164,8 @@ export function ProfilePage() {
   }
 
   const handlePushToggle = async () => {
-    console.log('[Profile] handlePushToggle called | prefs =', prefs, '| permission =', push.permission)
     if (!prefs) return
     const shouldEnable = !prefs.push
-    console.log('[Profile] Push toggle →', shouldEnable ? 'ON' : 'OFF', '| current permission:', push.permission)
 
     if (shouldEnable) {
       const ok = await push.enable()
@@ -334,10 +322,7 @@ export function ProfilePage() {
 
           {/* Preferences */}
           <div className="bg-surface-1 rounded-3xl p-5 shadow-card border border-border">
-            <p className="text-sm font-bold text-ink mb-1">
-              Preferences
-              <span className="ml-2 text-xs font-mono text-amber-500 font-normal">Push Build: ea27b66</span>
-            </p>
+            <p className="text-sm font-bold text-ink mb-1">Preferences</p>
             {prefsLoading ? (
               <div className="space-y-3 py-2">
                 {[...Array(3)].map((_, i) => (

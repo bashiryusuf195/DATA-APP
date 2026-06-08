@@ -5,7 +5,7 @@ export function AuthLayout() {
     <div className="min-h-screen flex flex-col bg-surface-0">
       {/* Brand bar */}
       <div className="flex items-center justify-center py-8">
-        <img src="/logo-horizontal.png" alt="Hive Data" className="h-10 object-contain" />
+        <img src="/logo-horizontal.png" alt="Hive Data" className="w-[200px] h-auto object-contain" />
       </div>
 
       {/* Form card */}

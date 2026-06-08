@@ -12,8 +12,6 @@ applyPersistedTheme()
 // Sync the auth header from persisted store before first render
 syncAuthHeader()
 
-// Visible marker for confirming the deployed build — check browser console
-console.log('[VTU] Transaction PIN build:', __BUILD_TIME__)
 
 const queryClient = new QueryClient({
   defaultOptions: {
