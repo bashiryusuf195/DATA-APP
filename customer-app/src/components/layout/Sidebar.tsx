@@ -31,8 +31,8 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-surface-1 border-r border-border shrink-0">
       {/* Brand */}
-      <div className="flex items-center px-5 h-16 border-b border-border shrink-0">
-        <img src="/logo-horizontal.png" alt="Hive Data" className="w-[150px] h-auto object-contain" />
+      <div className="flex items-center px-5 py-3 h-16 border-b border-border shrink-0">
+        <img src="/logo-horizontal.png" alt="Hive Data" className="w-[125px] h-auto object-contain" />
       </div>
 
       {/* Nav */}
