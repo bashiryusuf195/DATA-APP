@@ -1,71 +1,70 @@
-// Firebase Messaging Service Worker
-// Handles background (app not open/focused) push notifications.
-// This file must live at the root path (/firebase-messaging-sw.js) — Vite
-// serves everything inside /public at the root, so it is correctly located.
+// Firebase Cloud Messaging — background service worker
+// Uses the native Web Push API so there are zero CDN importScripts calls.
+// FCM delivers push messages via the standard Web Push Protocol; the browser
+// decrypts them and fires 'push' with the JSON payload — no Firebase SDK needed.
 
-importScripts("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js");
+// Activate immediately: skip the "waiting" phase so a fresh SW takes effect
+// on the next navigation without requiring the user to close all tabs.
+self.addEventListener('install',  ()  => self.skipWaiting())
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
 
-// Config is injected at runtime from the query-string when the SW is registered.
-// See src/hooks/usePushNotifications.ts — we register the SW with the config
-// embedded in the URL so this file stays static and cache-safe.
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "FIREBASE_CONFIG") {
-    try {
-      firebase.initializeApp(event.data.config);
-      const messaging = firebase.messaging();
+// ── Background push handler ───────────────────────────────────────────────────
+// Fires when a push message arrives and the app is not in the foreground.
+// The FCM payload is a JSON object with optional `notification` and `data` fields.
+self.addEventListener('push', (event) => {
+  if (!event.data) return
 
-      messaging.onBackgroundMessage((payload) => {
-        const notification = payload.notification ?? {};
-        const data         = payload.data         ?? {};
-
-        const title = notification.title ?? "Hive Data";
-        const body  = notification.body  ?? "";
-        const icon  = notification.icon  ?? "/icons/icon-192x192.png";
-        const image = notification.image ?? data.image;
-
-        const options = {
-          body,
-          icon,
-          badge: "/icons/badge-72x72.png",
-          data: {
-            deep_link:         data.deep_link ?? "/notifications",
-            notification_type: data.notification_type ?? "",
-          },
-          ...(image ? { image } : {}),
-          requireInteraction: false,
-          vibrate:            [200, 100, 200],
-        };
-
-        self.registration.showNotification(title, options);
-      });
-    } catch (e) {
-      console.error("[FCM SW] Failed to initialise Firebase:", e);
-    }
+  let payload
+  try {
+    payload = event.data.json()
+  } catch {
+    return
   }
-});
 
-// Handle notification click — focus existing window or open a new one,
-// then navigate to deep_link if provided.
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
+  const notification = payload.notification ?? {}
+  const data         = payload.data         ?? {}
 
-  const deepLink = event.notification.data?.deep_link ?? "/notifications";
-  const targetUrl = new URL(deepLink, self.location.origin).href;
+  const title = notification.title ?? data.title ?? 'Hive Data'
+  const body  = notification.body  ?? data.body  ?? ''
+  const icon  = notification.icon  ?? data.icon  ?? '/icons/icon-192x192.png'
+  const image = notification.image ?? data.image
+
+  // Browsers require a user-visible notification in response to a push event.
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: '/icons/badge-72x72.png',
+      data: {
+        deep_link:         data.deep_link         ?? '/notifications',
+        notification_type: data.notification_type ?? '',
+      },
+      ...(image ? { image } : {}),
+      requireInteraction: false,
+      vibrate: [200, 100, 200],
+    })
+  )
+})
+
+// ── Notification click ────────────────────────────────────────────────────────
+// Focus an existing app window or open a new one, then navigate to deep_link.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+
+  const deepLink  = event.notification.data?.deep_link ?? '/notifications'
+  const targetUrl = new URL(deepLink, self.location.origin).href
 
   event.waitUntil(
     clients
-      .matchAll({ type: "window", includeUncontrolled: true })
+      .matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {
-        // If app window is already open, focus it and post a navigation message
         for (const client of windowClients) {
-          if (client.url.includes(self.location.origin) && "focus" in client) {
-            client.postMessage({ type: "NAVIGATE", url: deepLink });
-            return client.focus();
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.postMessage({ type: 'NAVIGATE', url: deepLink })
+            return client.focus()
           }
         }
-        // Otherwise open a new window
-        if (clients.openWindow) return clients.openWindow(targetUrl);
-      }),
-  );
-});
+        if (clients.openWindow) return clients.openWindow(targetUrl)
+      })
+  )
+})

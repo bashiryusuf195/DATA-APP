@@ -61,17 +61,21 @@ export function attachForegroundListener(onDeepLink: (link: string) => void): vo
 async function getSwRegistration(): Promise<ServiceWorkerRegistration | undefined> {
   if (!('serviceWorker' in navigator)) return undefined
   try {
-    // Wait for the controller to be ready — this resolves once the SW is active.
-    const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
-    console.log(
-      '[PUSH] SW registration:',
-      reg
-        ? `scope=${reg.scope} active=${reg.active?.state ?? 'none'} installing=${reg.installing?.state ?? 'none'}`
-        : 'not found',
-    )
+    // Explicitly register the SW every time — the browser deduplicates if the
+    // URL + scope are unchanged. updateViaCache: 'none' bypasses the HTTP cache
+    // so a newly-deployed firebase-messaging-sw.js is always fetched fresh.
+    await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
+    // navigator.serviceWorker.ready resolves once there is an active SW for
+    // this page. The SW's install handler calls skipWaiting() so it activates
+    // immediately without waiting for existing tabs to close.
+    const reg = await navigator.serviceWorker.ready
+    console.log('[PUSH] SW registration:', `scope=${reg.scope} active=${reg.active?.state ?? 'none'}`)
     return reg
   } catch (err) {
-    console.warn('[PUSH] Could not read SW registration:', err)
+    console.warn('[PUSH] Could not register SW:', err)
     return undefined
   }
 }
