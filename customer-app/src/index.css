@@ -85,6 +85,21 @@ html.dark .dashboard-mobile-hero {
   );
 }
 
+/* ── Logo dark-mode visibility ───────────────────────────────────────────────
+   The logo contains dark navy/indigo elements that disappear against the dark
+   sidebar/header backgrounds. A modest brightness lift and two stacked soft
+   white drop-shadows create enough separation without any neon or blur effect.
+   The double shadow layers a tight halo (4px) with a wide ambient glow (10px)
+   to mimic the natural edge lighting seen on Stripe / Linear dark UIs.
+────────────────────────────────────────────────────────────────────────────── */
+html.dark .app-logo {
+  filter:
+    brightness(1.25)
+    contrast(1.08)
+    drop-shadow(0 0 4px rgba(255, 255, 255, 0.12))
+    drop-shadow(0 0 10px rgba(255, 255, 255, 0.06));
+}
+
 /* Smooth number input without spinners */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {

@@ -23,7 +23,7 @@ export function AppHeader() {
     <header className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between h-14 px-4 bg-surface-1 border-b border-border">
       {/* Brand */}
       <Link to="/dashboard" className="flex items-center">
-        <img src="/logo-horizontal.png" alt="Hive Data" className="h-9 w-auto object-contain" />
+        <img src="/logo-horizontal.png" alt="Hive Data" className="h-9 w-auto object-contain app-logo" />
       </Link>
 
       {/* Right: theme + bell + avatar */}

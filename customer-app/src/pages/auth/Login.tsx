@@ -12,6 +12,9 @@ import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
   authenticateWithPasskey,
+  browserSupportsWebAuthnAutofill,
+  WebAuthnAbortService,
+  startConditionalAuthentication,
 } from '@/hooks/usePasskey'
 
 type Step = 'credentials' | '2fa'
@@ -46,9 +49,35 @@ export function LoginPage() {
       navigate('/onboarding', { replace: true })
     }
 
-    // Check biometric availability without blocking the page render
+    // Explicit biometric button: check platform authenticator availability
     if (isWebAuthnSupported()) {
       isPlatformAuthenticatorAvailable().then(setBiometricAvailable)
+    }
+
+    // Conditional UI: start a background WebAuthn ceremony so registered passkeys
+    // appear in the browser's email autofill dropdown. The promise stays pending
+    // until the user picks a credential or the ceremony is aborted. Requires the
+    // email input to have autocomplete ending in "webauthn".
+    browserSupportsWebAuthnAutofill().then((supported) => {
+      if (!supported) return
+      startConditionalAuthentication()
+        .then((result) => {
+          if (result) {
+            toast.success('Welcome back!')
+            navigate('/dashboard', { replace: true })
+          }
+        })
+        .catch((err) => {
+          // AbortError = intentional cancel (unmount or explicit biometric button used)
+          if ((err as Error)?.name === 'AbortError') return
+          // Challenge expired or server error — silently fall back to the form
+          console.warn('[passkey] conditional UI error:', (err as Error)?.message)
+        })
+    })
+
+    return () => {
+      // Cancel any pending WebAuthn ceremony to avoid dangling promises on unmount
+      WebAuthnAbortService.cancelCeremony()
     }
   }, [navigate])
 
@@ -164,7 +193,7 @@ export function LoginPage() {
       <h1 className="text-xl font-bold text-ink mb-1">Sign in</h1>
       <p className="text-sm text-ink-muted mb-6">Enter your credentials to continue.</p>
       <form onSubmit={handleCredentials} className="space-y-4">
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" prefix={<Mail className="h-4 w-4" />} />
+        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email webauthn" prefix={<Mail className="h-4 w-4" />} />
         <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" prefix={<Lock className="h-4 w-4" />} />
         <div className="flex justify-end">
           <Link to="/forgot-password" className="text-xs text-brand-600 hover:underline">Forgot password?</Link>

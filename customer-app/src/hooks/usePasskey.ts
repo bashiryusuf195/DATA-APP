@@ -1,9 +1,17 @@
-import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
+import {
+  startRegistration,
+  startAuthentication,
+  browserSupportsWebAuthnAutofill,
+  WebAuthnAbortService,
+} from '@simplewebauthn/browser'
 import type { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser'
 import { passkeyApi }    from '@/api/passkey.api'
 import { useAuthStore }  from '@/store/auth.store'
 import { apiClient }     from '@/api/client'
 import type { User }     from '@/types'
+
+// Re-export for use by Login.tsx without a direct simplewebauthn import there.
+export { browserSupportsWebAuthnAutofill, WebAuthnAbortService }
 
 // ── Support detection ─────────────────────────────────────────────────────────
 
@@ -99,6 +107,61 @@ export async function authenticateWithPasskey(): Promise<BiometricAuthResult | n
   })
 
   // 5. Attach Authorization header for all future requests
+  apiClient.defaults.headers.common['Authorization'] = `Bearer ${result.tokens.access_token}`
+
+  return {
+    success:       true,
+    access_token:  result.tokens.access_token,
+    refresh_token: result.tokens.refresh_token,
+    session_id:    result.session_id,
+    user:          result.user,
+  }
+}
+
+/**
+ * Start a WebAuthn Conditional UI ceremony (passkey autofill).
+ *
+ * Call this on page load after confirming browserSupportsWebAuthnAutofill().
+ * The promise stays pending while the browser shows passkey suggestions in the
+ * email autofill dropdown. It resolves only when the user picks a credential.
+ *
+ * The email input must have autocomplete="... webauthn" for the library to
+ * detect it; otherwise startAuthentication throws immediately.
+ *
+ * On component unmount, call WebAuthnAbortService.cancelCeremony() to clean up.
+ * Calling authenticateWithPasskey() also auto-cancels this via the singleton.
+ */
+export async function startConditionalAuthentication(): Promise<BiometricAuthResult | null> {
+  // 1. Fetch a fresh challenge from the server (stored in Redis)
+  const { options, passkeySessionToken } = await passkeyApi.authBegin()
+
+  // 2. Hand off to the browser — promise stays pending until autofill selection
+  let assertion
+  try {
+    assertion = await startAuthentication({
+      optionsJSON:       options as PublicKeyCredentialRequestOptionsJSON,
+      useBrowserAutofill: true,
+    })
+  } catch (err) {
+    const name = (err as Error)?.name
+    // AbortError: intentionally cancelled (unmount or new ceremony started) — re-throw
+    if (name === 'AbortError') throw err
+    // User dismissed or no resident credential available — silent fallback
+    if (name === 'NotAllowedError' || name === 'NotSupportedError') return null
+    throw err
+  }
+
+  // 3. Verify the assertion on the server
+  const result = await passkeyApi.authComplete(passkeySessionToken, assertion)
+
+  // 4. Store auth state (same path as explicit passkey / email login)
+  const setAuth = useAuthStore.getState().setAuth
+  setAuth({
+    access_token:  result.tokens.access_token,
+    refresh_token: result.tokens.refresh_token,
+    session_id:    result.session_id,
+    user:          result.user,
+  })
   apiClient.defaults.headers.common['Authorization'] = `Bearer ${result.tokens.access_token}`
 
   return {
