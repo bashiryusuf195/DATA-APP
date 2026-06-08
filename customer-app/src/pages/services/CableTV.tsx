@@ -193,10 +193,10 @@ export function CableTvPage() {
             </div>
 
             {verifyResult?.success && (
-              <div className="flex items-start gap-3 rounded-2xl bg-brand-50 border border-brand-200 px-4 py-3">
-                <CheckCircle2 className="h-5 w-5 text-brand-600 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 rounded-2xl bg-brand-50 dark:bg-brand-900/30 border border-brand-200 dark:border-brand-700 px-4 py-3">
+                <CheckCircle2 className="h-5 w-5 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-semibold text-brand-700">Decoder Verified</p>
+                  <p className="font-semibold text-brand-700 dark:text-brand-300">Decoder Verified</p>
                   <p className="text-ink mt-0.5">{verifyResult.customer_name}</p>
                   {verifyResult.current_package && (
                     <p className="text-ink-faint text-xs mt-0.5">
