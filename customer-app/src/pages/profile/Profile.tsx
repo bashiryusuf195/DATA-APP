@@ -15,6 +15,9 @@ import { cn } from '@/utils/cn'
 import type { NotificationPreferences } from '@/types'
 import { usePushNotifications, attachForegroundListener } from '@/hooks/usePushNotifications'
 
+// Module-level build marker — fires when this JS chunk is first executed
+console.log('[PROFILE_BUILD_MARKER] ea27b66')
+
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <button
@@ -331,7 +334,10 @@ export function ProfilePage() {
 
           {/* Preferences */}
           <div className="bg-surface-1 rounded-3xl p-5 shadow-card border border-border">
-            <p className="text-sm font-bold text-ink mb-1">Preferences</p>
+            <p className="text-sm font-bold text-ink mb-1">
+              Preferences
+              <span className="ml-2 text-xs font-mono text-amber-500 font-normal">Push Build: ea27b66</span>
+            </p>
             {prefsLoading ? (
               <div className="space-y-3 py-2">
                 {[...Array(3)].map((_, i) => (
