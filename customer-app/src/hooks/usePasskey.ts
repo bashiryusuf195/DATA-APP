@@ -7,21 +7,23 @@ import type { User }     from '@/types'
 
 // ── Support detection ─────────────────────────────────────────────────────────
 
-/** True if the browser supports WebAuthn at all. */
+/** True if the browser has a functional WebAuthn implementation. */
 export function isWebAuthnSupported(): boolean {
   return (
     typeof window !== 'undefined' &&
-    typeof window.PublicKeyCredential !== 'undefined'
+    typeof window.PublicKeyCredential !== 'undefined' &&
+    typeof navigator.credentials?.get === 'function'
   )
 }
 
 /**
  * Async check: true if the device has a platform authenticator
  * (Touch ID, Face ID, Windows Hello, Android biometrics, device passcode).
- * Returns false if WebAuthn is not supported at all.
+ * Returns false if WebAuthn is unsupported or the platform check fails.
  */
 export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
   if (!isWebAuthnSupported()) return false
+  if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') return false
   try {
     return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
   } catch {

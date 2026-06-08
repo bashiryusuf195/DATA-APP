@@ -57,6 +57,34 @@ html.dark {
   .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
+/* ── Dashboard ambient gradients ─────────────────────────────────────────────
+   Separate light / dark values so the mobile hero is noticeably branded in
+   light mode while staying subtle in dark mode.
+────────────────────────────────────────────────────────────────────────────── */
+.dashboard-bg {
+  background: linear-gradient(180deg, rgba(79, 70, 229, 0.07) 0%, transparent 14rem);
+}
+html.dark .dashboard-bg {
+  background: linear-gradient(180deg, rgba(53, 53, 217, 0.04) 0%, transparent 14rem);
+}
+
+.dashboard-mobile-hero {
+  background: linear-gradient(
+    180deg,
+    rgba(79, 70, 229, 0.13) 0%,
+    rgba(99, 91, 238, 0.05) 55%,
+    transparent 100%
+  );
+}
+html.dark .dashboard-mobile-hero {
+  background: linear-gradient(
+    180deg,
+    rgba(53, 53, 217, 0.09) 0%,
+    rgba(53, 53, 217, 0.03) 55%,
+    transparent 100%
+  );
+}
+
 /* Smooth number input without spinners */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {

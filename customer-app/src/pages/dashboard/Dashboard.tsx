@@ -208,7 +208,7 @@ export function DashboardPage() {
   )
 
   return (
-    <div className="space-y-5" style={{ background: 'linear-gradient(180deg, rgba(53,53,217,0.04) 0%, transparent 14rem)' }}>
+    <div className="space-y-5 dashboard-bg">
       {/* ── Greeting row (desktop only) ─────────────────────────────────── */}
       <div className="hidden md:flex items-center justify-between pt-1">
         <div>
@@ -284,10 +284,16 @@ export function DashboardPage() {
       </div>
 
       {/* ── Mobile greeting + wallet hero ─────────────────────────────── */}
-      <div
-        className="md:hidden -mx-4 px-4 pt-2 pb-5"
-        style={{ background: 'linear-gradient(180deg, rgba(53,53,217,0.09) 0%, rgba(53,53,217,0.03) 55%, transparent 100%)' }}
-      >
+      <div className="md:hidden -mx-4 px-4 pt-2 pb-5 relative dashboard-mobile-hero">
+        {/* Soft radial glow behind wallet card — light mode only */}
+        <div
+          className="dark:hidden pointer-events-none absolute inset-x-8 bottom-3 h-40 rounded-full"
+          style={{
+            background: 'radial-gradient(ellipse, rgba(79,70,229,0.24) 0%, transparent 70%)',
+            filter: 'blur(32px)',
+          }}
+          aria-hidden="true"
+        />
         <p className="text-ink-faint text-xs font-medium tracking-widest uppercase mb-0.5">{getGreeting()}</p>
         <h1 className="text-xl font-bold text-ink mb-4">{firstName} 👋</h1>
         <WalletBalanceCard balance={balance?.balance} currency={balance?.currency} isLoading={balanceLoading} />
