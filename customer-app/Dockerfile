@@ -24,7 +24,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Change this value to force Docker to discard any cached source/build layers
-ARG CACHE_BUST=2026-06-09b
+ARG CACHE_BUST=2026-06-09c
 
 # Copy source code in explicit layers so Docker invalidates cache on any src change
 COPY src/ ./src/
@@ -37,7 +37,9 @@ RUN npm run build
 # ─── Serve stage ──────────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-# Pull nginx.conf from the build stage so this works regardless of Docker build context
-COPY --from=build /app/nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# nginx.conf uses ${PORT} as a template variable. Copy it as a .template file
+# so we can run envsubst at container start to inject Railway's $PORT.
+COPY --from=build /app/nginx.conf /etc/nginx/templates/default.conf.template
+# envsubst '${PORT}' substitutes only ${PORT}, leaving nginx's own $uri, $uri/,
+# $http_upgrade, etc. completely untouched.
+CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
