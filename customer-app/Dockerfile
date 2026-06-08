@@ -24,7 +24,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Change this value to force Docker to discard any cached source/build layers
-ARG CACHE_BUST=2026-06-09c
+ARG CACHE_BUST=2026-06-09d
 
 # Copy source code in explicit layers so Docker invalidates cache on any src change
 COPY src/ ./src/
