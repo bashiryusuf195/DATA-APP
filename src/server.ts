@@ -95,11 +95,29 @@ async function startServer(): Promise<void> {
   // console.log is used in addition to logger so these lines appear in Railway
   // deployment logs even if the logger transports are misconfigured.
   console.log(`[STARTUP] VTU API initialising — NODE_ENV=${config.env} PORT=${config.port} version=${config.appVersion}`);
+
+  // ── FCM / push notification readiness ────────────────────────────────────────
+  {
+    const fcmVars = [
+      { name: 'FIREBASE_PROJECT_ID',   value: config.firebase.projectId   },
+      { name: 'FIREBASE_CLIENT_EMAIL', value: config.firebase.clientEmail  },
+      { name: 'FIREBASE_PRIVATE_KEY',  value: config.firebase.privateKey   },
+    ];
+    const missingPush = fcmVars.filter((v) => !v.value).map((v) => v.name);
+    const pushConfigured = missingPush.length === 0;
+    console.log(`[STARTUP] push_configured      : ${pushConfigured}`);
+    if (!pushConfigured) {
+      console.warn(`[STARTUP] missing_push_env     : ${missingPush.join(', ')}`);
+      console.warn('[STARTUP] Push token storage works without these; add them to Railway to enable sending notifications.');
+    }
+  }
+
   logger.info('vtu_api_startup_init', {
     env:              config.env,
     version:          config.appVersion,
     port:             config.port,
     workers_disabled: config.workers.disabled,
+    push_configured:  Boolean(config.firebase.projectId && config.firebase.clientEmail && config.firebase.privateKey),
   });
 
   try {

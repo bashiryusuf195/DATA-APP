@@ -23,10 +23,12 @@ export async function registerPushTokenController(
   req: Request, res: Response, next: NextFunction,
 ): Promise<void> {
   try {
-    if (!isFcmConfigured()) {
-      throw new AppError(503, "PUSH_NOT_CONFIGURED", "Push notifications are not configured on this server");
-    }
-
+    // Token registration only persists the browser FCM token to the database.
+    // It does not call the Firebase Admin SDK, so it works regardless of whether
+    // Admin credentials (FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY) are set.
+    // The Admin SDK is only required when sending notifications (sendPushToUsers /
+    // sendPushToAll), which already returns { disabled: true } gracefully when
+    // credentials are absent.
     const userId = getUserId(req);
     const body   = RegisterSchema.parse(req.body);
     const now    = new Date();
