@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Phone, Wifi, Zap, Tv, Shield, Wallet,
@@ -78,7 +78,6 @@ function StepCard({ step }: { step: HowItWorksStep }) {
 }
 
 export function LandingPage() {
-  const navigate = useNavigate()
   const token    = useAuthStore((s) => s.access_token)
   const { dark, toggle: toggleDark } = useThemeStore()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -86,17 +85,16 @@ export function LandingPage() {
   const { data: content } = useQuery({
     queryKey: ['app-content'],
     queryFn:  contentApi.getAppContent,
-    staleTime: 0,
+    staleTime: 5 * 60_000,  // 5 min — prevents re-render flash on every mount
     retry:    false,
   })
 
   const c: LandingContent = content?.landing ?? DEFAULT_CONTENT
   const appName = c.app_name
 
-  if (token) {
-    navigate('/dashboard', { replace: true })
-    return null
-  }
+  // Declarative redirect — avoids calling navigate() as a render side-effect
+  // which caused a brief paint of landing content before the redirect completed.
+  if (token) return <Navigate to="/dashboard" replace />
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#070B12] text-gray-900 dark:text-white font-sans transition-colors duration-200">

@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom'
+import { Link, useNavigate, useLocation, Outlet, ScrollRestoration } from 'react-router-dom'
 import { Zap, ArrowLeft, Sun, Moon } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useThemeStore } from '@/store/theme.store'
@@ -17,18 +17,31 @@ export function LegalLayout() {
   const token    = useAuthStore((s) => s.access_token)
   const { dark, toggle: toggleDark } = useThemeStore()
 
-  const backTo   = token ? '/dashboard' : '/'
+  const backTo    = token ? '/dashboard' : '/'
   const backLabel = token ? 'Dashboard' : 'Home'
+
+  // Go back in the SPA history if there is a previous entry; otherwise fall
+  // back to a sensible default so the button always works on direct-link opens.
+  const handleBack = () => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1)
+    } else {
+      navigate(backTo)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink font-sans transition-colors duration-200">
+
+      {/* Scroll to top on every route change within the legal layout */}
+      <ScrollRestoration />
 
       {/* Navbar */}
       <nav className="sticky top-0 z-40 border-b border-border bg-white/90 dark:bg-[#161B22]/90 backdrop-blur-md">
         <div className="max-w-4xl mx-auto px-5 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => navigate(backTo)}
+              onClick={handleBack}
               className="flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />

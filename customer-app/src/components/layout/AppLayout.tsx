@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, ScrollRestoration } from 'react-router-dom'
 import { Sidebar }                from './Sidebar'
 import { BottomNav }              from './BottomNav'
 import { AppHeader }              from './AppHeader'
@@ -85,6 +85,9 @@ export function AppLayout() {
       {!showSetup && popups.length > 0 && (
         <PopupAnnouncement announcements={popups} />
       )}
+
+      {/* Scroll to top on every route change, restore on back/forward */}
+      <ScrollRestoration />
     </div>
   )
 }

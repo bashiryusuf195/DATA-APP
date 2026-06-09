@@ -35,7 +35,10 @@ html.dark {
   html {
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
-    scroll-behavior: smooth;
+    /* scroll-behavior intentionally omitted here — applying it globally makes
+       programmatic window.scrollTo() animate, which causes the previous page's
+       content to stay visible during route transitions. Smooth scroll is applied
+       per-component where intentional (e.g. snap-scroll carousels, anchor links). */
   }
 
   body {

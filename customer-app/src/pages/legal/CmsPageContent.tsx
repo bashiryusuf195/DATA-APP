@@ -7,11 +7,13 @@ interface Props {
 }
 
 // Renders CMS HTML when available, otherwise falls back to children.
-// Skeleton is not shown — the fallback renders immediately while the fetch
-// happens in the background, so the page never feels slow.
+// On the initial fetch (no cache) a minimal skeleton is shown instead of the
+// static fallback — this prevents the jarring two-stage swap where the fallback
+// content appears and is then immediately replaced by the CMS version.
 export function CmsPageContent({ slug, children }: Props) {
-  const { data: page } = useSitePage(slug)
+  const { data: page, isLoading } = useSitePage(slug)
 
+  // CMS content available — render it.
   if (page?.content) {
     return (
       <div
@@ -36,5 +38,28 @@ export function CmsPageContent({ slug, children }: Props) {
     )
   }
 
+  // Initial fetch in progress (no cache yet) — show a skeleton so there is no
+  // visible swap between fallback and CMS content once the fetch completes.
+  if (isLoading) {
+    return (
+      <div className="animate-pulse space-y-6 pt-4" aria-hidden="true">
+        <div className="space-y-3">
+          <div className="h-9 bg-surface-2 rounded-xl w-56" />
+          <div className="h-4 bg-surface-2 rounded w-full" />
+          <div className="h-4 bg-surface-2 rounded w-4/5" />
+          <div className="h-4 bg-surface-2 rounded w-3/4" />
+        </div>
+        <div className="h-32 bg-surface-2 rounded-2xl" />
+        <div className="space-y-2">
+          <div className="h-4 bg-surface-2 rounded w-full" />
+          <div className="h-4 bg-surface-2 rounded w-5/6" />
+          <div className="h-4 bg-surface-2 rounded w-full" />
+          <div className="h-4 bg-surface-2 rounded w-3/5" />
+        </div>
+      </div>
+    )
+  }
+
+  // Fetch complete, no CMS content configured — use the static fallback.
   return <>{children}</>
 }
