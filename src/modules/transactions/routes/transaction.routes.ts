@@ -25,14 +25,22 @@ import {
   getTransactionController,
 } from "../controllers/transaction-history.controller";
 import { identityReportController } from "../controllers/identity-report.controller";
+import { downloadReceiptController } from "../controllers/receipt.controller";
 
 const router = Router();
 
 router.get("/", authenticate, listTransactionsController);
-// Specific sub-paths must come BEFORE the /:reference wildcard
+
+// Specific sub-paths MUST come before the /:reference wildcard
 router.get("/identity-verification/:reference/report",
   authenticate,
   identityReportController);
+
+// PDF receipt — works for all transaction types
+router.get("/:reference/receipt",
+  authenticate,
+  downloadReceiptController);
+
 router.get("/:reference", authenticate, getTransactionController);
 
 // ── Purchase endpoints ─────────────────────────────────────────────────────────

@@ -102,4 +102,19 @@ export const transactionsApi = {
     a.click()
     URL.revokeObjectURL(objUrl)
   },
+
+  /** Download a PDF receipt for any transaction type. */
+  downloadReceipt: async (reference: string): Promise<void> => {
+    const resp = await apiClient.get(
+      `/transactions/${reference}/receipt`,
+      { responseType: 'blob' },
+    )
+    const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
+    const objUrl = URL.createObjectURL(blob)
+    const a      = document.createElement('a')
+    a.href       = objUrl
+    a.download   = `hivedata-receipt-${reference}.pdf`
+    a.click()
+    URL.revokeObjectURL(objUrl)
+  },
 }

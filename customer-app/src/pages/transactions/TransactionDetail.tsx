@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Copy, Check, Zap, Download, Loader2, ShieldCheck,
-  Share2, CheckCircle2, XCircle, Clock, Search, RefreshCw, Printer,
+  Share2, CheckCircle2, XCircle, Clock, Search, RefreshCw,
   ArrowDownLeft,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
@@ -470,7 +470,8 @@ function ServiceCard({
 // ─── Action bar ───────────────────────────────────────────────────────────────
 
 function ActionBar({ tx }: { tx: Transaction }) {
-  const [copiedRef, setCopiedRef] = useState(false)
+  const [copiedRef,    setCopiedRef]    = useState(false)
+  const [downloading,  setDownloading]  = useState(false)
 
   const handleCopyRef = useCallback(async () => {
     try { await navigator.clipboard.writeText(tx.reference) } catch { return }
@@ -499,7 +500,6 @@ function ActionBar({ tx }: { tx: Transaction }) {
         return
       } catch { /* user cancelled or share unavailable */ }
     }
-    // Fallback: clipboard
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Receipt copied to clipboard')
@@ -508,14 +508,21 @@ function ActionBar({ tx }: { tx: Transaction }) {
     }
   }, [tx])
 
-  const handlePrint = useCallback(() => {
-    window.print()
-  }, [])
+  const handleDownload = useCallback(async () => {
+    setDownloading(true)
+    try {
+      await transactionsApi.downloadReceipt(tx.reference)
+    } catch {
+      toast.error('Could not generate receipt. Please try again.')
+    } finally {
+      setDownloading(false)
+    }
+  }, [tx.reference])
 
-  const btn = 'flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-2xl bg-surface-2 hover:bg-border transition-colors text-ink-muted hover:text-ink'
+  const btn = 'flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-2xl bg-surface-2 hover:bg-border transition-colors text-ink-muted hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
-    <div className="rounded-3xl bg-surface-1 border border-border p-4 print:hidden">
+    <div className="rounded-3xl bg-surface-1 border border-border p-4">
       <div className="flex gap-3">
         <button onClick={handleCopyRef} className={btn} title="Copy reference">
           {copiedRef
@@ -529,9 +536,18 @@ function ActionBar({ tx }: { tx: Transaction }) {
           <span className="text-[11px] font-semibold">Share</span>
         </button>
 
-        <button onClick={handlePrint} className={btn} title="Download / Print">
-          <Printer className="h-5 w-5" />
-          <span className="text-[11px] font-semibold">Save PDF</span>
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className={btn}
+          title="Download PDF receipt"
+        >
+          {downloading
+            ? <Loader2 className="h-5 w-5 animate-spin" />
+            : <Download className="h-5 w-5" />}
+          <span className="text-[11px] font-semibold">
+            {downloading ? 'Generating…' : 'Receipt PDF'}
+          </span>
         </button>
       </div>
     </div>
