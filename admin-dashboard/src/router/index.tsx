@@ -58,6 +58,7 @@ import { AppContentPage }            from '@/pages/AppContent'
 import { CmsPagesPage }             from '@/pages/CmsPages'
 import { CmsEditorPage }            from '@/pages/CmsEditor'
 import { SquadUATPage }             from '@/pages/SquadUAT'
+import { ServiceStatusPage }        from '@/pages/ServiceStatusPage'
 
 import {
   Landmark,
@@ -103,6 +104,7 @@ export const router = createBrowserRouter([
       { path: '/service-plans',  element: <ServicePlansPage /> },
       { path: '/pricing',        element: <PricingPage /> },
       { path: '/service-availability', element: <ServiceAvailabilityPage /> },
+      { path: '/service-status', element: <ServiceStatusPage /> },
 
       // ── Payments ───────────────────────────────────────────────────────────
       { path: '/payment-gateways', element: <PaymentGatewaysPage /> },

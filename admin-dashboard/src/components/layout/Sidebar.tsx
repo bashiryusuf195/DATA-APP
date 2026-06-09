@@ -9,7 +9,7 @@ import {
   ClipboardList, SlidersHorizontal, ArrowUpDown, Radio, ShieldCheck,
   Gift, MessageSquare, Flag, PackageX, Webhook, Layout, MonitorDot,
   HeartHandshake, HardDrive, KeyRound, TrendingUp, AlertTriangle,
-  BookOpen, Tag, RefreshCcw, FileText, Plus, FlaskConical,
+  BookOpen, Tag, RefreshCcw, FileText, Plus, FlaskConical, Activity,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -65,9 +65,10 @@ const nav: NavSection[] = [
     key:   'services',
     title: 'Services & Pricing',
     items: [
-      { to: '/service-plans',        label: 'Service Plans', icon: <List  className="h-4 w-4" /> },
-      { to: '/service-availability', label: 'Availability',  icon: <Globe className="h-4 w-4" /> },
-      { to: '/pricing',              label: 'Pricing',       icon: <Tag   className="h-4 w-4" /> },
+      { to: '/service-plans',        label: 'Service Plans',  icon: <List     className="h-4 w-4" /> },
+      { to: '/service-status',       label: 'Service Status', icon: <Activity className="h-4 w-4" /> },
+      { to: '/service-availability', label: 'Availability',   icon: <Globe    className="h-4 w-4" /> },
+      { to: '/pricing',              label: 'Pricing',        icon: <Tag      className="h-4 w-4" /> },
     ],
   },
   {

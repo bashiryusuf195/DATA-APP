@@ -20,6 +20,7 @@ import { customerKycRouter }     from '../modules/compliance/routes/customer-kyc
 import { adminRouter }           from './admin.routes';
 import { publicRouter }          from '../modules/public/routes/public.routes';
 import { transactionPinRouter }  from '../modules/security/routes/transaction-pin.routes';
+import { serviceStatusRouter }    from '../modules/service-status/routes/service-status.routes';
 
 export const rootRouter = Router();
 
@@ -37,3 +38,4 @@ rootRouter.use('/admin',                     adminRouter);
 rootRouter.use('/public',                    publicRouter);
 rootRouter.use('/security/transaction-pin',  transactionPinRouter);
 rootRouter.use('/content',                   cmsRouter);
+rootRouter.use('/service-status',            serviceStatusRouter);

@@ -11,6 +11,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { WalletBalanceCard } from '@/components/shared/WalletBalanceCard'
 import { TransactionCard } from '@/components/shared/TransactionCard'
 import { KycBanner } from '@/components/shared/KycBanner'
+import { ServiceStatusBanner } from '@/components/shared/ServiceStatusBanner'
 import { FundingCarousel } from '@/components/shared/FundingCarousel'
 import { Skeleton } from '@/components/ui'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -176,6 +177,9 @@ export function DashboardPage() {
 
       {/* ── KYC banner — full width ───────────────────────────────────── */}
       <KycBanner />
+
+      {/* ── Service status — only shown when a service is degraded ───── */}
+      <ServiceStatusBanner />
 
       {/* ── Main 2-col grid (desktop) / stacked (mobile) ─────────────── */}
       <div className="lg:grid lg:grid-cols-[5fr_7fr] xl:grid-cols-[2fr_3fr] lg:gap-6 lg:items-start">
