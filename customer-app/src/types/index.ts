@@ -17,6 +17,7 @@ export interface User {
   has_transaction_pin: boolean
   referral_code?: string | null
   created_at?: string
+  preferences?: { balance_hidden?: boolean; [key: string]: unknown }
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────

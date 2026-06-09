@@ -10,11 +10,12 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useNotifications } from '@/hooks/useNotifications'
 import { WalletBalanceCard } from '@/components/shared/WalletBalanceCard'
 import { TransactionCard } from '@/components/shared/TransactionCard'
-import { KycBanner } from '@/components/shared/KycBanner'
+import { KycStatusCard } from '@/components/shared/KycStatusCard'
 import { ServiceStatusBanner } from '@/components/shared/ServiceStatusBanner'
 import { FundingCarousel } from '@/components/shared/FundingCarousel'
+import { DashboardSkeleton } from '@/components/skeletons'
 import { Skeleton } from '@/components/ui'
-import { EmptyState } from '@/components/shared/EmptyState'
+import { EmptyTransactions } from '@/components/shared/empty-states'
 import { cn } from '@/utils/cn'
 
 function getGreetingInfo(): { greeting: string; subtitle: string } {
@@ -74,6 +75,11 @@ export function DashboardPage() {
   const { data: balance, isLoading: balanceLoading } = useWalletBalance()
   const { data: txData,  isLoading: txLoading }      = useTransactions({ limit: 5 })
   const { data: notifData }                          = useNotifications({ limit: 1 })
+
+  // First load: all data is fetching and nothing is cached yet
+  if (balanceLoading && txLoading && !txData) {
+    return <DashboardSkeleton />
+  }
 
   const { greeting, subtitle } = getGreetingInfo()
   const firstName = user?.first_name ?? user?.email?.split('@')[0] ?? 'there'
@@ -175,8 +181,8 @@ export function DashboardPage() {
         <WalletBalanceCard balance={balance?.balance} currency={balance?.currency} isLoading={balanceLoading} />
       </div>
 
-      {/* ── KYC banner — full width ───────────────────────────────────── */}
-      <KycBanner />
+      {/* ── KYC status card — full width ─────────────────────────────── */}
+      <KycStatusCard />
 
       {/* ── Service status — only shown when a service is degraded ───── */}
       <ServiceStatusBanner />
@@ -241,15 +247,18 @@ export function DashboardPage() {
 
             <div className="bg-surface-1 rounded-3xl overflow-hidden shadow-card border border-border dashboard-shine-card">
               {txLoading ? (
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-0 divide-y divide-border">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="flex-1 space-y-1.5">
-                        <Skeleton className="h-3.5 w-32" />
-                        <Skeleton className="h-3 w-24" />
+                    <div key={i} className="flex items-center gap-3 py-3.5">
+                      <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-1.5 min-w-0">
+                        <Skeleton className="h-3.5 w-28 rounded" />
+                        <Skeleton className="h-3 w-20 rounded" />
                       </div>
-                      <Skeleton className="h-4 w-16" />
+                      <div className="space-y-1.5 text-right shrink-0">
+                        <Skeleton className="h-3.5 w-16 rounded ml-auto" />
+                        <Skeleton className="h-3 w-12 rounded ml-auto" />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -260,11 +269,7 @@ export function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState
-                  icon={ArrowLeftRight}
-                  title="No transactions yet"
-                  description="Your transaction history will appear here."
-                />
+                <EmptyTransactions />
               )}
             </div>
           </div>

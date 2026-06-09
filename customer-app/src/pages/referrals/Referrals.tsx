@@ -6,7 +6,9 @@ import {
   Target, Share2, Wallet, AlertCircle, ChevronRight, Star,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Skeleton } from '@/components/ui'
+import { Card } from '@/components/ui'
+import { ReferralsSkeleton } from '@/components/skeletons'
+import { EmptyReferrals } from '@/components/shared/empty-states'
 import { referralsApi } from '@/api/referrals.api'
 import type { ReferralReward } from '@/types'
 import { fmtCurrency, fmtDate } from '@/utils/format'
@@ -262,6 +264,8 @@ export function ReferralsPage() {
   const hasGrowthData   = growthData.some((d)   => d.value > 0)
   const hasEarningsData = earningsData.some((d) => d.value > 0)
 
+  if (isLoading) return <ReferralsSkeleton />
+
   return (
     <div className="space-y-5 pt-1 pb-8">
       {/* Back */}
@@ -301,9 +305,7 @@ export function ReferralsPage() {
           </div>
 
           {/* Referral code */}
-          {isLoading ? (
-            <div className="h-14 rounded-2xl bg-white/10 animate-pulse" />
-          ) : data ? (
+          {data && (
             <>
               <p className="text-white/60 text-[11px] font-semibold uppercase tracking-wider mb-1.5">
                 Your Referral Code
@@ -347,11 +349,7 @@ export function ReferralsPage() {
       </div>
 
       {/* ── Stats grid (2×3) ───────────────────────────────────────────── */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
-        </div>
-      ) : data ? (
+      {data && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard
             icon={<Users className="h-4.5 w-4.5 text-blue-600" />}
@@ -464,26 +462,8 @@ export function ReferralsPage() {
           {isMilestone ? 'Qualifying Referrals' : 'Reward History'}
         </p>
 
-        {isLoading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex justify-between items-center gap-3">
-                <div className="space-y-1.5 flex-1">
-                  <Skeleton className="h-4 w-40 rounded" />
-                  <Skeleton className="h-3 w-24 rounded" />
-                </div>
-                <Skeleton className="h-6 w-20 rounded-full" />
-              </div>
-            ))}
-          </div>
-        ) : !data?.rewards?.length ? (
-          <div className="py-10 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
-              <Clock className="h-7 w-7 text-ink-faint" />
-            </div>
-            <p className="text-sm font-semibold text-ink-muted">No referrals yet</p>
-            <p className="text-xs text-ink-faint mt-1">Share your code to start earning.</p>
-          </div>
+        {!data?.rewards?.length ? (
+          <EmptyReferrals />
         ) : (
           <div className="space-y-0">
             {visibleRewards.map((r, i) => {

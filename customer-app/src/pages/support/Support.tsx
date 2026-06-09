@@ -2,6 +2,7 @@ import { Mail, MessageCircle, Phone, ChevronRight, HelpCircle, Scale } from 'luc
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { contentApi, type SupportContact, type SupportContent } from '@/api/content.api'
+import { EmptySupportTickets } from '@/components/shared/empty-states'
 
 const DEFAULTS: SupportContent = {
   hero_subtitle: 'Our support team is available Monday – Saturday, 8 am – 8 pm.',
@@ -81,6 +82,14 @@ export function SupportPage() {
           </div>
         </div>
       )}
+
+      {/* My Tickets */}
+      <div>
+        <p className="text-sm font-bold text-ink mb-3">My Tickets</p>
+        <div className="bg-surface-1 rounded-3xl shadow-card border border-border overflow-hidden">
+          <EmptySupportTickets />
+        </div>
+      </div>
 
       {/* FAQs */}
       {support.faqs.length > 0 && (

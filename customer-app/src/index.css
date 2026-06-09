@@ -216,6 +216,50 @@ html.dark .dashboard-shine-card::before {
   border-radius: inherit;
 }
 
+/* ── Skeleton shimmer ────────────────────────────────────────────────────────
+   A left-to-right highlight sweep that works in both light and dark mode.
+   --skeleton-highlight is a thin bright band; base colour is --surface-2.
+   Respects prefers-reduced-motion: falls back to a static pulse.
+────────────────────────────────────────────────────────────────────────────── */
+:root {
+  --skeleton-base:      #F3F5FB;       /* same as --surface-2 */
+  --skeleton-highlight: rgba(255, 255, 255, 0.80);
+}
+html.dark {
+  --skeleton-base:      #21262D;       /* same as dark --surface-2 */
+  --skeleton-highlight: rgba(255, 255, 255, 0.07);
+}
+
+/* Override on dark/colored card backgrounds */
+.skeleton-on-dark {
+  --skeleton-base:      rgba(255, 255, 255, 0.12);
+  --skeleton-highlight: rgba(255, 255, 255, 0.30);
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.skeleton-shimmer {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-base)      0%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base)      100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+    background-image: none;
+  }
+}
+
 /* Smooth number input without spinners */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
@@ -243,4 +287,106 @@ input[type='number'] { -moz-appearance: textfield; }
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+}
+
+/* ══ Native-app UX system ════════════════════════════════════════════════════
+   Page transitions · pull-to-refresh · touch feedback · bottom sheet
+   All motion respects prefers-reduced-motion.
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Disable native browser overscroll / bounce ─────────────────────────────
+   We implement our own pull-to-refresh, so disable the default one.
+   On Android Chrome this also removes the blue "glow" at the edge.         */
+html, body {
+  overscroll-behavior: none;
+}
+
+/* 2. Remove 300 ms tap delay on every interactive element ───────────────────
+   touch-action:manipulation tells the browser this element will never need
+   to detect a double-tap zoom, so it fires click events immediately.        */
+@layer base {
+  a, button, [role="button"], input, label, select, textarea, summary {
+    touch-action: manipulation;
+  }
+  /* Prevent image / text selection ghosts on long-press */
+  img { -webkit-user-drag: none; user-select: none; }
+}
+
+/* 3. Pressable scale feedback ───────────────────────────────────────────────
+   .pressable: slight scale-down + dim on :active, GPU-accelerated.
+   Never layout-triggers — only transform + opacity.                         */
+.pressable {
+  transition: transform 80ms ease-out, opacity 80ms ease-out;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pressable:active {
+  transform: scale(0.93);
+  opacity: 0.78;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pressable:active { transform: none; opacity: 1; }
+}
+
+/* 4. Page entry animations ──────────────────────────────────────────────────
+   page-anim-fade  → tab switches (cross-fade, feels instant)
+   page-anim-slide → drilldown pages (slide up, Android Activity style)     */
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes page-slide-up {
+  from { opacity: 0.25; transform: translateY(18px); }
+  to   { opacity: 1;    transform: translateY(0);    }
+}
+
+.page-anim-fade {
+  animation: page-fade-in 180ms ease both;
+}
+.page-anim-slide {
+  animation: page-slide-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-anim-fade,
+  .page-anim-slide { animation: none; will-change: auto; }
+}
+
+/* 5. Pull-to-refresh ────────────────────────────────────────────────────────
+   ptr-spinner class is applied to the icon when state = 'refreshing'.      */
+@keyframes ptr-spin {
+  to { transform: rotate(360deg); }
+}
+.ptr-spinner {
+  animation: ptr-spin 0.85s linear infinite;
+}
+
+/* 6. Bottom-nav active-icon bounce ─────────────────────────────────────────
+   Triggered once in JS (remove + void offsetWidth + add) each time a tab
+   transitions from inactive → active. Gives an Android spring-tap feel.   */
+@keyframes nav-bounce {
+  0%   { transform: scale(1);    }
+  28%  { transform: scale(0.80); }
+  62%  { transform: scale(1.18); }
+  82%  { transform: scale(0.96); }
+  100% { transform: scale(1);    }
+}
+.nav-active-bounce {
+  animation: nav-bounce 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 7. Bottom sheet ───────────────────────────────────────────────────────────
+   Transitions are applied inline via React so they can be paused during
+   a drag gesture. The backdrop uses a CSS animation for its fade-in.       */
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.sheet-backdrop {
+  animation: backdrop-fade-in 220ms ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-backdrop { animation: none; }
 }

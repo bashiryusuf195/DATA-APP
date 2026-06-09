@@ -53,6 +53,7 @@ function mapUser(raw: Record<string, unknown>): User {
     has_transaction_pin: (raw.has_transaction_pin as boolean) ?? false,
     referral_code:       raw.referral_code as string | null,
     created_at:          raw.created_at as string,
+    preferences:         (raw.preferences as User['preferences']) ?? {},
   }
 }
 
@@ -144,6 +145,11 @@ export const authApi = {
     apiClient
       .post<ApiResponse<{ message: string }>>('/auth/reset-password', body)
       .then((r) => r.data.data),
+
+  updatePreferences: (patch: { balance_hidden?: boolean }) =>
+    apiClient
+      .patch<ApiResponse<{ preferences: Record<string, unknown> }>>('/auth/preferences', patch)
+      .then((r) => r.data.data.preferences),
 
   updateProfile: async (body: {
     first_name?:    string

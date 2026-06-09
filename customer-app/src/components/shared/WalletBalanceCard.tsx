@@ -3,7 +3,7 @@ import { Eye, EyeOff, Plus, ArrowDownLeft } from 'lucide-react'
 import { fmtCurrency } from '@/utils/format'
 import { Skeleton } from '@/components/ui'
 import { cn } from '@/utils/cn'
-import { useThemeStore } from '@/store/theme.store'
+import { useBalanceVisibility } from '@/hooks/useBalanceVisibility'
 
 interface WalletBalanceCardProps {
   balance?: number
@@ -12,8 +12,7 @@ interface WalletBalanceCardProps {
 }
 
 export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: WalletBalanceCardProps) {
-  const hidden             = useThemeStore((s) => s.balanceHidden)
-  const toggleBalanceHidden = useThemeStore((s) => s.toggleBalanceHidden)
+  const { hidden, toggle: toggleBalanceHidden } = useBalanceVisibility()
 
   return (
     <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet wallet-card-shimmer ring-1 ring-inset ring-white/10"
@@ -37,9 +36,11 @@ export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: Wall
           </button>
         </div>
 
-        {/* Balance */}
+        {/* Balance — skeleton-on-dark overrides shimmer colours for the navy card */}
         {isLoading ? (
-          <Skeleton className="h-10 w-44 bg-white/20 mb-5 mt-1" />
+          <div className="skeleton-on-dark mb-5 mt-1">
+            <Skeleton className="h-10 w-44 rounded-xl" />
+          </div>
         ) : (
           <p className={cn('text-4xl font-bold tracking-tight mb-5 mt-1', hidden && 'blur-md select-none')}>
             {fmtCurrency(balance ?? 0, currency)}

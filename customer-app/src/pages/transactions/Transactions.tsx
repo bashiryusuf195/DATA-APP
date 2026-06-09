@@ -8,9 +8,10 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useDebounce } from '@/hooks/useDebounce'
 import { TransactionCard, TYPE_ICON, TYPE_LABEL, TYPE_BG, TYPE_COLOR } from '@/components/shared/TransactionCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
-import { Skeleton, Button } from '@/components/ui'
+import { EmptyTransactions } from '@/components/shared/empty-states'
+import { Button } from '@/components/ui'
+import { TransactionsSkeleton } from '@/components/skeletons'
 import { fmtCurrency, fmtDateTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import type { Transaction } from '@/types'
@@ -368,35 +369,13 @@ export function TransactionsPage() {
       {error ? (
         <ErrorMessage error={error} onRetry={refetch} />
       ) : isLoading ? (
-        <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border space-y-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-3.5 w-36" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-              <Skeleton className="h-4 w-16" />
-            </div>
-          ))}
-        </div>
+        <TransactionsSkeleton />
       ) : txList.length === 0 ? (
         <div className="bg-surface-1 rounded-3xl shadow-card border border-border overflow-hidden">
-          <EmptyState
-            icon={ArrowLeftRight}
-            title={hasAnyFilter ? 'No matching transactions' : 'No transactions'}
-            description={hasAnyFilter
-              ? 'Try adjusting your filters or search term.'
-              : 'Your transaction history will appear here.'
-            }
-          />
-          {hasAnyFilter && (
-            <div className="pb-6 flex justify-center">
-              <Button variant="ghost" size="sm" onClick={clearAll}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Clear filters
-              </Button>
-            </div>
-          )}
+          {hasAnyFilter
+            ? <EmptyTransactions filtered onClear={clearAll} />
+            : <EmptyTransactions />
+          }
         </div>
       ) : (
         <>

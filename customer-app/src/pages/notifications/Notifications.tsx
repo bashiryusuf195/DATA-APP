@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, ArrowLeft } from 'lucide-react'
-import { Card, Skeleton } from '@/components/ui'
+import { Card } from '@/components/ui'
+import { NotificationsSkeleton } from '@/components/skeletons'
+import { EmptyNotifications } from '@/components/shared/empty-states'
 import { useNotifications, useMarkAllNotificationsRead } from '@/hooks/useNotifications'
 import { fmtRelativeTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
@@ -18,6 +20,8 @@ export function NotificationsPage() {
 
   const notifications = data?.data ?? []
 
+  if (isLoading) return <NotificationsSkeleton />
+
   return (
     <div className="space-y-4 pt-2">
       <button
@@ -30,8 +34,8 @@ export function NotificationsPage() {
       <Card>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Bell className="h-5 w-5 text-blue-600" />
+            <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+              <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
               <p className="text-base font-semibold text-ink">Notifications</p>
@@ -42,24 +46,8 @@ export function NotificationsPage() {
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex gap-3">
-                <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                  <Skeleton className="h-3 w-full rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="py-12 text-center">
-            <Bell className="h-10 w-10 text-ink-faint mx-auto mb-3" />
-            <p className="text-sm font-medium text-ink-muted">No notifications yet</p>
-            <p className="text-xs text-ink-faint mt-1">We'll notify you of important updates here.</p>
-          </div>
+        {notifications.length === 0 ? (
+          <EmptyNotifications />
         ) : (
           <div className="divide-y divide-border -mx-5">
             {notifications.map((n) => (
