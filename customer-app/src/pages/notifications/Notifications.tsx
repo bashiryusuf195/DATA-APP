@@ -1,14 +1,20 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, ArrowLeft, Check } from 'lucide-react'
+import { Bell, ArrowLeft } from 'lucide-react'
 import { Card, Skeleton } from '@/components/ui'
-import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications'
+import { useNotifications, useMarkAllNotificationsRead } from '@/hooks/useNotifications'
 import { fmtRelativeTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
 
 export function NotificationsPage() {
   const navigate = useNavigate()
   const { data, isLoading } = useNotifications({ limit: 50 })
-  const markRead = useMarkNotificationRead()
+  const markAllRead = useMarkAllNotificationsRead()
+
+  useEffect(() => {
+    markAllRead.mutate()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const notifications = data?.data ?? []
 
@@ -77,16 +83,6 @@ export function NotificationsPage() {
                   <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">{n.body}</p>
                   <p className="text-xs text-ink-faint mt-1">{fmtRelativeTime(n.created_at)}</p>
                 </div>
-                {!n.is_read && (
-                  <button
-                    onClick={() => markRead.mutate(n.id)}
-                    disabled={markRead.isPending}
-                    className="shrink-0 p-1.5 rounded-lg hover:bg-brand-100 transition-colors"
-                    title="Mark as read"
-                  >
-                    <Check className="h-3.5 w-3.5 text-brand-600" />
-                  </button>
-                )}
               </div>
             ))}
           </div>

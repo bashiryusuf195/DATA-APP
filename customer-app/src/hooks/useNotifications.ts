@@ -19,3 +19,14 @@ export function useMarkNotificationRead() {
     },
   })
 }
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: notificationsApi.markAllRead,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+      qc.invalidateQueries({ queryKey: ['notifications-count'] })
+    },
+  })
+}

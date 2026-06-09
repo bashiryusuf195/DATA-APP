@@ -11,7 +11,7 @@ export function AppHeader() {
   const { dark, toggle: toggleDark } = useThemeStore()
   const { data } = useQuery({
     queryKey: ['notifications-count'],
-    queryFn: () => notificationsApi.list({ limit: 1 }),
+    queryFn: () => notificationsApi.list({ limit: 50 }),
     staleTime: 60_000,
   })
 

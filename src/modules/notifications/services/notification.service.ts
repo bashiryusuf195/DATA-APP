@@ -107,6 +107,18 @@ export async function markAsRead(
   return count > 0;
 }
 
+// ── Mark all as read ──────────────────────────────────────────────────────────
+
+export async function markAllAsRead(userId: string): Promise<number> {
+  const now = new Date();
+  const count = await db("notifications")
+    .where({ user_id: userId, channel: "in_app" })
+    .whereNot("status", "read")
+    .whereNull("deleted_at")
+    .update({ status: "read", read_at: now, updated_at: now });
+  return count;
+}
+
 // ── Soft-delete ───────────────────────────────────────────────────────────────
 
 export async function softDeleteNotification(id: string): Promise<boolean> {

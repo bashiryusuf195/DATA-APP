@@ -27,6 +27,9 @@ export const notificationsApi = {
   markRead: (id: string): Promise<void> =>
     apiClient.patch(`/notifications/${id}/read`).then(() => undefined),
 
+  markAllRead: (): Promise<void> =>
+    apiClient.post('/notifications/mark-all-read').then(() => undefined),
+
   getPreferences: async (): Promise<NotificationPreferences> => {
     const r = await apiClient.get<ApiResponse<Record<string, unknown>>>('/notifications/preferences')
     const d = r.data.data

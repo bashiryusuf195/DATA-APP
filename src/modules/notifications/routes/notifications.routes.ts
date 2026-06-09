@@ -4,6 +4,7 @@ import { balanceRateLimiter } from "../../../middleware/rateLimiter.redis";
 import {
   listNotificationsController,
   markNotificationReadController,
+  markAllNotificationsReadController,
 } from "../controllers/notifications.controller";
 import {
   getPreferencesController,
@@ -26,7 +27,8 @@ router.post(  "/push-token",  authenticate, balanceRateLimiter, registerPushToke
 router.delete("/push-token",  authenticate, balanceRateLimiter, deregisterPushTokenController);
 router.get(   "/push-status", authenticate, balanceRateLimiter, getPushStatusController);
 
-router.get(   "/",         authenticate, balanceRateLimiter, listNotificationsController);
-router.patch( "/:id/read", authenticate, balanceRateLimiter, markNotificationReadController);
+router.get(   "/",              authenticate, balanceRateLimiter, listNotificationsController);
+router.post(  "/mark-all-read", authenticate, balanceRateLimiter, markAllNotificationsReadController);
+router.patch( "/:id/read",      authenticate, balanceRateLimiter, markNotificationReadController);
 
 export { router as notificationsRouter };

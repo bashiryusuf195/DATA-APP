@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   listUserNotifications,
   markAsRead,
+  markAllAsRead,
 } from "../services/notification.service";
 
 const ListQuerySchema = z.object({
@@ -25,6 +26,19 @@ export async function listNotificationsController(
       data:    notifications,
       meta:    { limit: query.limit, offset: query.offset },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function markAllNotificationsReadController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const count = await markAllAsRead(req.user!.id);
+    res.status(200).json({ success: true, data: { updated: count } });
   } catch (err) {
     next(err);
   }
