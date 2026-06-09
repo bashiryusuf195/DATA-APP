@@ -1,5 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { walletApi } from '@/api/wallet.api'
+import { apiClient } from '@/api/client'
+
+export type FundingPriority = 'dedicated_first' | 'quick_first'
+
+export function useFundingConfig() {
+  return useQuery<{ priority: FundingPriority }>({
+    queryKey: ['funding-config'],
+    queryFn: async () => {
+      try {
+        const r = await apiClient.get<{ priority: FundingPriority }>('/public/funding-config')
+        return r.data
+      } catch {
+        return { priority: 'quick_first' }
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+}
 
 export const WALLET_BALANCE_KEY = ['wallet-balance'] as const
 

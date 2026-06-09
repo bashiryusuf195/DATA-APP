@@ -33,6 +33,7 @@ import {
   Copy,
   Check,
   LogOut,
+  CreditCard,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -47,15 +48,16 @@ function errMsg(err: unknown, fallback: string): string {
 // ── Tab config ────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'general',      label: 'General',       icon: <Settings className="h-3.5 w-3.5" /> },
-  { key: 'provider',     label: 'Provider',      icon: <Zap className="h-3.5 w-3.5" /> },
-  { key: 'wallet',       label: 'Wallet',        icon: <Wallet className="h-3.5 w-3.5" /> },
-  { key: 'security',     label: 'Security',      icon: <Shield className="h-3.5 w-3.5" /> },
-  { key: 'notification', label: 'Notifications', icon: <Bell className="h-3.5 w-3.5" /> },
-  { key: 'queue',        label: 'Queue',         icon: <ListChecks className="h-3.5 w-3.5" /> },
-  { key: 'maintenance',  label: 'Maintenance',   icon: <Wrench   className="h-3.5 w-3.5" /> },
-  { key: 'environment',  label: 'Environment',   icon: <Server   className="h-3.5 w-3.5" /> },
-  { key: 'account',      label: 'Account',       icon: <KeyRound className="h-3.5 w-3.5" /> },
+  { key: 'general',      label: 'General',       icon: <Settings    className="h-3.5 w-3.5" /> },
+  { key: 'provider',     label: 'Provider',      icon: <Zap         className="h-3.5 w-3.5" /> },
+  { key: 'wallet',       label: 'Wallet',        icon: <Wallet      className="h-3.5 w-3.5" /> },
+  { key: 'payment',      label: 'Payment',       icon: <CreditCard  className="h-3.5 w-3.5" /> },
+  { key: 'security',     label: 'Security',      icon: <Shield      className="h-3.5 w-3.5" /> },
+  { key: 'notification', label: 'Notifications', icon: <Bell        className="h-3.5 w-3.5" /> },
+  { key: 'queue',        label: 'Queue',         icon: <ListChecks  className="h-3.5 w-3.5" /> },
+  { key: 'maintenance',  label: 'Maintenance',   icon: <Wrench      className="h-3.5 w-3.5" /> },
+  { key: 'environment',  label: 'Environment',   icon: <Server      className="h-3.5 w-3.5" /> },
+  { key: 'account',      label: 'Account',       icon: <KeyRound    className="h-3.5 w-3.5" /> },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
