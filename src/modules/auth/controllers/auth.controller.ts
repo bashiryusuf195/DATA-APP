@@ -1,6 +1,7 @@
 // src/modules/auth/controllers/auth.controller.ts
 // Thin HTTP adapter — all business logic lives in auth.service.ts.
 
+import { z } from "zod";
 import { getDbInstance } from "../../../db/knex";
 import type { Request, Response, NextFunction } from "express";
 import { AppError } from "../../../shared/errors/AppError";
@@ -24,6 +25,7 @@ import {
   changePassword,
   forgotPassword,
   resetPassword,
+  updateUserPreferences,
 } from "../services/auth.service";
 
 // ── Cookie helpers ─────────────────────────────────────────────
@@ -275,6 +277,7 @@ export async function getMeController(
         roles:                data.roles,
         permissions:          data.permissions,
         has_transaction_pin:  data.has_transaction_pin,
+        preferences:          data.preferences ?? {},
       },
     });
   } catch (err) { next(err); }
@@ -446,5 +449,23 @@ export async function changePasswordController(
       success: true,
       data: { message: "Password changed. Please log in again on all devices." },
     });
+  } catch (err) { next(err); }
+}
+
+// ── PATCH /auth/preferences ───────────────────────────────────
+
+const PreferencesSchema = z.object({
+  balance_hidden: z.boolean().optional(),
+}).passthrough();
+
+export async function updatePreferencesController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
+    const patch = PreferencesSchema.parse(req.body);
+    const db    = getDbInstance();
+    const prefs = await updateUserPreferences(db, req.user.id, patch as Record<string, unknown>);
+    res.json({ success: true, data: { preferences: prefs } });
   } catch (err) { next(err); }
 }

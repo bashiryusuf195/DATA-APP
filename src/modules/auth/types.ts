@@ -43,11 +43,17 @@ export interface UserProfile {
   date_of_birth:  string | null;  // ISO "YYYY-MM-DD"
 }
 
+export interface UserPreferences {
+  balance_hidden?: boolean;
+  [key: string]: unknown;
+}
+
 export interface AuthUserWithProfile extends AuthUser {
   profile:              UserProfile | null;
   roles:                string[];
   permissions:          string[];
   has_transaction_pin:  boolean;
+  preferences:          UserPreferences;
 }
 
 // ── Token types ────────────────────────────────────────────────

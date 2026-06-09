@@ -26,6 +26,7 @@ import {
   updateProfileController,
   forgotPasswordController,
   resetPasswordController,
+  updatePreferencesController,
 } from "../controllers/auth.controller";
 import {
   getSecurityStatusController,
@@ -57,7 +58,8 @@ router.post("/reset-password",   resetPasswordLimiter,  resetPasswordController)
 router.post( "/logout",          authenticate, logoutController);
 router.get(  "/me",              authenticate, getMeController);
 router.patch("/profile",         authenticate, updateProfileController);
-router.post( "/change-password", authenticate, changePasswordLimiter, changePasswordController);
+router.post(  "/change-password", authenticate, changePasswordLimiter, changePasswordController);
+router.patch( "/preferences",     authenticate, updatePreferencesController);
 
 // ── 2FA login verification (public — uses challenge token, no session) ────────
 router.post("/2fa/verify-login", twoFactorVerifyLimiter, verifyLoginTotpController);

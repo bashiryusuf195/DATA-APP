@@ -571,6 +571,7 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
       "p.first_name", "p.last_name", "p.display_name",
       "p.avatar_url", "p.country", "p.city", "p.address_line1", "p.gender", "p.date_of_birth",
       db.raw("u.transaction_pin_hash IS NOT NULL AS has_transaction_pin"),
+      "u.preferences",
     ]);
 
   if (!row) throw new AuthAppError(404, "NOT_FOUND", "User not found");
@@ -609,7 +610,29 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
     roles:               rbac.roles,
     permissions:         rbac.permissions,
     has_transaction_pin: (row.has_transaction_pin as boolean) ?? false,
+    preferences:         (row.preferences as Record<string, unknown>) ?? {},
   };
+}
+
+// ── Update preferences ─────────────────────────────────────────
+
+export async function updateUserPreferences(
+  db:     Knex,
+  userId: string,
+  patch:  Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const [updated] = await db("users")
+    .where({ id: userId })
+    .update({
+      preferences: db.raw(
+        "COALESCE(preferences, '{}'::jsonb) || ?::jsonb",
+        [JSON.stringify(patch)],
+      ),
+      updated_at: new Date(),
+    })
+    .returning("preferences");
+
+  return (updated?.preferences as Record<string, unknown>) ?? patch;
 }
 
 // ── Change password ────────────────────────────────────────────
