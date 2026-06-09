@@ -7,7 +7,12 @@ import {
 import { contentApi, type OnboardingSlide } from '@/api/content.api'
 import { cn } from '@/utils/cn'
 
-const ONBOARDING_KEY = 'smshikasub_onboarded'
+// Migrate existing users from the old key so they don't see onboarding again.
+if (typeof localStorage !== 'undefined' && localStorage.getItem('smshikasub_onboarded') === '1') {
+  localStorage.setItem('hivedata_onboarded', '1')
+  localStorage.removeItem('smshikasub_onboarded')
+}
+export const ONBOARDING_KEY = 'hivedata_onboarded'
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   Phone, Wifi, Zap, Tv, Shield, Wallet,
@@ -166,4 +171,4 @@ export function OnboardingPage() {
   )
 }
 
-export { ONBOARDING_KEY }
+

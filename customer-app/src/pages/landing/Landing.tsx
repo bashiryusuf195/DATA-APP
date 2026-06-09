@@ -24,7 +24,7 @@ const FEATURE_COLORS = [
 ]
 
 const DEFAULT_CONTENT: LandingContent = {
-  app_name: 'Smshikasub',
+  app_name: 'Hive Data',
   hero_title: 'All Your VTU Services in One Place',
   hero_subtitle:
     'Top up airtime, buy data, pay electricity and cable TV bills instantly. Fast, secure, and always available.',

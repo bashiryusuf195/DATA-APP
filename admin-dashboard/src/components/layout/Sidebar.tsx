@@ -178,7 +178,7 @@ export function Sidebar() {
               <div className="h-6 w-6 rounded-md bg-accent flex items-center justify-center shrink-0">
                 <Zap className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-sm font-bold text-ink">VTU Admin</span>
+              <span className="text-sm font-bold text-ink">Hive Data</span>
             </div>
             <button
               onClick={toggleSidebar}

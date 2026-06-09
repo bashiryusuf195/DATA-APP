@@ -127,7 +127,7 @@ export function LoginPage() {
           </div>
           <div>
             <p className="text-xs text-ink-faint">Admin Console</p>
-            <p className="text-base font-bold text-ink leading-none">VTU Platform</p>
+            <p className="text-base font-bold text-ink leading-none">Hive Data</p>
           </div>
         </div>
 
@@ -215,7 +215,7 @@ export function LoginPage() {
         )}
 
         <p className="text-center text-xs text-ink-faint mt-4">
-          VTU Admin Dashboard · Restricted Access
+          Hive Data Admin · Restricted Access
         </p>
       </div>
     </div>

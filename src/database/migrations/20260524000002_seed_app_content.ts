@@ -2,7 +2,7 @@ import type { Knex } from 'knex'
 
 const DEFAULT_CONTENT = {
   landing: {
-    app_name: 'Smshikasub',
+    app_name: 'Hive Data',
     hero_title: 'All Your VTU Services in One Place',
     hero_subtitle:
       'Top up airtime, buy data, pay electricity and cable TV bills instantly. Fast, secure, and always available.',
@@ -26,7 +26,7 @@ const DEFAULT_CONTENT = {
     hero_subtitle: 'Our support team is available Monday – Saturday, 8 am – 8 pm.',
     contacts: [
       { type: 'whatsapp', label: 'WhatsApp', value: 'Chat with us',           href: 'https://wa.me/2348000000000' },
-      { type: 'email',    label: 'Email',    value: 'support@smshikasub.com', href: 'mailto:support@smshikasub.com' },
+      { type: 'email',    label: 'Email',    value: 'support@hivedata.com', href: 'mailto:support@hivedata.com' },
       { type: 'phone',    label: 'Phone',    value: '0800 000 0000',          href: 'tel:08000000000' },
     ],
     faqs: [
