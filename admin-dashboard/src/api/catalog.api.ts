@@ -91,6 +91,9 @@ export const catalogApi = {
       .post<{ success: boolean; data: { updated: number } }>('/admin/service-plans/bulk-set-provider', { ids, primary_provider_code })
       .then((r) => r.data.data),
 
+  deleteServicePlan: (id: string): Promise<void> =>
+    apiClient.delete(`/admin/service-plans/${id}`).then(() => undefined),
+
   fetchProviderPlans: (providerCode: string, service: 'data' | 'cable_tv' | 'electricity', network?: string): Promise<{ service: string; network: string | null; plans: Record<string, unknown>[] }> =>
     apiClient
       .get<{ success: boolean; data: { service: string; network: string | null; plans: Record<string, unknown>[] } }>(`/admin/providers/${providerCode}/plans`, { params: { service, network } })

@@ -14,6 +14,7 @@ import {
   updateCatalogService,
   createServicePlan,
   updateServicePlan,
+  deleteServicePlan,
   bulkImportServicePlans,
 } from "../services/catalog.service";
 
@@ -319,6 +320,24 @@ export async function bulkToggleServicePlansController(
     const { is_active, ...filters } = BulkTogglePlansSchema.parse(req.body);
     const count = await bulkToggleServicePlans(filters, is_active);
     res.json({ success: true, data: { updated: count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── DELETE /admin/service-plans/:id ──────────────────────────────────────────
+
+export async function deleteServicePlanController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!id) throw new AppError(400, "MISSING_PARAM", "id is required");
+    const deleted = await deleteServicePlan(id);
+    if (!deleted) throw new AppError(404, "PLAN_NOT_FOUND", "Service plan not found");
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

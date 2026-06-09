@@ -15,7 +15,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtCurrency } from '@/utils/format'
 import { ENDPOINTS } from '@/config/endpoints'
 import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule } from '@/types'
-import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2 } from 'lucide-react'
+import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2, Trash2 } from 'lucide-react'
 
 const PAGE_SIZE = 50
 
@@ -996,6 +996,12 @@ function ImportPlansModal({ open, onClose, services, onSaved }: ImportPlansModal
             variant="primary" size="sm"
             onClick={() => importMutation.mutate()}
             disabled={!serviceId || selectedCodes.size === 0 || !fetched || !!fetchError || importMutation.isPending}
+            title={
+              !serviceId ? 'Select a service first' :
+              !fetched ? 'Fetch plans first' :
+              selectedCodes.size === 0 ? 'Select at least one plan' :
+              undefined
+            }
           >
             {importMutation.isPending ? 'Importing…' : `Import ${selectedCodes.size} Plan${selectedCodes.size !== 1 ? 's' : ''}`}
           </Button>
@@ -1034,6 +1040,14 @@ function ImportPlansModal({ open, onClose, services, onSaved }: ImportPlansModal
             onChange={(e) => { setNetwork(e.target.value); setFetched(false); setPlans([]); setSelectedCodes(new Set()) }}
             options={networkOptions} />
         )}
+
+        {/* Target service + markup must be set before importing */}
+        <div className="grid grid-cols-2 gap-3">
+          <Select label="Add to Service" value={serviceId} onChange={(e) => setServiceId(e.target.value)} options={serviceOptions} />
+          <Input label="Markup %" type="number" min={0} step={0.5} value={markupPct}
+            onChange={(e) => setMarkupPct(e.target.value)}
+            hint="Applied to cost price → selling price." />
+        </div>
 
         <Button variant="secondary" size="sm"
           onClick={() => fetchMutation.mutate()}
@@ -1075,13 +1089,6 @@ function ImportPlansModal({ open, onClose, services, onSaved }: ImportPlansModal
                 </tbody>
               </table>
             </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <Select label="Add to Service" value={serviceId} onChange={(e) => setServiceId(e.target.value)} options={serviceOptions} />
-              <Input label="Markup %" type="number" min={0} step={0.5} value={markupPct}
-                onChange={(e) => setMarkupPct(e.target.value)}
-                hint="Applied to cost price → selling price. Cable TV plans have no cost price — set prices after import." />
-            </div>
             <p className="text-xs text-ink-faint">Plans with the same variation code are skipped automatically.</p>
           </>
         )}
@@ -1110,6 +1117,7 @@ export function ServicePlansPage() {
   const [bulkClearOpen, setBulkClearOpen] = useState(false)
   const [bulkSetProviderOpen, setBulkSetProviderOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [deleteItem, setDeleteItem] = useState<ServicePlan | null>(null)
 
   const { data: services = [] } = useQuery({
     queryKey: ['admin-services'],
@@ -1200,6 +1208,16 @@ export function ServicePlansPage() {
       toast.success(`Primary provider set to ${vars.provider} for ${vars.ids.length} plan${vars.ids.length !== 1 ? 's' : ''}`)
     },
     onError: (err) => toast.error(errMsg(err, 'Failed to set provider')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => catalogApi.deleteServicePlan(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
+      setDeleteItem(null)
+      toast.success('Plan deleted')
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to delete plan')),
   })
 
   const handleSaved = () => {
@@ -1412,6 +1430,13 @@ export function ServicePlansPage() {
             onClick={(e) => { e.stopPropagation(); toggleMutation.mutate({ id: p.id, is_active: !p.is_active }) }}
             title={p.is_active ? 'Disable' : 'Enable'}
             disabled={toggleMutation.isPending}
+          />
+          <Button
+            variant="ghost"
+            size="xs"
+            icon={<Trash2 className="h-3.5 w-3.5 text-rose-400" />}
+            onClick={(e) => { e.stopPropagation(); setDeleteItem(p) }}
+            title="Delete"
           />
         </div>
       ),
@@ -1649,6 +1674,36 @@ export function ServicePlansPage() {
         services={services}
         onSaved={handleSaved}
       />
+
+      {/* Delete plan confirmation */}
+      <Modal
+        open={deleteItem !== null}
+        onClose={() => setDeleteItem(null)}
+        title="Delete plan?"
+        subtitle={deleteItem?.name}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setDeleteItem(null)} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete Plan'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-muted">
+          This permanently removes <span className="font-medium text-ink">{deleteItem?.name}</span> from the catalog.
+          Any transactions using this plan will retain their history. This cannot be undone.
+        </p>
+      </Modal>
     </div>
   )
 }

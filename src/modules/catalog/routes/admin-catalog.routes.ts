@@ -11,6 +11,7 @@ import {
   updateServiceController,
   createServicePlanController,
   updateServicePlanController,
+  deleteServicePlanController,
   bulkToggleServicePlansController,
   getCategoryProvidersController,
   bulkAssignProviderController,
@@ -35,5 +36,6 @@ router.post("/service-plans",                 ...adminGuard, adminRateLimiter, c
 router.post("/service-plans/bulk-toggle",     ...adminGuard, adminRateLimiter, bulkToggleServicePlansController);
 router.post("/service-plans/bulk-import",     ...adminGuard, adminRateLimiter, bulkImportServicePlansController);
 router.patch("/service-plans/:id",            ...adminGuard, adminRateLimiter, updateServicePlanController);
+router.delete("/service-plans/:id",           ...adminGuard, adminRateLimiter, deleteServicePlanController);
 
 export { router as adminCatalogRouter };

@@ -273,6 +273,11 @@ export async function updateServicePlan(
   return rows[0] ?? null;
 }
 
+export async function deleteServicePlan(id: string): Promise<boolean> {
+  const count = await db("service_plans").where({ id }).delete();
+  return count > 0;
+}
+
 export interface BulkImportPlanInput {
   name:                    string;
   variation_code:          string;
