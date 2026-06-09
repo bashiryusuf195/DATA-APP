@@ -58,31 +58,30 @@ html.dark {
 }
 
 /* ── Dashboard ambient gradients ─────────────────────────────────────────────
+   Multi-layer: a radial brand glow at the top edge + a linear fade below.
    Separate light / dark values so the mobile hero is noticeably branded in
    light mode while staying subtle in dark mode.
 ────────────────────────────────────────────────────────────────────────────── */
 .dashboard-bg {
-  background: linear-gradient(180deg, rgba(79, 70, 229, 0.07) 0%, transparent 14rem);
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -5%, rgba(79, 70, 229, 0.09) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(79, 70, 229, 0.06) 0%, transparent 14rem);
 }
 html.dark .dashboard-bg {
-  background: linear-gradient(180deg, rgba(53, 53, 217, 0.04) 0%, transparent 14rem);
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -5%, rgba(53, 53, 217, 0.05) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(53, 53, 217, 0.03) 0%, transparent 14rem);
 }
 
 .dashboard-mobile-hero {
-  background: linear-gradient(
-    180deg,
-    rgba(79, 70, 229, 0.13) 0%,
-    rgba(99, 91, 238, 0.05) 55%,
-    transparent 100%
-  );
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 0%, rgba(79, 70, 229, 0.17) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(79, 70, 229, 0.11) 0%, rgba(99, 91, 238, 0.04) 55%, transparent 100%);
 }
 html.dark .dashboard-mobile-hero {
-  background: linear-gradient(
-    180deg,
-    rgba(53, 53, 217, 0.09) 0%,
-    rgba(53, 53, 217, 0.03) 55%,
-    transparent 100%
-  );
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 0%, rgba(53, 53, 217, 0.07) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(53, 53, 217, 0.08) 0%, rgba(53, 53, 217, 0.02) 55%, transparent 100%);
 }
 
 /* ── Logo dark-mode visibility ───────────────────────────────────────────────
@@ -98,6 +97,120 @@ html.dark .app-logo {
     contrast(1.08)
     drop-shadow(0 0 4px rgba(255, 255, 255, 0.12))
     drop-shadow(0 0 10px rgba(255, 255, 255, 0.06));
+}
+
+/* ── Premium shine card ──────────────────────────────────────────────────────
+   Apply .dashboard-shine-card to any card container to get:
+     • subtle static diagonal gloss (::before)
+     • sweeping shine on hover — desktop/hover-capable devices only (::after)
+     • gentle 2 px lift on hover
+   All motion is disabled when prefers-reduced-motion is set.
+────────────────────────────────────────────────────────────────────────────── */
+.dashboard-shine-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.15s ease;
+}
+
+/* Static diagonal gloss */
+.dashboard-shine-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.055) 52%,
+    transparent 68%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+html.dark .dashboard-shine-card::before {
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.025) 52%,
+    transparent 68%
+  );
+}
+
+/* Hover sweep — only on devices with a true pointer (desktop) */
+@media (hover: hover) {
+  .dashboard-shine-card::after {
+    content: '';
+    position: absolute;
+    top: -60%;
+    left: -120%;
+    width: 60%;
+    height: 220%;
+    background: linear-gradient(
+      115deg,
+      transparent 25%,
+      rgba(255, 255, 255, 0.09) 50%,
+      transparent 75%
+    );
+    pointer-events: none;
+    transition: left 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  html.dark .dashboard-shine-card::after {
+    background: linear-gradient(
+      115deg,
+      transparent 25%,
+      rgba(255, 255, 255, 0.05) 50%,
+      transparent 75%
+    );
+  }
+
+  .dashboard-shine-card:hover::after {
+    left: 140%;
+  }
+
+  .dashboard-shine-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 6px 20px 0 rgb(0 0 0 / 0.10),
+      0 2px 6px -1px rgb(0 0 0 / 0.07);
+  }
+
+  html.dark .dashboard-shine-card:hover {
+    box-shadow:
+      0 6px 24px 0 rgb(0 0 0 / 0.35),
+      0 2px 8px -1px rgb(0 0 0 / 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shine-card {
+    transition: none;
+  }
+  .dashboard-shine-card::after {
+    display: none;
+  }
+  .dashboard-shine-card:hover {
+    transform: none !important;
+  }
+}
+
+/* ── Wallet card shimmer ──────────────────────────────────────────────────────
+   Overlays a top-left → bottom-right diagonal highlight on the navy gradient.
+   The wallet card already has position:relative and overflow:hidden.
+────────────────────────────────────────────────────────────────────────────── */
+.wallet-card-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    transparent 45%,
+    rgba(255, 255, 255, 0.04) 65%,
+    transparent 100%
+  );
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 /* Smooth number input without spinners */

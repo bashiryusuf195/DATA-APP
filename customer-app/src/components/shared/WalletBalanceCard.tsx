@@ -15,7 +15,7 @@ export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: Wall
   const [hidden, setHidden] = useState(false)
 
   return (
-    <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet"
+    <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet wallet-card-shimmer ring-1 ring-inset ring-white/10"
       style={{ background: 'linear-gradient(135deg, #1E4E7E 0%, #163A5E 100%)' }}>
       {/* Decorative circles */}
       <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/5" />

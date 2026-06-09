@@ -24,12 +24,12 @@ function getGreetingInfo(): { greeting: string; subtitle: string } {
 }
 
 const QUICK_ACTIONS = [
-  { to: '/services/airtime',     label: 'Airtime',     icon: Phone,       color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950' },
-  { to: '/services/data',        label: 'Data',        icon: Wifi,        color: 'text-blue-600',    bg: 'bg-blue-50 dark:bg-blue-950'       },
-  { to: '/services/electricity', label: 'Electricity', icon: Zap,         color: 'text-amber-600',   bg: 'bg-amber-50 dark:bg-amber-950'     },
-  { to: '/services/cable-tv',    label: 'Cable TV',    icon: Tv,          color: 'text-purple-600',  bg: 'bg-purple-50 dark:bg-purple-950'   },
-  { to: '/services/exam-pin',    label: 'Exam PIN',    icon: ShieldCheck, color: 'text-rose-600',    bg: 'bg-rose-50 dark:bg-rose-950'       },
-  { to: '/services/identity',    label: 'Identity',    icon: Building2,   color: 'text-indigo-600',  bg: 'bg-indigo-50 dark:bg-indigo-950'   },
+  { to: '/services/airtime',     label: 'Airtime',     icon: Phone,       color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950', glow: 'group-hover:shadow-emerald-500/30' },
+  { to: '/services/data',        label: 'Data',        icon: Wifi,        color: 'text-blue-600',    bg: 'bg-blue-50 dark:bg-blue-950',       glow: 'group-hover:shadow-blue-500/30'   },
+  { to: '/services/electricity', label: 'Electricity', icon: Zap,         color: 'text-amber-600',   bg: 'bg-amber-50 dark:bg-amber-950',     glow: 'group-hover:shadow-amber-500/30'  },
+  { to: '/services/cable-tv',    label: 'Cable TV',    icon: Tv,          color: 'text-purple-600',  bg: 'bg-purple-50 dark:bg-purple-950',   glow: 'group-hover:shadow-purple-500/30' },
+  { to: '/services/exam-pin',    label: 'Exam PIN',    icon: ShieldCheck, color: 'text-rose-600',    bg: 'bg-rose-50 dark:bg-rose-950',       glow: 'group-hover:shadow-rose-500/30'   },
+  { to: '/services/identity',    label: 'Identity',    icon: Building2,   color: 'text-indigo-600',  bg: 'bg-indigo-50 dark:bg-indigo-950',   glow: 'group-hover:shadow-indigo-500/30' },
 ]
 
 function ReferralBanner() {
@@ -126,7 +126,7 @@ export function DashboardPage() {
 
       {/* ── Desktop quick stats strip ────────────────────────────────────── */}
       <div className="hidden md:flex gap-3 -mt-1">
-        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3">
+        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3 dashboard-shine-card">
           <div className="h-8 w-8 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
             <span className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
           </div>
@@ -135,7 +135,7 @@ export function DashboardPage() {
             <p className="text-sm font-bold text-ink">Account Active</p>
           </div>
         </div>
-        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3">
+        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3 dashboard-shine-card">
           <div className="h-8 w-8 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
             <ArrowLeftRight className="h-4 w-4 text-brand-600 dark:text-brand-400" />
           </div>
@@ -144,7 +144,7 @@ export function DashboardPage() {
             <p className="text-sm font-bold text-ink">{recentTxs.length} Recent Txs</p>
           </div>
         </div>
-        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3">
+        <div className="flex-1 bg-surface-1 rounded-2xl px-4 py-3 border border-border shadow-card flex items-center gap-3 dashboard-shine-card">
           <div className={cn(
             'h-8 w-8 rounded-xl flex items-center justify-center shrink-0',
             unread > 0 ? 'bg-danger/10' : 'bg-surface-2'
@@ -210,9 +210,9 @@ export function DashboardPage() {
                 <Link
                   key={`${s.to}-${s.label}`}
                   to={s.to}
-                  className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-surface-1 shadow-card border border-border hover:border-brand-200 hover:shadow-card-md active:scale-95 transition-all duration-150"
+                  className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-surface-1 shadow-card border border-border hover:border-brand-200 active:opacity-80 dashboard-shine-card"
                 >
-                  <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-110', s.bg)}>
+                  <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:shadow-md', s.bg, s.glow)}>
                     <s.icon className={cn('h-5 w-5', s.color)} />
                   </div>
                   <span className="text-[11px] font-semibold text-ink text-center leading-tight">{s.label}</span>
@@ -235,7 +235,7 @@ export function DashboardPage() {
               </Link>
             </div>
 
-            <div className="bg-surface-1 rounded-3xl overflow-hidden shadow-card border border-border">
+            <div className="bg-surface-1 rounded-3xl overflow-hidden shadow-card border border-border dashboard-shine-card">
               {txLoading ? (
                 <div className="p-4 space-y-4">
                   {[...Array(3)].map((_, i) => (
