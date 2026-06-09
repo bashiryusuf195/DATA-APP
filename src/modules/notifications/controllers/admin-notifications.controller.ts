@@ -15,6 +15,7 @@ import {
   renderTemplate,
 } from "../services/template.service";
 import { AppError } from "../../../shared/errors/AppError";
+import { softDeleteNotification } from "../services/notification.service";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -193,5 +194,18 @@ export async function updateTemplateController(
     const body = UpdateTemplateSchema.parse(req.body);
     const tmpl = await updateTemplate(id, body);
     res.json({ success: true, data: tmpl });
+  } catch (err) { next(err); }
+}
+
+// Soft-delete a single customer notification so it disappears from inbox.
+export async function deleteNotificationController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!id) throw new AppError(400, "MISSING_PARAM", "id is required");
+    const deleted = await softDeleteNotification(id);
+    if (!deleted) throw new AppError(404, "NOT_FOUND", "Notification not found or already deleted");
+    res.status(204).end();
   } catch (err) { next(err); }
 }

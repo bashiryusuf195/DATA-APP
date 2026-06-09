@@ -107,7 +107,17 @@ export async function markAsRead(
   return count > 0;
 }
 
-// ── User inbox — in_app channel only ─────────────────────────────────────────
+// ── Soft-delete ───────────────────────────────────────────────────────────────
+
+export async function softDeleteNotification(id: string): Promise<boolean> {
+  const count = await db("notifications")
+    .where({ id })
+    .whereNull("deleted_at")
+    .update({ deleted_at: new Date(), updated_at: new Date() });
+  return count > 0;
+}
+
+// ── User inbox — in_app channel only, excludes soft-deleted rows ──────────────
 
 export async function listUserNotifications(
   userId: string,
@@ -119,6 +129,7 @@ export async function listUserNotifications(
 ) {
   return db("notifications")
     .where({ user_id: userId, channel: "in_app" })
+    .whereNull("deleted_at")
     .modify((q) => {
       if (options.status) q.where("status", options.status);
     })

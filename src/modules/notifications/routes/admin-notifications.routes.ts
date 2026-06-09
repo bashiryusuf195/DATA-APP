@@ -11,6 +11,7 @@ import {
   listTemplatesController,
   createTemplateController,
   updateTemplateController,
+  deleteNotificationController,
 } from "../controllers/admin-notifications.controller";
 
 const router = Router();
@@ -39,11 +40,18 @@ router.post(
   retryNotificationJobController,
 );
 
-// Delete a notification job
+// Delete a notification job from the queue
 router.delete(
   "/notifications/jobs/:id",
   ...adminGuard, adminRateLimiter,
   deleteNotificationJobController,
+);
+
+// Soft-delete a single customer inbox notification (must come after /jobs/:id)
+router.delete(
+  "/notifications/:id",
+  ...adminGuard, adminRateLimiter,
+  deleteNotificationController,
 );
 
 // Notification jobs queue

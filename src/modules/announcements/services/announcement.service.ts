@@ -4,10 +4,13 @@ import { AppError } from "../../../shared/errors/AppError";
 
 const db = getDbInstance();
 
+export type AnnouncementSeverity = "info" | "success" | "warning" | "critical";
+
 export interface Announcement {
   id:           string;
   title:        string;
   message:      string;
+  severity:     AnnouncementSeverity;
   display_type: "popup" | "ticker";
   priority:     number;
   status:       "active" | "inactive";
@@ -21,6 +24,7 @@ export interface Announcement {
 export interface CreateAnnouncementInput {
   title:        string;
   message:      string;
+  severity?:    AnnouncementSeverity;
   display_type: "popup" | "ticker";
   priority?:    number;
   status?:      "active" | "inactive";
@@ -75,12 +79,13 @@ export async function createAnnouncement(input: CreateAnnouncementInput): Promis
       id:           randomUUID(),
       title:        input.title,
       message:      input.message,
+      severity:     input.severity     ?? "info",
       display_type: input.display_type,
-      priority:     input.priority  ?? 0,
-      status:       input.status    ?? "active",
-      start_at:     input.start_at  ? new Date(input.start_at)  : null,
-      end_at:       input.end_at    ? new Date(input.end_at)    : null,
-      created_by:   input.created_by ?? null,
+      priority:     input.priority     ?? 0,
+      status:       input.status       ?? "active",
+      start_at:     input.start_at     ? new Date(input.start_at)  : null,
+      end_at:       input.end_at       ? new Date(input.end_at)    : null,
+      created_by:   input.created_by   ?? null,
     })
     .returning("*");
   return row as Announcement;
@@ -93,6 +98,7 @@ export async function updateAnnouncement(
   const patch: Record<string, unknown> = { updated_at: new Date() };
   if (input.title        !== undefined) patch.title        = input.title;
   if (input.message      !== undefined) patch.message      = input.message;
+  if (input.severity     !== undefined) patch.severity     = input.severity;
   if (input.display_type !== undefined) patch.display_type = input.display_type;
   if (input.priority     !== undefined) patch.priority     = input.priority;
   if (input.status       !== undefined) patch.status       = input.status;

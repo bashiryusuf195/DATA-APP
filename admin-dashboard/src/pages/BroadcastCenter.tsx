@@ -16,7 +16,7 @@ import type { NotificationJob, NotificationTemplate } from '@/types'
 import {
   Send, Eye, Radio, Users, User, Mail,
   MessageSquare, Smartphone, Bell, RefreshCw, CheckCircle2, Trash2,
-  Megaphone, TicketSlash, PenLine, Plus,
+  Megaphone, TicketSlash, PenLine, Plus, Info, AlertTriangle, AlertCircle,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -25,11 +25,27 @@ function errMsg(err: unknown, fallback: string): string {
   return fallback
 }
 
+// ── Severity config ───────────────────────────────────────────────────────────
+
+const SEVERITY_OPTIONS = [
+  { value: 'info',     label: 'Info',     color: 'text-blue-400'   },
+  { value: 'success',  label: 'Success',  color: 'text-emerald-400' },
+  { value: 'warning',  label: 'Warning',  color: 'text-amber-400'  },
+  { value: 'critical', label: 'Critical', color: 'text-red-400'    },
+] as const
+
+const SEVERITY_ICON: Record<string, React.ReactNode> = {
+  info:     <Info          className="h-3 w-3 text-blue-400"    />,
+  success:  <CheckCircle2  className="h-3 w-3 text-emerald-400" />,
+  warning:  <AlertTriangle className="h-3 w-3 text-amber-400"   />,
+  critical: <AlertCircle   className="h-3 w-3 text-red-400"     />,
+}
+
 // ── Announcement form default ─────────────────────────────────────────────────
 
 const BLANK_ANN: AnnouncementInput = {
-  title: '', message: '', display_type: 'popup', priority: 0, status: 'active',
-  start_at: null, end_at: null,
+  title: '', message: '', severity: 'info', display_type: 'popup',
+  priority: 0, status: 'active', start_at: null, end_at: null,
 }
 
 // ── Announcements section ─────────────────────────────────────────────────────
@@ -99,6 +115,7 @@ function AnnouncementsSection() {
     setForm({
       title:        a.title,
       message:      a.message,
+      severity:     a.severity ?? 'info',
       display_type: a.display_type,
       priority:     a.priority,
       status:       a.status,
@@ -131,6 +148,16 @@ function AnnouncementsSection() {
             ? <Megaphone  className="h-3.5 w-3.5 text-ink-faint" />
             : <TicketSlash className="h-3.5 w-3.5 text-ink-faint" />}
           <Badge variant="neutral" size="sm">{a.display_type}</Badge>
+        </div>
+      ),
+    },
+    {
+      key: 'severity',
+      header: 'Severity',
+      render: (a: Announcement) => (
+        <div className="flex items-center gap-1">
+          {SEVERITY_ICON[a.severity ?? 'info']}
+          <span className="text-xs text-ink-muted capitalize">{a.severity ?? 'info'}</span>
         </div>
       ),
     },
@@ -203,7 +230,7 @@ function AnnouncementsSection() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Popup &amp; Ticker Announcements</h2>
+          <h2 className="text-sm font-semibold text-ink">Dashboard Announcements</h2>
           <p className="text-xs text-ink-faint mt-0.5">
             Popup modals and scrolling tickers shown on the customer dashboard.
           </p>
@@ -262,7 +289,7 @@ function AnnouncementsSection() {
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-ink-muted mb-1.5">Display Type *</label>
               <Select
@@ -272,6 +299,14 @@ function AnnouncementsSection() {
                   { value: 'popup',  label: 'Popup — modal on dashboard' },
                   { value: 'ticker', label: 'Ticker — scrolling banner' },
                 ]}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Severity</label>
+              <Select
+                value={form.severity ?? 'info'}
+                onChange={(e) => setF('severity', e.target.value as AnnouncementInput['severity'])}
+                options={SEVERITY_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
               />
             </div>
             <div>

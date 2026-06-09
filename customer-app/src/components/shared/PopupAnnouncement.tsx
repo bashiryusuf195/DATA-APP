@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { X, Megaphone } from 'lucide-react'
-import type { Announcement } from '@/types'
+import { X, Megaphone, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
+import type { Announcement, AnnouncementSeverity } from '@/types'
 
-const STORAGE_KEY = 'vtu_dismissed_announcements'
+// ── Per-session dismissal — cleared automatically on logout/new tab ───────────
+// sessionStorage is scoped to the browser tab session; clearing on logout is
+// handled implicitly because a fresh login opens a new session context.
+const STORAGE_KEY = 'hivedata_dismissed_popups'
 
 function getDismissedIds(): Set<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(STORAGE_KEY)
     return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
   } catch {
     return new Set()
@@ -17,10 +20,22 @@ function saveDismissedId(id: string): void {
   try {
     const ids = getDismissedIds()
     ids.add(id)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]))
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]))
   } catch {
-    // localStorage unavailable — skip persistence
+    // sessionStorage unavailable — skip persistence
   }
+}
+
+// ── Severity appearance map ───────────────────────────────────────────────────
+
+const SEVERITY_CONFIG: Record<
+  AnnouncementSeverity,
+  { headerBg: string; Icon: React.FC<{ className?: string }> }
+> = {
+  info:     { headerBg: 'bg-brand-600',   Icon: Megaphone      },
+  success:  { headerBg: 'bg-emerald-600', Icon: CheckCircle2   },
+  warning:  { headerBg: 'bg-amber-500',   Icon: AlertTriangle  },
+  critical: { headerBg: 'bg-red-600',     Icon: AlertCircle    },
 }
 
 interface Props {
@@ -28,7 +43,6 @@ interface Props {
 }
 
 export function PopupAnnouncement({ announcements }: Props) {
-  // Pick the first undismissed popup, sorted by priority desc (already sorted by API)
   const [currentId, setCurrentId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -41,16 +55,17 @@ export function PopupAnnouncement({ announcements }: Props) {
 
   if (!current) return null
 
+  const severity = (current.severity ?? 'info') as AnnouncementSeverity
+  const { headerBg, Icon } = SEVERITY_CONFIG[severity]
+
   const dismiss = () => {
     saveDismissedId(current.id)
-    // Show next undismissed popup (if any)
     const dismissed = getDismissedIds()
     const next = announcements.find((a) => !dismissed.has(a.id))
     setCurrentId(next?.id ?? null)
   }
 
   return (
-    /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 animate-fade-in"
       onClick={dismiss}
@@ -63,9 +78,9 @@ export function PopupAnnouncement({ announcements }: Props) {
         className="relative w-full max-w-sm rounded-2xl bg-surface-1 shadow-xl border border-border overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header stripe */}
-        <div className="flex items-center gap-3 px-5 py-4 bg-brand-600">
-          <Megaphone className="h-5 w-5 text-white shrink-0" />
+        {/* Header stripe — severity-tinted */}
+        <div className={`flex items-center gap-3 px-5 py-4 ${headerBg}`}>
+          <Icon className="h-5 w-5 text-white shrink-0" />
           <p className="text-sm font-bold text-white flex-1 leading-snug">{current.title}</p>
           <button
             onClick={dismiss}

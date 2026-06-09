@@ -86,6 +86,10 @@ export const notificationsApi = {
   deleteJob: (jobId: string): Promise<void> =>
     apiClient.delete(`/admin/notifications/jobs/${jobId}`).then(() => undefined),
 
+  // Soft-delete a customer inbox notification (removes from customer view)
+  deleteNotification: (id: string): Promise<void> =>
+    apiClient.delete(`/admin/notifications/${id}`).then(() => undefined),
+
   // ── Templates ─────────────────────────────────────────────────────────────────
   listTemplates: (
     params: { type?: string; notification_type?: string; is_active?: boolean; search?: string; page?: number; limit?: number } = {}

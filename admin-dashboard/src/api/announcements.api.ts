@@ -1,9 +1,12 @@
 import { apiClient } from './client'
 
+export type AnnouncementSeverity = 'info' | 'success' | 'warning' | 'critical'
+
 export interface Announcement {
   id:           string
   title:        string
   message:      string
+  severity:     AnnouncementSeverity
   display_type: 'popup' | 'ticker'
   priority:     number
   status:       'active' | 'inactive'
@@ -17,6 +20,7 @@ export interface Announcement {
 export interface AnnouncementInput {
   title:        string
   message:      string
+  severity?:    AnnouncementSeverity
   display_type: 'popup' | 'ticker'
   priority?:    number
   status?:      'active' | 'inactive'

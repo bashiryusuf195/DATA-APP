@@ -343,10 +343,13 @@ export interface KycStatus {
 
 // ── Announcements ─────────────────────────────────────────────────────────────
 
+export type AnnouncementSeverity = 'info' | 'success' | 'warning' | 'critical'
+
 export interface Announcement {
   id:           string
   title:        string
   message:      string
+  severity:     AnnouncementSeverity
   display_type: 'popup' | 'ticker'
   priority:     number
   status:       'active' | 'inactive'

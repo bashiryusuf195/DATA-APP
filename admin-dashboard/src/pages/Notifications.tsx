@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import axios from 'axios'
 import { notificationsApi } from '@/api/notifications.api'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FilterBar } from '@/components/shared/FilterBar'
@@ -7,15 +9,21 @@ import { DataTable } from '@/components/shared/DataTable'
 import { Pagination } from '@/components/shared/Pagination'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { MetricCard } from '@/components/shared/MetricCard'
-import { Button, Badge, Card, Select } from '@/components/ui'
+import { Button, Badge, Card, Select, Modal } from '@/components/ui'
 import { SkeletonTable, SkeletonCard } from '@/components/ui/Skeleton'
 import { fmtRelative } from '@/utils/format'
 import type { Notification } from '@/types'
 import {
   RefreshCw, Bell, CheckCircle2, XCircle, Clock, Mail,
-  MessageSquare, Smartphone, Wifi, Eye,
+  MessageSquare, Smartphone, Wifi, Eye, Trash2,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
+
+function errMsg(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) return err.response?.data?.error ?? err.message ?? fallback
+  if (err instanceof Error) return err.message
+  return fallback
+}
 
 const CHANNEL_ICON: Record<string, React.ReactNode> = {
   email:  <Mail         className="h-3.5 w-3.5" />,
@@ -42,14 +50,29 @@ function StatusBadge({ status }: { status: string }) {
 type N = Notification & { user_email?: string; user_name?: string }
 
 export function NotificationsPage() {
-  const [page,    setPage]    = useState(1)
-  const [channel, setChannel] = useState('')
-  const [status,  setStatus]  = useState('')
+  const qc = useQueryClient()
+  const [page,          setPage]          = useState(1)
+  const [channel,       setChannel]       = useState('')
+  const [status,        setStatus]        = useState('')
+  const [confirmDelId,  setConfirmDelId]  = useState<string | null>(null)
   const limit = 25
 
   const { data: raw, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-notifications', { channel, status, page, limit }],
     queryFn: () => notificationsApi.adminList({ channel: channel || undefined, status: status || undefined, page, limit }),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => notificationsApi.deleteNotification(id),
+    onSuccess: () => {
+      toast.success('Notification deleted')
+      setConfirmDelId(null)
+      void qc.invalidateQueries({ queryKey: ['admin-notifications'] })
+    },
+    onError: (err) => {
+      toast.error(errMsg(err, 'Failed to delete notification'))
+      setConfirmDelId(null)
+    },
   })
 
   const rows  = (raw?.data ?? []) as N[]
@@ -103,6 +126,20 @@ export function NotificationsPage() {
       header: 'Sent',
       render: (n: N) => (
         <span className="text-xs text-ink-faint whitespace-nowrap">{fmtRelative(n.created_at)}</span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (n: N) => (
+        <button
+          type="button"
+          onClick={() => setConfirmDelId(n.id)}
+          className="p-1.5 rounded text-ink-faint hover:text-red-500 hover:bg-rose-500/10 transition-colors"
+          title="Delete notification"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       ),
     },
   ]
@@ -186,6 +223,35 @@ export function NotificationsPage() {
           </>
         )}
       </Card>
+
+      {/* Delete confirmation */}
+      <Modal
+        open={confirmDelId !== null}
+        onClose={() => setConfirmDelId(null)}
+        title="Delete notification?"
+        subtitle="This removes the notification from the customer's inbox immediately."
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmDelId(null)} disabled={deleteMut.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              onClick={() => confirmDelId && deleteMut.mutate(confirmDelId)}
+              disabled={deleteMut.isPending}
+            >
+              {deleteMut.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-muted">
+          The notification will be soft-deleted. The customer's unread count will update on their next refresh.
+        </p>
+      </Modal>
     </div>
   )
 }

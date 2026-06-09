@@ -10,10 +10,12 @@ import { AppError } from "../../../shared/errors/AppError";
 
 const DisplayTypeEnum = z.enum(["popup", "ticker"]);
 const StatusEnum      = z.enum(["active", "inactive"]);
+const SeverityEnum    = z.enum(["info", "success", "warning", "critical"]);
 
 const CreateSchema = z.object({
   title:        z.string().min(1).max(255),
   message:      z.string().min(1),
+  severity:     SeverityEnum.optional(),
   display_type: DisplayTypeEnum,
   priority:     z.number().int().min(0).max(100).optional(),
   status:       StatusEnum.optional(),
