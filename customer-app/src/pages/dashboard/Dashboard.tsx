@@ -16,11 +16,11 @@ import { Skeleton } from '@/components/ui'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { cn } from '@/utils/cn'
 
-function getGreeting(): string {
+function getGreetingInfo(): { greeting: string; subtitle: string } {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
+  if (h >= 5 && h < 12)  return { greeting: 'Good Morning',   subtitle: 'Ready to power your day?' }
+  if (h >= 12 && h < 17) return { greeting: 'Good Afternoon', subtitle: 'Stay connected with Hive Data.' }
+  return                         { greeting: 'Good Evening',   subtitle: 'Manage your services with ease.' }
 }
 
 const QUICK_ACTIONS = [
@@ -74,6 +74,7 @@ export function DashboardPage() {
   const { data: txData,  isLoading: txLoading }      = useTransactions({ limit: 5 })
   const { data: notifData }                          = useNotifications({ limit: 1 })
 
+  const { greeting, subtitle } = getGreetingInfo()
   const firstName = user?.first_name ?? user?.email?.split('@')[0] ?? 'there'
   const unread    = notifData?.unread_count ?? 0
   const recentTxs = txData?.data ?? []
@@ -86,8 +87,8 @@ export function DashboardPage() {
       {/* ── Greeting row (desktop only) ─────────────────────────────────── */}
       <div className="hidden md:flex items-center justify-between pt-1">
         <div>
-          <p className="text-ink-faint text-xs font-medium tracking-widest uppercase">{getGreeting()}</p>
-          <h1 className="text-2xl font-bold text-ink mt-0.5">{firstName} 👋</h1>
+          <h1 className="text-2xl font-bold text-ink">{greeting}, {firstName} 👋</h1>
+          <p className="text-xs text-ink-faint mt-0.5">{subtitle}</p>
           <div className="flex items-center gap-3 mt-1.5">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
               <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
@@ -168,8 +169,8 @@ export function DashboardPage() {
           }}
           aria-hidden="true"
         />
-        <p className="text-ink-faint text-xs font-medium tracking-widest uppercase mb-0.5">{getGreeting()}</p>
-        <h1 className="text-xl font-bold text-ink mb-4">{firstName} 👋</h1>
+        <h1 className="text-xl font-bold text-ink mb-0.5">{greeting}, {firstName} 👋</h1>
+        <p className="text-xs text-ink-faint mb-4">{subtitle}</p>
         <WalletBalanceCard balance={balance?.balance} currency={balance?.currency} isLoading={balanceLoading} />
       </div>
 
