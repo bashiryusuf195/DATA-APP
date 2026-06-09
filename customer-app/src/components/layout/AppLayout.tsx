@@ -6,6 +6,7 @@ import { AppHeader }              from './AppHeader'
 import { PinSetupModal }          from '@/components/shared/PinSetupModal'
 import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
 import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
+import { NotificationPromptModal, shouldShowNotificationPrompt } from '@/components/shared/NotificationPromptModal'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
 import { useAuthStore }           from '@/store/auth.store'
 import { authApi }                from '@/api/auth.api'
@@ -31,6 +32,19 @@ export function AppLayout() {
   // purchases until a PIN is created.
   const [dismissed, setDismissed] = useState(false)
   const showSetup = !!user && !user.has_transaction_pin && !dismissed
+
+  // Push notification onboarding prompt — shown once on first visit,
+  // re-shown after 30 days if dismissed with "Maybe Later".
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    if (!shouldShowNotificationPrompt()) return
+    // Slight delay so the prompt doesn't collide with page load animations
+    const t = setTimeout(() => setShowNotifPrompt(true), 2500)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!user])
 
   const { data: announcements = [] } = useAnnouncements()
   const popups  = announcements.filter((a) => a.display_type === 'popup')
@@ -84,6 +98,11 @@ export function AppLayout() {
       {/* Popup announcements — rendered above PIN modal so PIN takes precedence */}
       {!showSetup && popups.length > 0 && (
         <PopupAnnouncement announcements={popups} />
+      )}
+
+      {/* Push notification onboarding — only after higher-priority modals are gone */}
+      {!showSetup && showNotifPrompt && (
+        <NotificationPromptModal onClose={() => setShowNotifPrompt(false)} />
       )}
 
       {/* Scroll to top on every route change, restore on back/forward */}

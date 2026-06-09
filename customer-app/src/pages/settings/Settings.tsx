@@ -22,26 +22,29 @@ function ToggleRow({
   hint,
   checked,
   onChange,
+  disabled,
 }: {
   label: string
   hint?: string
   checked: boolean
   onChange: (v: boolean) => void
+  disabled?: boolean
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3 border-b border-border last:border-0">
       <div>
-        <p className="text-sm font-medium text-ink">{label}</p>
+        <p className={`text-sm font-medium ${disabled ? 'text-ink-muted' : 'text-ink'}`}>{label}</p>
         {hint && <p className="text-xs text-ink-muted mt-0.5">{hint}</p>}
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-          checked ? 'bg-brand-600' : 'bg-surface-2 border border-border'
-        }`}
+        aria-disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+        } ${checked ? 'bg-brand-600' : 'bg-surface-2 border border-border'}`}
       >
         <span
           className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${
@@ -604,14 +607,19 @@ export function SettingsPage() {
               <ToggleRow
                 label="Push notifications"
                 hint={
-                  push.permission === 'denied'      ? 'Blocked — enable in browser settings' :
+                  push.permission === 'denied'      ? 'Blocked by browser — enable in site settings first' :
                   push.permission === 'unsupported'  ? 'Not supported in this browser' :
                   push.permission === 'unconfigured' ? 'Not configured on this server' :
                   push.permission === 'granted'      ? 'Active on this device' :
-                  'Receive alerts even when app is closed'
+                  'Receive alerts even when the app is closed'
                 }
                 checked={prefs.push && push.permission === 'granted'}
                 onChange={handlePushToggle}
+                disabled={
+                  push.permission === 'denied' ||
+                  push.permission === 'unsupported' ||
+                  push.permission === 'unconfigured'
+                }
               />
             </div>
           ) : (
