@@ -223,3 +223,24 @@ input[type='number']::-webkit-outer-spin-button {
   margin: 0;
 }
 input[type='number'] { -moz-appearance: textfield; }
+
+/* ── Receipt print styles ─────────────────────────────────────────────────────
+   Used when the user clicks "Save PDF" on the transaction detail page.
+   Hides navigation chrome; forces white background; preserves status colors.
+────────────────────────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the receipt content */
+  body > * { display: none !important; }
+  #root > * { display: none !important; }
+  #root > div > div > div > main { display: block !important; }
+  #root > div > div > div > main > div { display: block !important; }
+
+  /* Simpler: just target the .print-receipt root we mark in the DOM */
+  body { background: #fff !important; }
+
+  /* Force color printing for status badges and token boxes */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
