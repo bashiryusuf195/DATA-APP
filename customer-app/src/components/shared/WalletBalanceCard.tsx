@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff, Plus, ArrowDownLeft } from 'lucide-react'
-import { useState } from 'react'
 import { fmtCurrency } from '@/utils/format'
 import { Skeleton } from '@/components/ui'
 import { cn } from '@/utils/cn'
+import { useThemeStore } from '@/store/theme.store'
 
 interface WalletBalanceCardProps {
   balance?: number
@@ -12,7 +12,8 @@ interface WalletBalanceCardProps {
 }
 
 export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: WalletBalanceCardProps) {
-  const [hidden, setHidden] = useState(false)
+  const hidden             = useThemeStore((s) => s.balanceHidden)
+  const toggleBalanceHidden = useThemeStore((s) => s.toggleBalanceHidden)
 
   return (
     <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet wallet-card-shimmer ring-1 ring-inset ring-white/10"
@@ -26,7 +27,7 @@ export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: Wall
         <div className="flex items-center justify-between mb-1">
           <p className="text-white/70 text-xs font-medium tracking-wide uppercase">Current Balance</p>
           <button
-            onClick={() => setHidden((h) => !h)}
+            onClick={toggleBalanceHidden}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
             aria-label={hidden ? 'Show balance' : 'Hide balance'}
           >

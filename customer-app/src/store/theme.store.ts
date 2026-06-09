@@ -5,6 +5,8 @@ interface ThemeState {
   dark: boolean
   toggle: () => void
   setDark: (v: boolean) => void
+  balanceHidden: boolean
+  toggleBalanceHidden: () => void
 }
 
 export const useThemeStore = create<ThemeState>()(
@@ -13,6 +15,8 @@ export const useThemeStore = create<ThemeState>()(
       dark: false,
       toggle: () => set((s) => ({ dark: !s.dark })),
       setDark: (v: boolean) => set({ dark: v }),
+      balanceHidden: false,
+      toggleBalanceHidden: () => set((s) => ({ balanceHidden: !s.balanceHidden })),
     }),
     { name: 'vtu-theme' }
   )
