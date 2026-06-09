@@ -10,6 +10,7 @@ import {
   useDedicatedAccount, useSquadAccount,
   useInitializeFunding, useFundingConfig,
 } from '@/hooks/useWallet'
+import type { FundingCardConfig } from '@/hooks/useWallet'
 import { useQueryClient } from '@tanstack/react-query'
 import { AmountInput } from '@/components/shared/AmountInput'
 import { Skeleton } from '@/components/ui'
@@ -311,30 +312,34 @@ function QuickTransferCard() {
   )
 }
 
-// ── Carousel shell ────────────────────────────────────────────────────────────
+// ── Card renderer ─────────────────────────────────────────────────────────────
 
-type CardType = 'dedicated' | 'quick_transfer'
+function renderCard(cfg: FundingCardConfig) {
+  switch (cfg.type) {
+    case 'dedicated_account': return <DedicatedAccountCard />
+    case 'quick_transfer':    return <QuickTransferCard />
+    default:                  return null
+  }
+}
+
+function cardLabel(type: FundingCardConfig['type']): string {
+  switch (type) {
+    case 'dedicated_account': return 'Dedicated Account'
+    case 'quick_transfer':    return 'Quick Bank Transfer'
+    default:                  return type
+  }
+}
+
+// ── Carousel shell ────────────────────────────────────────────────────────────
 
 export function FundingCarousel() {
   const { data: config } = useFundingConfig()
-  const { data: dva }        = useDedicatedAccount()
-  const { data: squadData }  = useSquadAccount()
 
   const trackRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const hasDedicated = !!(dva || squadData?.account)
-  const priority     = config?.priority ?? 'quick_first'
-
-  // Build ordered card list. Both cards always included; order follows priority.
-  // If dedicated unavailable and priority is dedicated_first, quick goes first.
-  const cards: CardType[] = (() => {
-    const dedicated: CardType = 'dedicated'
-    const quick: CardType     = 'quick_transfer'
-    if (priority === 'dedicated_first' && hasDedicated) return [dedicated, quick]
-    if (priority === 'dedicated_first' && !hasDedicated) return [quick, dedicated]
-    return [quick, dedicated]
-  })()
+  // Ordered, enabled cards — exactly what the server says
+  const cards = (config?.cards ?? []).filter(c => c.enabled)
 
   const scrollTo = useCallback((idx: number) => {
     if (!trackRef.current) return
@@ -382,23 +387,20 @@ export function FundingCarousel() {
         style={{ WebkitOverflowScrolling: 'touch' }}
         aria-label="Funding methods"
       >
-        {cards.map((type) => (
+        {cards.map((cfg) => (
           <div
-            key={type}
+            key={cfg.type}
             className="shrink-0 w-full snap-start"
-            aria-label={type === 'dedicated' ? 'Dedicated Account' : 'Quick Bank Transfer'}
+            aria-label={cardLabel(cfg.type)}
           >
             <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px]">
-              {type === 'dedicated'
-                ? <DedicatedAccountCard />
-                : <QuickTransferCard />
-              }
+              {renderCard(cfg)}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Dot indicators — only show when >1 card */}
+      {/* Dot indicators */}
       {cards.length > 1 && (
         <div className="flex items-center justify-center gap-1.5 mt-2.5" aria-label="Funding method indicators" role="tablist">
           {cards.map((_, idx) => (
@@ -419,7 +421,7 @@ export function FundingCarousel() {
         </div>
       )}
 
-      {/* Swipe hint — mobile only, shown briefly */}
+      {/* Swipe hint — mobile only */}
       {cards.length > 1 && activeIndex === 0 && (
         <p className="md:hidden text-center text-[10px] text-ink-faint mt-1 flex items-center justify-center gap-1">
           <Zap className="h-2.5 w-2.5" />

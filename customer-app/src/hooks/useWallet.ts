@@ -2,17 +2,26 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { walletApi } from '@/api/wallet.api'
 import { apiClient } from '@/api/client'
 
-export type FundingPriority = 'dedicated_first' | 'quick_first'
+export type FundingCardType = 'quick_transfer' | 'dedicated_account'
+export interface FundingCardConfig { type: FundingCardType; enabled: boolean }
+export interface FundingConfig { cards: FundingCardConfig[] }
+
+const DEFAULT_FUNDING_CONFIG: FundingConfig = {
+  cards: [
+    { type: 'quick_transfer',    enabled: true },
+    { type: 'dedicated_account', enabled: true },
+  ],
+}
 
 export function useFundingConfig() {
-  return useQuery<{ priority: FundingPriority }>({
+  return useQuery<FundingConfig>({
     queryKey: ['funding-config'],
     queryFn: async () => {
       try {
-        const r = await apiClient.get<{ priority: FundingPriority }>('/public/funding-config')
+        const r = await apiClient.get<FundingConfig>('/public/funding-config')
         return r.data
       } catch {
-        return { priority: 'quick_first' }
+        return DEFAULT_FUNDING_CONFIG
       }
     },
     staleTime: 5 * 60 * 1000,
