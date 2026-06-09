@@ -30,6 +30,30 @@ export async function getFundingConfigController(
   }
 }
 
+export async function getSupportConfigController(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const db   = getDbInstance()
+    const rows = await db('admin_settings')
+      .whereIn('key', ['support_widget_enabled', 'support_whatsapp_url', 'support_ticket_url'])
+      .select('key', 'value')
+
+    const map: Record<string, string> = {}
+    for (const r of rows) map[r.key] = r.value ?? ''
+
+    res.json({
+      enabled:      (map['support_widget_enabled'] ?? 'true') === 'true',
+      whatsapp_url: map['support_whatsapp_url']  ?? '',
+      ticket_url:   map['support_ticket_url']    ?? '',
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function getAppContentController(
   _req: Request,
   res: Response,

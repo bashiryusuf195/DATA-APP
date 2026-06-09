@@ -34,6 +34,7 @@ import {
   Check,
   LogOut,
   CreditCard,
+  HeartHandshake,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -57,6 +58,7 @@ const TABS = [
   { key: 'queue',        label: 'Queue',         icon: <ListChecks  className="h-3.5 w-3.5" /> },
   { key: 'maintenance',  label: 'Maintenance',   icon: <Wrench      className="h-3.5 w-3.5" /> },
   { key: 'environment',  label: 'Environment',   icon: <Server      className="h-3.5 w-3.5" /> },
+  { key: 'support',      label: 'Support',       icon: <HeartHandshake className="h-3.5 w-3.5" /> },
   { key: 'account',      label: 'Account',       icon: <KeyRound    className="h-3.5 w-3.5" /> },
 ] as const
 

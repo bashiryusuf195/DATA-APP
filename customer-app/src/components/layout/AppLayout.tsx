@@ -7,6 +7,7 @@ import { PinSetupModal }          from '@/components/shared/PinSetupModal'
 import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
 import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
 import { NotificationPromptModal, shouldShowNotificationPrompt } from '@/components/shared/NotificationPromptModal'
+import { SupportWidget } from '@/components/shared/SupportWidget'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
 import { useAuthStore }           from '@/store/auth.store'
 import { authApi }                from '@/api/auth.api'
@@ -104,6 +105,9 @@ export function AppLayout() {
       {!showSetup && showNotifPrompt && (
         <NotificationPromptModal onClose={() => setShowNotifPrompt(false)} />
       )}
+
+      {/* Floating support widget */}
+      <SupportWidget />
 
       {/* Scroll to top on every route change, restore on back/forward */}
       <ScrollRestoration />
