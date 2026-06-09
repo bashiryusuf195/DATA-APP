@@ -45,21 +45,25 @@ async function purchase(endpoint: string, body: PurchaseInput): Promise<Transact
 // paginated envelope.  Normalize here so callers always get TransactionListResponse.
 export const transactionsApi = {
   list: async (params?: {
-    page?: number
-    limit?: number
-    type?: string
-    status?: string
+    page?:      number
+    limit?:     number
+    type?:      string
+    status?:    string
+    date_from?: string
+    date_to?:   string
+    reference?: string
+    search?:    string
   }): Promise<TransactionListResponse> => {
-    const r = await apiClient.get<{ success: boolean; data: Transaction[] }>(
-      '/transactions',
-      { params }
-    )
-    const data = r.data.data ?? []
+    const r = await apiClient.get<{
+      success: boolean
+      data:    Transaction[]
+      meta:    { total: number; page: number; limit: number; pages: number }
+    }>('/transactions', { params })
     return {
-      data,
-      total: data.length,
-      page:  params?.page  ?? 1,
-      limit: params?.limit ?? 20,
+      data:  r.data.data  ?? [],
+      total: r.data.meta?.total ?? (r.data.data?.length ?? 0),
+      page:  r.data.meta?.page  ?? (params?.page  ?? 1),
+      limit: r.data.meta?.limit ?? (params?.limit ?? 20),
     }
   },
 

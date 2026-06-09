@@ -94,21 +94,59 @@ export async function mergeTransactionMetadata(
 export async function getUserTransactions(
   userId: string,
   options: {
-    limit: number;
-    offset: number;
-    status?: string;
-    type?: string;
+    limit:      number;
+    offset:     number;
+    status?:    string;
+    type?:      string;
+    date_from?: string;
+    date_to?:   string;
+    reference?: string;
+    search?:    string;
   }
-) {
-  return db("transactions")
+): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+  const base = db("transactions")
     .where({ user_id: userId })
     .modify((q) => {
       if (options.status) q.where({ status: options.status });
-      if (options.type) q.where({ type: options.type });
-    })
-    .orderBy("created_at", "desc")
-    .limit(options.limit)
-    .offset(options.offset);
+      if (options.type)   q.where({ type: options.type });
+
+      if (options.date_from) q.where("created_at", ">=", new Date(options.date_from));
+      if (options.date_to) {
+        // Include the full day specified by date_to
+        const end = new Date(options.date_to);
+        end.setUTCHours(23, 59, 59, 999);
+        q.where("created_at", "<=", end);
+      }
+
+      if (options.reference) {
+        q.whereRaw("reference ILIKE ?", [`%${options.reference}%`]);
+      }
+
+      if (options.search) {
+        const term = `%${options.search.trim()}%`;
+        q.where(function () {
+          this.whereRaw("reference ILIKE ?", [term])
+            .orWhereRaw("description ILIKE ?", [term])
+            .orWhereRaw("metadata->>'phone' ILIKE ?", [term])
+            .orWhereRaw("metadata->>'meter_number' ILIKE ?", [term])
+            .orWhereRaw("metadata->>'smartcard_number' ILIKE ?", [term])
+            .orWhereRaw("metadata->>'recipient_phone' ILIKE ?", [term]);
+        });
+      }
+    });
+
+  const [countRow, rows] = await Promise.all([
+    base.clone().count<{ count: string }[]>("id as count").first(),
+    base.clone()
+      .orderBy("created_at", "desc")
+      .limit(options.limit)
+      .offset(options.offset),
+  ]);
+
+  return {
+    rows:  rows as Record<string, unknown>[],
+    total: parseInt(String((countRow as Record<string, unknown> | undefined)?.count ?? "0"), 10),
+  };
 }
 
 export async function listAllTransactions(options: {
