@@ -390,3 +390,23 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .sheet-backdrop { animation: none; }
 }
+
+/* 8. Safe-area utilities ────────────────────────────────────────────────────
+   Used by AppHeader (top) and BottomNav (bottom) to respect the Android
+   status bar and gesture navigation bar when running inside Capacitor.
+   On plain web/PWA, env() resolves to 0px so these are no-ops.
+   Requires viewport-fit=cover in the <meta viewport> tag.               */
+
+/* Mobile-only main-content top offset: header height + status-bar inset.
+   These classes replace the hardcoded pt-[72px]/pt-[80px] Tailwind values
+   and are scoped to mobile so md:pt-8 still applies on desktop without
+   a specificity fight (both use their own media query range).            */
+@media (max-width: 767px) {
+  .app-content-offset {
+    padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  }
+  .app-content-offset-ticker {
+    padding-top: calc(5rem + env(safe-area-inset-top, 0px));
+  }
+}
+
