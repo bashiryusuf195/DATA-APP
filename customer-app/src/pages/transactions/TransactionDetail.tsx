@@ -487,14 +487,15 @@ function ActionBar({ tx }: { tx: Transaction }) {
     const uiStatus = getUIStatus(tx.status)
     const cfg = STATUS_CFG[uiStatus]
     const text = [
-      'Hive Data — Transaction Receipt',
-      '─────────────────────────────',
-      `Service:   ${TYPE_LABEL[tx.type] ?? tx.type}`,
-      `Amount:    ${fmtCurrency(tx.amount)}`,
-      `Status:    ${cfg.label}`,
+      'Hive Data - Transaction Receipt',
+      '',
+      `Service: ${TYPE_LABEL[tx.type] ?? tx.type}`,
+      `Amount: ${fmtCurrency(tx.amount)}`,
+      `Status: ${cfg.label}`,
       `Reference: ${tx.reference}`,
-      `Date:      ${fmtDateTime(tx.created_at)}`,
-      '─────────────────────────────',
+      `Date: ${fmtDateTime(tx.created_at)}`,
+      '',
+      'hivedata.ng',
     ].join('\n')
 
     if (Capacitor.isNativePlatform()) {
@@ -522,21 +523,25 @@ function ActionBar({ tx }: { tx: Transaction }) {
     setDownloading(true)
     try {
       if (Capacitor.isNativePlatform()) {
+        console.log('[Receipt] Fetching PDF for reference:', tx.reference)
         const { blob, filename } = await transactionsApi.fetchReceiptBlob(tx.reference)
+        console.log('[Receipt] PDF fetched ok, size:', blob.size, 'bytes')
+
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
-          reader.onload = () => {
-            const result = reader.result as string
-            resolve(result.split(',')[1])
-          }
-          reader.onerror = reject
+          reader.onload  = () => resolve((reader.result as string).split(',')[1])
+          reader.onerror = (e) => { console.error('[Receipt] FileReader error:', e); reject(e) }
           reader.readAsDataURL(blob)
         })
+        console.log('[Receipt] Base64 encoded, length:', base64.length)
+
         const writeResult = await Filesystem.writeFile({
           path: filename,
           data: base64,
           directory: Directory.Cache,
         })
+        console.log('[Receipt] Written to cache, uri:', writeResult.uri)
+
         await Share.share({
           title: 'Transaction Receipt',
           files: [writeResult.uri],
@@ -546,6 +551,7 @@ function ActionBar({ tx }: { tx: Transaction }) {
         await transactionsApi.downloadReceipt(tx.reference)
       }
     } catch (err) {
+      console.error('[Receipt] Download error:', err)
       const msg = err instanceof Error ? err.message : 'Could not generate receipt. Please try again.'
       toast.error(msg)
     } finally {

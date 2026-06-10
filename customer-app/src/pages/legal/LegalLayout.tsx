@@ -36,8 +36,11 @@ export function LegalLayout() {
       {/* Scroll to top on every route change within the legal layout */}
       <ScrollRestoration />
 
-      {/* Navbar */}
-      <nav className="sticky top-0 z-40 border-b border-border bg-white/90 dark:bg-[#161B22]/90 backdrop-blur-md">
+      {/* Navbar — paddingTop accounts for Android status bar / iOS notch */}
+      <nav
+        className="sticky top-0 z-40 border-b border-border bg-white/90 dark:bg-[#161B22]/90 backdrop-blur-md"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="max-w-4xl mx-auto px-5 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button

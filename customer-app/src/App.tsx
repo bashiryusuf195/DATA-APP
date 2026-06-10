@@ -5,6 +5,7 @@ import { useThemeStore } from '@/store/theme.store'
 import { getFirebaseApp } from '@/lib/firebase'
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
+import { App as CapApp } from '@capacitor/app'
 
 // ── Service worker helpers ─────────────────────────────────────────────────────
 
@@ -127,6 +128,24 @@ export default function App() {
 
     const cleanup = listenForSwNavigation()
     return cleanup
+  }, [])
+
+  // Android hardware back button — navigate back in SPA history, or exit if at root.
+  // Prevents Capacitor's default behavior of exiting the app on every back press.
+  // No-op on web/PWA (Capacitor.isNativePlatform() is false).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const listenerPromise = CapApp.addListener('backButton', () => {
+      const idx = (window.history.state?.idx ?? 0) as number
+      if (idx > 0) {
+        window.history.back()
+      } else {
+        CapApp.exitApp()
+      }
+    })
+
+    return () => { listenerPromise.then(h => h.remove()) }
   }, [])
 
   // Dark fallback matches the app background so lazy-chunk loads are invisible
