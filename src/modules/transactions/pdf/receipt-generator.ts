@@ -98,19 +98,29 @@ export function receiptNumber(reference: string): string {
   return `RCP-${h.slice(0, 8).toUpperCase()}`;
 }
 
+// Month abbreviations — avoids Intl.DateTimeFormat("en-NG") which is not
+// available in Alpine Node.js small-icu builds and throws RangeError.
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 /** Format currency without the ₦ glyph (falls outside WinAnsi PDF font range). */
 function fmtAmt(n: number): string {
-  return `NGN ${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Avoid toLocaleString — Alpine Node.js small-icu may lack en-NG locale data.
+  const [int, dec] = n.toFixed(2).split(".");
+  return `NGN ${int.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${dec ? "." + dec : ""}`;
 }
 
 function fmtDate(d: string | Date): string {
   const dt = d instanceof Date ? d : new Date(d);
-  return dt.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+  return `${dt.getDate()} ${MONTHS[dt.getMonth()]} ${dt.getFullYear()}`;
 }
 
 function fmtTime(d: string | Date): string {
-  const dt = d instanceof Date ? d : new Date(d);
-  return dt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const dt   = d instanceof Date ? d : new Date(d);
+  const h24  = dt.getHours();
+  const h12  = h24 % 12 || 12;
+  const mm   = String(dt.getMinutes()).padStart(2, "0");
+  const ampm = h24 >= 12 ? "PM" : "AM";
+  return `${h12}:${mm} ${ampm}`;
 }
 
 function amtDisplay(type: string, status: string, amount: number): { text: string; color: string } {
