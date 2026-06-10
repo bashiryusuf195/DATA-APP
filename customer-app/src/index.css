@@ -406,7 +406,8 @@ html, body {
     padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
   }
   .app-content-offset-ticker {
-    padding-top: calc(5rem + env(safe-area-inset-top, 0px));
+    /* 3.5rem header + 2rem ticker (h-8) + 1rem gap = 6.5rem */
+    padding-top: calc(6.5rem + env(safe-area-inset-top, 0px));
   }
 }
 
