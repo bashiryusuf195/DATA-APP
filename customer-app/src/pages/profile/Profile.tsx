@@ -114,8 +114,9 @@ function kycBadgeStyle(level: number): string {
 
 export function ProfilePage() {
   const navigate  = useNavigate()
-  const user      = useAuthStore((s) => s.user)
-  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const user             = useAuthStore((s) => s.user)
+  const clearAuth        = useAuthStore((s) => s.clearAuth)
+  const biometricEnabled = useAuthStore((s) => s.biometric_enabled)
   const qc        = useQueryClient()
   const { dark, toggle: toggleDark } = useThemeStore()
   const [logging, setLogging] = useState(false)
@@ -132,7 +133,14 @@ export function ProfilePage() {
 
   const handleLogout = async () => {
     setLogging(true)
-    try { await authApi.logout() } catch { /* ignore */ }
+    try {
+      // When biometric login is enabled, skip server-side session revocation.
+      // The refresh_token must stay valid so biometric re-login works after logout.
+      // The access_token will expire on its own (typically within 1 hour).
+      if (!biometricEnabled) {
+        await authApi.logout()
+      }
+    } catch { /* ignore */ }
     clearAuth()
     qc.clear()
     navigate('/login', { replace: true })
