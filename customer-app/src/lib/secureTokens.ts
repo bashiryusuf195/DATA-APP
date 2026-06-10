@@ -25,19 +25,25 @@ export async function getStoredTokens(): Promise<{
   }
 }
 
+// All mutating helpers below use try-catch + .catch() to suppress both
+// synchronous throws (plugin not yet registered in the APK) and async
+// rejections (OS keystore errors). Token operations must never propagate
+// errors to callers — a storage failure should degrade gracefully, not
+// crash login or logout.
+
 export function saveTokens(access_token: string, refresh_token: string): void {
   if (!isNative) return
-  SecureStorage.set(KEY_AT, access_token).catch(() => {})
-  SecureStorage.set(KEY_RT, refresh_token).catch(() => {})
+  try { SecureStorage.set(KEY_AT, access_token).catch(() => {}) } catch {}
+  try { SecureStorage.set(KEY_RT, refresh_token).catch(() => {}) } catch {}
 }
 
 export function removeTokens(): void {
   if (!isNative) return
-  SecureStorage.remove(KEY_AT).catch(() => {})
-  SecureStorage.remove(KEY_RT).catch(() => {})
+  try { SecureStorage.remove(KEY_AT).catch(() => {}) } catch {}
+  try { SecureStorage.remove(KEY_RT).catch(() => {}) } catch {}
 }
 
 export function removeAccessToken(): void {
   if (!isNative) return
-  SecureStorage.remove(KEY_AT).catch(() => {})
+  try { SecureStorage.remove(KEY_AT).catch(() => {}) } catch {}
 }
