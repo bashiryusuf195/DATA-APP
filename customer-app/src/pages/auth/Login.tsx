@@ -21,10 +21,12 @@ import { checkNativeBiometricAvailable, performNativeBiometric } from '@/hooks/u
 
 type Step = 'credentials' | '2fa'
 
+const LAST_EMAIL_KEY = 'hive-last-email'
+
 export function LoginPage() {
   const [step, setStep]               = useState<Step>('credentials')
   const [challengeId, setChallengeId] = useState('')
-  const [email, setEmail]             = useState('')
+  const [email, setEmail]             = useState(() => localStorage.getItem(LAST_EMAIL_KEY) ?? '')
   const [password, setPassword]       = useState('')
   const [totpCode, setTotpCode]       = useState('')
   const [loading, setLoading]         = useState(false)
@@ -248,7 +250,7 @@ export function LoginPage() {
       <h1 className="text-xl font-bold text-ink mb-1">Sign in</h1>
       <p className="text-sm text-ink-muted mb-6">Enter your credentials to continue.</p>
       <form onSubmit={handleCredentials} className="space-y-4">
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email webauthn" prefix={<Mail className="h-4 w-4" />} />
+        <Input label="Email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); localStorage.setItem(LAST_EMAIL_KEY, e.target.value) }} placeholder="you@example.com" autoComplete="email webauthn" prefix={<Mail className="h-4 w-4" />} />
         <Input
           label="Password"
           type={showPw ? 'text' : 'password'}
