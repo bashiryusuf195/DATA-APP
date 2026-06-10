@@ -85,7 +85,7 @@ export async function downloadReceiptController(
     const rn        = receiptNumber(reference);
     const filename  = `hivedata-receipt-${rn}.pdf`;
 
-    logger.info("receipt_generated", { reference, user_id: userId, type: tx.type });
+    logger.info("receipt_generated", { reference, user_id: userId, type: tx.type, bytes: pdfBuffer.length });
 
     res.setHeader("Content-Type",        "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -93,6 +93,12 @@ export async function downloadReceiptController(
     res.setHeader("Cache-Control",        "private, no-store");
     res.end(pdfBuffer);
   } catch (err) {
+    logger.error("receipt_failed", {
+      reference: req.params.reference,
+      user_id:   req.user?.id,
+      error:     err instanceof Error ? err.message : String(err),
+      stack:     err instanceof Error ? err.stack?.split("\n").slice(0, 6).join(" | ") : undefined,
+    });
     next(err);
   }
 }
