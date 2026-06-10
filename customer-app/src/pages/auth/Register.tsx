@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
-import { Mail, Lock, User, Phone } from 'lucide-react'
+import { Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
 import { apiClient } from '@/api/client'
@@ -14,6 +14,7 @@ export function RegisterPage() {
   })
   const [errors, setErrors] = useState<Partial<typeof form>>({})
   const [loading, setLoading] = useState(false)
+  const [showPw, setShowPw] = useState(false)
 
   const [searchParams] = useSearchParams()
   const { setAuth, access_token, _hasHydrated } = useAuthStore()
@@ -90,7 +91,22 @@ export function RegisterPage() {
         </div>
         <Input label="Email" type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" autoComplete="email" error={errors.email} prefix={<Mail className="h-4 w-4" />} />
         <Input label="Phone (optional)" type="tel" value={form.phone} onChange={set('phone')} placeholder="08012345678" prefix={<Phone className="h-4 w-4" />} hint="Nigerian numbers auto-converted to international format" />
-        <Input label="Password" type="password" value={form.password} onChange={set('password')} placeholder="Min 8 characters" autoComplete="new-password" error={errors.password} hint={!errors.password ? 'Uppercase, lowercase, and a number required' : undefined} prefix={<Lock className="h-4 w-4" />} />
+        <Input
+          label="Password"
+          type={showPw ? 'text' : 'password'}
+          value={form.password}
+          onChange={set('password')}
+          placeholder="Min 8 characters"
+          autoComplete="new-password"
+          error={errors.password}
+          hint={!errors.password ? 'Uppercase, lowercase, and a number required' : undefined}
+          prefix={<Lock className="h-4 w-4" />}
+          suffix={
+            <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => !v)} className="text-ink-faint hover:text-ink transition-colors" aria-label={showPw ? 'Hide password' : 'Show password'}>
+              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
+        />
         <Input label="Referral code (optional)" value={form.referral_code || searchParams.get('ref') || ''} onChange={set('referral_code')} placeholder="e.g. ABC123" />
         <Button type="submit" loading={loading} fullWidth className="mt-1">Create Account</Button>
       </form>

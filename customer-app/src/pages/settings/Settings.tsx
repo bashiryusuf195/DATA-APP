@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle, Fingerprint, Trash2, Plus, ChevronRight, FileText } from 'lucide-react'
+import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle, Fingerprint, Trash2, Plus, ChevronRight, FileText, Eye, EyeOff } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Button, Card, Input } from '@/components/ui'
@@ -65,6 +65,7 @@ export function SettingsPage() {
   // ── Change password ────────────────────────────────────────────────────────
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' })
   const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
+  const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false })
 
   const changePwMutation = useMutation({
     mutationFn: authApi.changePassword,
@@ -543,27 +544,42 @@ export function SettingsPage() {
           <form onSubmit={handleChangePw} className="space-y-4">
             <Input
               label="Current password"
-              type="password"
+              type={showPw.current ? 'text' : 'password'}
               value={pw.current}
               onChange={(e) => { setPw((p) => ({ ...p, current: e.target.value })); setPwErrors((x) => ({ ...x, current: '' })) }}
               error={pwErrors.current}
               autoComplete="current-password"
+              suffix={
+                <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => ({ ...v, current: !v.current }))} className="text-ink-faint hover:text-ink transition-colors" aria-label={showPw.current ? 'Hide password' : 'Show password'}>
+                  {showPw.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              }
             />
             <Input
               label="New password"
-              type="password"
+              type={showPw.next ? 'text' : 'password'}
               value={pw.next}
               onChange={(e) => { setPw((p) => ({ ...p, next: e.target.value })); setPwErrors((x) => ({ ...x, next: '' })) }}
               error={pwErrors.next}
               autoComplete="new-password"
+              suffix={
+                <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => ({ ...v, next: !v.next }))} className="text-ink-faint hover:text-ink transition-colors" aria-label={showPw.next ? 'Hide password' : 'Show password'}>
+                  {showPw.next ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              }
             />
             <Input
               label="Confirm new password"
-              type="password"
+              type={showPw.confirm ? 'text' : 'password'}
               value={pw.confirm}
               onChange={(e) => { setPw((p) => ({ ...p, confirm: e.target.value })); setPwErrors((x) => ({ ...x, confirm: '' })) }}
               error={pwErrors.confirm}
               autoComplete="new-password"
+              suffix={
+                <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => ({ ...v, confirm: !v.confirm }))} className="text-ink-faint hover:text-ink transition-colors" aria-label={showPw.confirm ? 'Hide password' : 'Show password'}>
+                  {showPw.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              }
             />
             <Button
               type="submit"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Lock, ArrowLeft, AlertCircle } from 'lucide-react'
+import { Lock, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
 import { isAxiosError } from 'axios'
@@ -15,10 +15,12 @@ export function ResetPasswordPage() {
   const [accessToken, setAccessToken]   = useState('')
   const [refreshToken, setRefreshToken] = useState('')
 
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm]   = useState('')
-  const [errors, setErrors]     = useState<Record<string, string>>({})
-  const [loading, setLoading]   = useState(false)
+  const [password, setPassword]   = useState('')
+  const [confirm, setConfirm]     = useState('')
+  const [errors, setErrors]       = useState<Record<string, string>>({})
+  const [loading, setLoading]     = useState(false)
+  const [showPw, setShowPw]       = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
     // Supabase appends tokens as a URL fragment:
@@ -107,23 +109,33 @@ export function ResetPasswordPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="New Password"
-          type="password"
+          type={showPw ? 'text' : 'password'}
           value={password}
           onChange={(e) => { setPassword(e.target.value); setErrors((prev) => ({ ...prev, password: '' })) }}
           placeholder="••••••••"
           autoComplete="new-password"
           prefix={<Lock className="h-4 w-4" />}
           error={errors.password}
+          suffix={
+            <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => !v)} className="text-ink-faint hover:text-ink transition-colors" aria-label={showPw ? 'Hide password' : 'Show password'}>
+              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
         <Input
           label="Confirm Password"
-          type="password"
+          type={showConfirm ? 'text' : 'password'}
           value={confirm}
           onChange={(e) => { setConfirm(e.target.value); setErrors((prev) => ({ ...prev, confirm: '' })) }}
           placeholder="••••••••"
           autoComplete="new-password"
           prefix={<Lock className="h-4 w-4" />}
           error={errors.confirm}
+          suffix={
+            <button type="button" tabIndex={-1} onClick={() => setShowConfirm((v) => !v)} className="text-ink-faint hover:text-ink transition-colors" aria-label={showConfirm ? 'Hide password' : 'Show password'}>
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
         />
         <Button type="submit" loading={loading} fullWidth>Set Password</Button>
       </form>

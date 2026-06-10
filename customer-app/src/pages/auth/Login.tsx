@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, Navigate } from 'react-router-dom'
-import { Mail, Lock, Smartphone, ArrowLeft, Fingerprint } from 'lucide-react'
+import { Mail, Lock, Smartphone, ArrowLeft, Fingerprint, Eye, EyeOff } from 'lucide-react'
 import { ONBOARDING_KEY } from '@/pages/onboarding/Onboarding'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
@@ -27,6 +27,7 @@ export function LoginPage() {
   const [totpCode, setTotpCode]       = useState('')
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
+  const [showPw, setShowPw]           = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricLoading, setBiometricLoading]     = useState(false)
 
@@ -194,7 +195,20 @@ export function LoginPage() {
       <p className="text-sm text-ink-muted mb-6">Enter your credentials to continue.</p>
       <form onSubmit={handleCredentials} className="space-y-4">
         <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email webauthn" prefix={<Mail className="h-4 w-4" />} />
-        <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" prefix={<Lock className="h-4 w-4" />} />
+        <Input
+          label="Password"
+          type={showPw ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          autoComplete="current-password"
+          prefix={<Lock className="h-4 w-4" />}
+          suffix={
+            <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => !v)} className="text-ink-faint hover:text-ink transition-colors" aria-label={showPw ? 'Hide password' : 'Show password'}>
+              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
+        />
         <div className="flex justify-end">
           <Link to="/forgot-password" className="text-xs text-brand-600 hover:underline">Forgot password?</Link>
         </div>
