@@ -9,8 +9,6 @@ import {
   removeAccessToken,
 } from '@/lib/secureTokens'
 
-// On native, tokens live in Android Keystore via SecureStorage — not localStorage.
-// On web, they stay in Zustand persist (localStorage) as before.
 const isNative = Capacitor.isNativePlatform()
 
 interface AuthState {
@@ -27,12 +25,10 @@ interface AuthState {
     session_id:    string
     user:          User
   }) => void
-  setUser:             (user: User)   => void
-  clearAuth:           ()             => void
-  setHasHydrated:      (v: boolean)  => void
-  setBiometricEnabled: (v: boolean)  => void
-  /** Internal: populate tokens from SecureStorage bootstrap without triggering side effects. */
-  _setTokens: (access_token: string, refresh_token: string) => void
+  setUser:             (user: User)  => void
+  clearAuth:           ()            => void
+  setHasHydrated:      (v: boolean) => void
+  setBiometricEnabled: (v: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -47,12 +43,12 @@ export const useAuthStore = create<AuthState>()(
 
       setHasHydrated: (v) => set({ _hasHydrated: v }),
 
-      _setTokens: (access_token, refresh_token) => set({ access_token, refresh_token }),
-
       setAuth: ({ access_token, refresh_token, session_id, user }) => {
         set({ access_token, refresh_token, session_id, user })
-        // Sync to Keystore on Android; no-op on web.
-        saveTokens(access_token, refresh_token)
+        // Persist tokens to Android Keystore; no-op on web.
+        // Extra try-catch: saveTokens already guards internally, but this
+        // ensures any unexpected error never surfaces to the login caller.
+        try { saveTokens(access_token, refresh_token) } catch {}
       },
 
       setUser: (user) => set({ user }),
@@ -60,12 +56,12 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () =>
         set((s) => {
           if (s.biometric_enabled) {
-            // Keep refresh_token + session_id + user for biometric re-login.
-            // Only the short-lived access_token is removed.
-            removeAccessToken()
+            // Only clear the short-lived access_token.
+            // refresh_token + session_id + user are preserved for biometric re-login.
+            try { removeAccessToken() } catch {}
             return { access_token: null }
           }
-          removeTokens()
+          try { removeTokens() } catch {}
           return { access_token: null, refresh_token: null, session_id: null, user: null }
         }),
 
@@ -74,9 +70,8 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'vtu-auth',
 
-      // On native, tokens are persisted to Android Keystore only — keep them
-      // out of localStorage to avoid storing sensitive data in plain text.
-      // On web, everything including tokens stays in localStorage (no change).
+      // On native, tokens are stored in Android Keystore only — exclude them
+      // from localStorage. On web, everything stays in localStorage (no change).
       partialize: (s) => ({
         ...(isNative
           ? {}
@@ -86,30 +81,42 @@ export const useAuthStore = create<AuthState>()(
         biometric_enabled: s.biometric_enabled,
       }),
 
-      // Async bootstrap: load tokens from SecureStorage after Zustand hydrates
-      // non-sensitive fields from localStorage.
-      //
-      // Migration path for existing users:
-      //   Old format stored tokens in localStorage ('vtu-auth').
-      //   Zustand merges those old fields into memory on first run, giving us
-      //   state.access_token / state.refresh_token here.
-      //   We write them to SecureStorage, then the next partialize write
-      //   removes them from localStorage automatically.
-      onRehydrateStorage: () => async (state) => {
-        if (!state) return
-        if (isNative) {
-          const stored = await getStoredTokens()
-          if (stored?.access_token && stored?.refresh_token) {
-            // Normal startup: tokens already live in Keystore.
-            state._setTokens(stored.access_token, stored.refresh_token)
-          } else if (state.access_token && state.refresh_token) {
-            // First-run migration: old tokens were in localStorage — move them.
-            saveTokens(state.access_token, state.refresh_token)
-            // Tokens are already in memory from the old Zustand hydration;
-            // no extra set() call needed here.
-          }
+      // onRehydrateStorage MUST return a synchronous function — Zustand does
+      // not await async callbacks. On native we launch a self-contained async
+      // IIFE and hold _hasHydrated=false until it completes, so the app never
+      // renders with missing tokens. On web we set _hasHydrated immediately.
+      onRehydrateStorage: () => (state) => {
+        if (!isNative) {
+          state?.setHasHydrated(true)
+          return
         }
-        state.setHasHydrated(true)
+
+        // Native path: load tokens from Keystore before unblocking the UI.
+        // useAuthStore.setState is used (not state.xxx) because the IIFE runs
+        // after the onRehydrateStorage callback returns, at which point the
+        // store is fully initialised.
+        ;(async () => {
+          try {
+            const stored = await getStoredTokens()
+            if (stored?.access_token && stored?.refresh_token) {
+              // Normal startup: tokens already in Keystore.
+              useAuthStore.setState({
+                access_token:  stored.access_token,
+                refresh_token: stored.refresh_token,
+              })
+            } else if (state?.access_token && state?.refresh_token) {
+              // First-run migration: old tokens were in localStorage — write
+              // them to Keystore. They're already in memory from Zustand
+              // hydration, so no extra setState needed here.
+              try { saveTokens(state.access_token, state.refresh_token) } catch {}
+            }
+          } catch {
+            // SecureStorage failure — tokens stay null, user sees login page.
+          } finally {
+            // Always unblock the UI, even if Keystore failed.
+            useAuthStore.setState({ _hasHydrated: true })
+          }
+        })()
       },
     }
   )
