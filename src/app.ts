@@ -32,6 +32,8 @@ import { adminRouter }               from "./routes/admin.routes";
 import { publicAuditMiddleware }       from "./middleware/publicAudit";
 import { publicRouter }               from "./modules/public/routes/public.routes";
 import { transactionPinRouter }       from "./modules/security/routes/transaction-pin.routes";
+import { customerKycRouter }          from "./modules/compliance/routes/customer-kyc.routes";
+import { userReferralRouter }         from "./modules/referral/routes/user-referral.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -119,6 +121,8 @@ app.use("/notifications",             notificationsRouter);
 app.use("/webhooks",                  webhookRouter);
 app.use("/public",                    publicRouter);
 app.use("/security/transaction-pin",  transactionPinRouter);
+app.use("/kyc",                       customerKycRouter);
+app.use("/referrals",                 userReferralRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.
