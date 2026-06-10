@@ -13,6 +13,12 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Draw the WebView edge-to-edge behind the transparent status bar so that
+             env(safe-area-inset-top) is correctly reported to CSS.
+             Without these, some Android versions (API 24-28) keep an opaque
+             status bar and the safe-area inset stays at 0px.               -->
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
     </style>
 
 

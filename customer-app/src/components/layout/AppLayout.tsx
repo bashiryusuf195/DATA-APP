@@ -105,8 +105,21 @@ export function AppLayout() {
         {/* Mobile header */}
         <AppHeader />
 
-        {/* Scrolling ticker — sits flush below the mobile header */}
-        {tickers.length > 0 && <AnnouncementTicker items={tickers} />}
+        {/* Scrolling ticker.
+            On mobile the AppHeader is position:fixed (z-40), so any in-flow
+            sibling at y=0 is hidden behind it.  We therefore make the ticker
+            fixed too on mobile (z-30, just below the header) and position it
+            flush below the header using the same safe-area-aware calculation.
+            On desktop the AppHeader is md:hidden, so the ticker stays in-flow
+            at the natural top of the content column (md:static resets it).   */}
+        {tickers.length > 0 && (
+          <div
+            className="fixed inset-x-0 z-30 md:static md:z-auto"
+            style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+          >
+            <AnnouncementTicker items={tickers} />
+          </div>
+        )}
 
         {/* Page content */}
         <main className={`flex-1 px-4 pb-28 md:pt-8 md:pb-4 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'app-content-offset-ticker' : 'app-content-offset'}`}>
