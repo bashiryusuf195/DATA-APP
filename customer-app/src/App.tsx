@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from '@/router'
 import { useThemeStore } from '@/store/theme.store'
@@ -129,5 +129,10 @@ export default function App() {
     return cleanup
   }, [])
 
-  return <RouterProvider router={router} />
+  // Dark fallback matches the app background so lazy-chunk loads are invisible
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070B12]" />}>
+      <RouterProvider router={router} />
+    </Suspense>
+  )
 }

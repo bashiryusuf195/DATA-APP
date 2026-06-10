@@ -87,7 +87,12 @@ function NavItem({ to, label, icon: Icon }: NavEntry) {
 
 export function BottomNav() {
   return (
-    <nav className="fixed bottom-4 inset-x-4 z-40 md:hidden">
+    // bottom: calc(1rem + env(safe-area-inset-bottom)) lifts the nav above the
+    // Android gesture navigation bar / iPhone home indicator. On web/PWA it's 0px.
+    <nav
+      className="fixed inset-x-4 z-40 md:hidden"
+      style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+    >
       <div className="bg-white/85 dark:bg-[#161B22]/90 backdrop-blur-xl border border-border rounded-[2rem] shadow-modal">
         <ul className="flex items-center h-[62px] px-2">
           {NAV.map((item) => <NavItem key={item.to} {...item} />)}

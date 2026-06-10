@@ -3,8 +3,11 @@ import { Outlet } from 'react-router-dom'
 export function AuthLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-surface-0">
-      {/* Brand bar */}
-      <div className="flex items-center justify-center py-8">
+      {/* Brand bar — top padding accounts for Android status bar / iOS notch */}
+      <div
+        className="flex items-center justify-center pb-8"
+        style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))' }}
+      >
         <img src="/logo-horizontal.png" alt="Hive Data" className="w-[200px] h-auto object-contain" />
       </div>
 

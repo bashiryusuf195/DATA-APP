@@ -15,44 +15,52 @@ export function AppHeader() {
     staleTime: 60_000,
   })
 
-  const unread    = data?.unread_count ?? 0
-  const initials  = [user?.first_name?.[0], user?.last_name?.[0]].filter(Boolean).join('').toUpperCase()
-                 || (user?.email?.[0] ?? 'U').toUpperCase()
+  const unread   = data?.unread_count ?? 0
+  const initials = [user?.first_name?.[0], user?.last_name?.[0]].filter(Boolean).join('').toUpperCase()
+               || (user?.email?.[0] ?? 'U').toUpperCase()
 
   return (
-    <header className="md:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between h-14 px-4 bg-surface-1 border-b border-border">
-      {/* Brand */}
-      <Link to="/dashboard" className="flex items-center">
-        <img src="/logo-horizontal.png" alt="Hive Data" className="h-9 w-auto object-contain app-logo" />
-      </Link>
-
-      {/* Right: theme + bell + avatar */}
-      <div className="flex items-center gap-1">
-        <button
-          onClick={toggleDark}
-          className="p-2.5 rounded-xl hover:bg-surface-2 transition-colors pressable"
-          aria-label="Toggle dark mode"
-        >
-          {dark ? <Sun className="h-5 w-5 text-ink-muted" /> : <Moon className="h-5 w-5 text-ink-muted" />}
-        </button>
-        <Link to="/notifications" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition-colors pressable">
-          <Bell className="h-5 w-5 text-ink-muted" />
-          {unread > 0 && (
-            <span className={cn(
-              'absolute top-1.5 right-1.5 min-w-[16px] h-4 px-0.5',
-              'bg-danger text-white text-[9px] font-bold rounded-full',
-              'flex items-center justify-center'
-            )}>
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
+    // paddingTop: env(safe-area-inset-top) shifts the content below the Android
+    // status bar / iOS notch. On plain web/PWA this evaluates to 0px (no change).
+    // Requires viewport-fit=cover in the <meta viewport> tag (already set in index.html).
+    <header
+      className="md:hidden fixed top-0 inset-x-0 z-40 bg-surface-1 border-b border-border"
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+    >
+      <div className="flex items-center justify-between h-14 px-4">
+        {/* Brand */}
+        <Link to="/dashboard" className="flex items-center">
+          <img src="/logo-horizontal.png" alt="Hive Data" className="h-9 w-auto object-contain app-logo" />
         </Link>
 
-        <Link to="/profile" className="pressable ml-1">
-          <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center">
-            <span className="text-xs font-bold text-brand-700">{initials}</span>
-          </div>
-        </Link>
+        {/* Right: theme + bell + avatar */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleDark}
+            className="p-2.5 rounded-xl hover:bg-surface-2 transition-colors pressable"
+            aria-label="Toggle dark mode"
+          >
+            {dark ? <Sun className="h-5 w-5 text-ink-muted" /> : <Moon className="h-5 w-5 text-ink-muted" />}
+          </button>
+          <Link to="/notifications" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition-colors pressable">
+            <Bell className="h-5 w-5 text-ink-muted" />
+            {unread > 0 && (
+              <span className={cn(
+                'absolute top-1.5 right-1.5 min-w-[16px] h-4 px-0.5',
+                'bg-danger text-white text-[9px] font-bold rounded-full',
+                'flex items-center justify-center'
+              )}>
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </Link>
+
+          <Link to="/profile" className="pressable ml-1">
+            <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center">
+              <span className="text-xs font-bold text-brand-700">{initials}</span>
+            </div>
+          </Link>
+        </div>
       </div>
     </header>
   )

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, Navigate } from 'react-router-dom'
 import { Mail, Lock, Smartphone, ArrowLeft, Fingerprint, Eye, EyeOff } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { ONBOARDING_KEY } from '@/pages/onboarding/Onboarding'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
@@ -44,11 +45,16 @@ export function LoginPage() {
       sessionStorage.removeItem('password_reset_success')
       toast.success('Password updated! Sign in with your new password.')
     }
-    // First-time mobile visitors see onboarding before login
+    // First-time mobile visitors see onboarding before login.
+    // Skipped on Android native — NativeEntry already routes to /login directly.
     const isMobile = window.innerWidth < 768
-    if (isMobile && !localStorage.getItem(ONBOARDING_KEY)) {
+    if (!Capacitor.isNativePlatform() && isMobile && !localStorage.getItem(ONBOARDING_KEY)) {
       navigate('/onboarding', { replace: true })
     }
+
+    // Passkey/WebAuthn is not supported in Capacitor Android WebView — skip all
+    // ceremony setup on native to avoid a wasted authBegin network round-trip.
+    if (Capacitor.isNativePlatform()) return
 
     // Explicit biometric button: check platform authenticator availability
     if (isWebAuthnSupported()) {
