@@ -175,10 +175,9 @@ export default function App() {
     })
 
     const action = PushNotifications.addListener('pushNotificationActionPerformed', (a) => {
-      const link = a.notification.data?.deep_link
-      if (typeof link === 'string' && link.startsWith('/')) {
-        router.navigate(link)
-      }
+      const raw  = a.notification.data?.deep_link
+      const link = typeof raw === 'string' && raw.startsWith('/') ? raw : '/dashboard'
+      router.navigate(link)
     })
 
     return () => {
