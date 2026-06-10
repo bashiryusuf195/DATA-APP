@@ -41,8 +41,11 @@ export const useAuthStore = create<AuthState>()(
 
       clearAuth: () =>
         set((s) => s.biometric_enabled
-          // Keep refresh_token + session_id so biometric re-login works after logout
-          ? { access_token: null, user: null }
+          // Only clear access_token — keep refresh_token, session_id, and user so
+          // biometric re-login can immediately call setAuth() without a me() round-trip.
+          // (The request interceptor reads access_token from the store; calling me()
+          // before setAuth() would send a no-auth request and trigger redirectToLogin.)
+          ? { access_token: null }
           : { access_token: null, refresh_token: null, session_id: null, user: null }
         ),
 

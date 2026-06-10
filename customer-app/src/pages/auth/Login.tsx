@@ -40,6 +40,7 @@ export function LoginPage() {
   const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled)
   const refresh_token       = useAuthStore((s) => s.refresh_token)
   const storedSessionId     = useAuthStore((s) => s.session_id)
+  const storedUser          = useAuthStore((s) => s.user)
   const navigate = useNavigate()
 
   const [nativeBiometricReady,   setNativeBiometricReady]   = useState(false)
@@ -137,26 +138,31 @@ export function LoginPage() {
       const result = await performNativeBiometric('Sign in to Hive Data')
       if (result !== 'success') return // cancelled — stay on login, no error shown
 
-      if (!refresh_token) {
+      if (!refresh_token || !storedUser) {
         setBiometricEnabled(false)
         setError('Session expired. Please sign in with your password.')
         return
       }
 
       const tokens = await authApi.refresh(refresh_token)
-      // Set auth header before calling me() so the request is authenticated
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`
-      const freshUser = await authApi.me()
+
+      // Call setAuth() BEFORE any further API calls.
+      // The request interceptor reads access_token from the store — calling me()
+      // before setAuth() would send an unauthenticated request and trigger
+      // the 401 redirect guard. setAuth() is synchronous, so any request after
+      // it immediately uses the correct token. AppLayout refreshes user data
+      // via /auth/me in the background once the dashboard mounts.
       setAuth({
         access_token:  tokens.access_token,
         refresh_token: tokens.refresh_token,
         session_id:    storedSessionId ?? '',
-        user:          freshUser,
+        user:          storedUser,
       })
+
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch {
-      // Token expired or network error — disable biometric and fall back to normal login
+      // Refresh token expired or network error
       setBiometricEnabled(false)
       setError('Session expired. Please sign in with your password.')
     } finally {
