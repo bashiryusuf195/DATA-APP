@@ -100,7 +100,12 @@ function normalizeNinReportData(d: Record<string, unknown>) {
     residence_lga:   str(d.residence_lga   ?? d.residenceLga   ?? d.residence_lga_name),
     birth_lga:       str(d.birth_lga       ?? d.birthLga),
     address:         str(d.address         ?? d.residential_address),
-    photo:           typeof d.photo === "string" ? d.photo : undefined,
+    // Provider returns photo under "image" key; "signature" is checked as a
+    // secondary fallback for providers that use that field name instead.
+    photo:           typeof d.photo     === "string" ? d.photo
+                   : typeof d.image     === "string" ? d.image
+                   : typeof d.signature === "string" ? d.signature
+                   : undefined,
   };
 }
 
@@ -123,7 +128,10 @@ function normalizeBvnReportData(d: Record<string, unknown>) {
     residence_state:        str(d.residence_state        ?? d.residenceState        ?? d.stateOfResidence),
     residence_lga:          str(d.residence_lga          ?? d.residenceLga          ?? d.residence_lga_name),
     address:                str(d.address                ?? d.residential_address),
-    photo:                  typeof d.photo === "string" ? d.photo : undefined,
+    photo:                  typeof d.photo     === "string" ? d.photo
+                          : typeof d.image     === "string" ? d.image
+                          : typeof d.signature === "string" ? d.signature
+                          : undefined,
   };
 }
 
