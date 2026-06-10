@@ -37,7 +37,6 @@ export function LoginPage() {
   const biometricEnabled    = useAuthStore((s) => s.biometric_enabled)
   const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled)
   const refresh_token       = useAuthStore((s) => s.refresh_token)
-  const storedUser          = useAuthStore((s) => s.user)
   const storedSessionId     = useAuthStore((s) => s.session_id)
   const navigate = useNavigate()
 
@@ -97,11 +96,11 @@ export function LoginPage() {
     }
   }, [navigate])
 
-  // Native Android: check if biometric is available on device
+  // Native Android: check if biometric hardware is available
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !biometricEnabled || !refresh_token) return
+    if (!Capacitor.isNativePlatform() || !biometricEnabled) return
     checkNativeBiometricAvailable().then(setNativeBiometricReady)
-  }, [biometricEnabled, refresh_token])
+  }, [biometricEnabled])
 
   if (!_hasHydrated) return null
   if (access_token) return <Navigate to="/dashboard" replace />
@@ -134,23 +133,28 @@ export function LoginPage() {
     setError('')
     try {
       const result = await performNativeBiometric('Sign in to Hive Data')
-      if (result !== 'success') return // cancelled — stay on login, no error
-      if (!refresh_token || !storedUser) {
+      if (result !== 'success') return // cancelled — stay on login, no error shown
+
+      if (!refresh_token) {
         setBiometricEnabled(false)
         setError('Session expired. Please sign in with your password.')
         return
       }
+
       const tokens = await authApi.refresh(refresh_token)
+      // Set auth header before calling me() so the request is authenticated
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`
+      const freshUser = await authApi.me()
       setAuth({
         access_token:  tokens.access_token,
         refresh_token: tokens.refresh_token,
         session_id:    storedSessionId ?? '',
-        user:          storedUser,
+        user:          freshUser,
       })
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch {
+      // Token expired or network error — disable biometric and fall back to normal login
       setBiometricEnabled(false)
       setError('Session expired. Please sign in with your password.')
     } finally {
@@ -265,7 +269,7 @@ export function LoginPage() {
         {error && <p className="text-xs text-danger">{error}</p>}
         <Button type="submit" loading={loading} fullWidth>Sign in</Button>
       </form>
-      {Capacitor.isNativePlatform() && biometricEnabled && nativeBiometricReady && !!refresh_token && (
+      {Capacitor.isNativePlatform() && biometricEnabled && nativeBiometricReady && (
         <>
           <div className="flex items-center gap-3 mt-5">
             <div className="flex-1 h-px bg-border" />
