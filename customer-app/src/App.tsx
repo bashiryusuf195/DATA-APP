@@ -3,6 +3,8 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from '@/router'
 import { useThemeStore } from '@/store/theme.store'
 import { getFirebaseApp } from '@/lib/firebase'
+import { Capacitor } from '@capacitor/core'
+import { SplashScreen } from '@capacitor/splash-screen'
 
 // ── Service worker helpers ─────────────────────────────────────────────────────
 
@@ -110,7 +112,19 @@ export default function App() {
   }, [dark])
 
   useEffect(() => {
-    registerFcmServiceWorker()
+    // Hide the native splash screen now that React has rendered its first frame.
+    // launchAutoHide is false in capacitor.config.ts so this is mandatory on native;
+    // it is a no-op on web.
+    if (Capacitor.isNativePlatform()) {
+      SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {})
+    }
+
+    // Service workers are not supported in Capacitor Android WebView — skip
+    // registration to avoid console noise and unnecessary work on native.
+    if (!Capacitor.isNativePlatform()) {
+      registerFcmServiceWorker()
+    }
+
     const cleanup = listenForSwNavigation()
     return cleanup
   }, [])

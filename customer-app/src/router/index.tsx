@@ -1,12 +1,26 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { AppLayout }  from '@/components/layout/AppLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { ProtectedRoute } from './ProtectedRoute'
 import { RouteError } from '@/components/shared/RouteError'
+import { useAuthStore } from '@/store/auth.store'
 
 // Public pages
 import { LandingPage }    from '@/pages/landing/Landing'
 import { OnboardingPage } from '@/pages/onboarding/Onboarding'
+
+// On native (Android/iOS) skip the web marketing landing page entirely.
+// Show a plain dark screen while Zustand rehydrates from localStorage,
+// then immediately navigate to /dashboard (logged in) or /login (logged out).
+function NativeEntry() {
+  const token    = useAuthStore((s) => s.access_token)
+  const hydrated = useAuthStore((s) => s._hasHydrated)
+  if (!hydrated) return <div className="min-h-screen bg-[#070B12]" />
+  return <Navigate to={token ? '/dashboard' : '/login'} replace />
+}
+
+const rootElement = Capacitor.isNativePlatform() ? <NativeEntry /> : <LandingPage />
 
 // Legal pages
 import { LegalLayout }        from '@/pages/legal/LegalLayout'
@@ -46,7 +60,7 @@ import { SupportPage }       from '@/pages/support/Support'
 
 export const router = createBrowserRouter([
   // ── Public pages ─────────────────────────────────────────────────────────────
-  { path: '/',           element: <LandingPage />,    errorElement: <RouteError /> },
+  { path: '/',           element: rootElement,         errorElement: <RouteError /> },
   { path: '/onboarding', element: <OnboardingPage />, errorElement: <RouteError /> },
 
   // ── Auth ────────────────────────────────────────────────────────────────────
