@@ -31,6 +31,7 @@ import { notificationsRouter }       from "./modules/notifications/routes/notifi
 import { adminRouter }               from "./routes/admin.routes";
 import { publicAuditMiddleware }       from "./middleware/publicAudit";
 import { publicRouter }               from "./modules/public/routes/public.routes";
+import { transactionPinRouter }       from "./modules/security/routes/transaction-pin.routes";
 import "./modules/queue";
 export const app = express();
 
@@ -110,13 +111,14 @@ app.use(publicAuditMiddleware);
 
 app.use('/api/v1', rootRouter);       // versioned API — includes /api/v1/admin/*
 app.use("/admin",  adminRouter);      // unversioned alias — dev proxy + direct access
-app.use("/auth",         authRouter);
-app.use("/wallet",       walletRouter);
-app.use("/transactions", transactionRouter);
-app.use("/services",     catalogRouter);
-app.use("/notifications", notificationsRouter);
-app.use("/webhooks",     webhookRouter);
-app.use("/public",       publicRouter);
+app.use("/auth",                      authRouter);
+app.use("/wallet",                    walletRouter);
+app.use("/transactions",              transactionRouter);
+app.use("/services",                  catalogRouter);
+app.use("/notifications",             notificationsRouter);
+app.use("/webhooks",                  webhookRouter);
+app.use("/public",                    publicRouter);
+app.use("/security/transaction-pin",  transactionPinRouter);
 
 // ── 7. 404 handler ───────────────────────────────────────────────────────────
 // Must come AFTER all routes so it only fires if nothing else matched.
