@@ -1,4 +1,5 @@
-import { NavLink, Link } from 'react-router-dom'
+import { NavLink, Link, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Home, Wallet, ArrowLeftRight, Bell,
   Gift, User, Settings, Zap, LogOut, Headphones,
@@ -20,12 +21,15 @@ const NAV = [
 ]
 
 export function Sidebar() {
-  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const clearAuth   = useAuthStore((s) => s.clearAuth)
+  const navigate    = useNavigate()
+  const queryClient = useQueryClient()
 
   const handleLogout = async () => {
     try { await authApi.logout() } catch { /* ignore */ }
     clearAuth()
-    window.location.href = '/login'
+    queryClient.clear()
+    navigate('/login', { replace: true })
   }
 
   return (

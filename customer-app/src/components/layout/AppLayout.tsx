@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Outlet, Link, ScrollRestoration } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { Link, ScrollRestoration } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Sidebar }                from './Sidebar'
 import { BottomNav }              from './BottomNav'
 import { AppHeader }              from './AppHeader'
@@ -7,23 +8,41 @@ import { PinSetupModal }          from '@/components/shared/PinSetupModal'
 import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
 import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
 import { NotificationPromptModal, shouldShowNotificationPrompt } from '@/components/shared/NotificationPromptModal'
-import { SupportWidget } from '@/components/shared/SupportWidget'
+import { SupportWidget }          from '@/components/shared/SupportWidget'
+import { PwaInstallSheet }        from '@/components/shared/PwaInstallSheet'
+import { PageTransition }         from '@/components/shared/PageTransition'
+import { PullToRefreshIndicator } from '@/components/shared/PullToRefresh'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
 import { useAuthStore }           from '@/store/auth.store'
+import { useThemeStore }          from '@/store/theme.store'
+import { usePwaInstall }          from '@/hooks/usePwaInstall'
+import { usePullToRefresh }       from '@/hooks/usePullToRefresh'
 import { authApi }                from '@/api/auth.api'
 
 export function AppLayout() {
-  const user    = useAuthStore((s) => s.user)
-  const setUser = useAuthStore((s) => s.setUser)
+  const user             = useAuthStore((s) => s.user)
+  const setUser          = useAuthStore((s) => s.setUser)
+  const setBalanceHidden = useThemeStore((s) => s.setBalanceHidden)
+  const dark             = useThemeStore((s) => s.dark)
+
+  // Sync Android status-bar / browser chrome colour with the app theme
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (meta) meta.content = dark ? '#0D1117' : '#ECEEF6'
+  }, [dark])
 
   // Refresh user profile from /auth/me on every app load so the store is never
-  // stale. The login response historically omitted profile fields (first_name,
-  // last_name, phone, etc.) — this call hydrates them after the persisted state
-  // is loaded. Silently ignored on network error so the cached store is used.
+  // stale. Also syncs balance_hidden preference from the server so the setting
+  // persists across devices and after logout/login.
   useEffect(() => {
     if (!user) return
     authApi.me()
-      .then((fresh) => setUser(fresh))
+      .then((fresh) => {
+        setUser(fresh)
+        if (fresh.preferences?.balance_hidden !== undefined) {
+          setBalanceHidden(fresh.preferences.balance_hidden as boolean)
+        }
+      })
       .catch(() => { /* keep existing store data on network error */ })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -46,6 +65,27 @@ export function AppLayout() {
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!user])
+
+  // Pull-to-refresh — invalidates all active queries; disabled until user is loaded
+  const queryClient  = useQueryClient()
+  const handleRefresh = useCallback(
+    () => queryClient.invalidateQueries(),
+    [queryClient],
+  )
+  const { ptrState, distance } = usePullToRefresh(handleRefresh, !!user)
+
+  // PWA install prompt — event listeners registered early so beforeinstallprompt is never missed.
+  // Shown 4.5 s after page load, only after second visit, and only if no higher-priority
+  // modal (PIN setup, notification prompt) is currently visible.
+  const pwa = usePwaInstall()
+  const [showPwaSheet, setShowPwaSheet] = useState(false)
+
+  useEffect(() => {
+    if (!pwa.shouldShow) return
+    const t = setTimeout(() => setShowPwaSheet(true), 4500)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwa.shouldShow])
 
   const { data: announcements = [] } = useAnnouncements()
   const popups  = announcements.filter((a) => a.display_type === 'popup')
@@ -70,7 +110,7 @@ export function AppLayout() {
 
         {/* Page content */}
         <main className={`flex-1 px-4 pb-28 md:pt-8 md:pb-4 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'pt-[80px]' : 'pt-[72px]'}`}>
-          <Outlet />
+          <PageTransition />
         </main>
 
         {/* Desktop legal footer */}
@@ -88,6 +128,9 @@ export function AppLayout() {
       {/* Mobile bottom nav */}
       <BottomNav />
 
+      {/* Pull-to-refresh indicator — mobile only, renders above content below header */}
+      <PullToRefreshIndicator ptrState={ptrState} distance={distance} />
+
       {/* Mandatory PIN setup — shown once per session until PIN is created */}
       {showSetup && (
         <PinSetupModal
@@ -104,6 +147,16 @@ export function AppLayout() {
       {/* Push notification onboarding — only after higher-priority modals are gone */}
       {!showSetup && showNotifPrompt && (
         <NotificationPromptModal onClose={() => setShowNotifPrompt(false)} />
+      )}
+
+      {/* PWA install prompt — deferred until higher-priority modals are gone */}
+      {!showSetup && !showNotifPrompt && showPwaSheet && (
+        <PwaInstallSheet
+          isIos={pwa.isIos}
+          onInstall={pwa.install}
+          onDismiss={() => { pwa.dismiss(); setShowPwaSheet(false) }}
+          onClose={() => setShowPwaSheet(false)}
+        />
       )}
 
       {/* Floating support widget */}

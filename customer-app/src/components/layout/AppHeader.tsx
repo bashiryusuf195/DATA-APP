@@ -27,15 +27,15 @@ export function AppHeader() {
       </Link>
 
       {/* Right: theme + bell + avatar */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <button
           onClick={toggleDark}
-          className="p-2 rounded-xl hover:bg-surface-2 transition-colors"
+          className="p-2.5 rounded-xl hover:bg-surface-2 transition-colors pressable"
           aria-label="Toggle dark mode"
         >
           {dark ? <Sun className="h-5 w-5 text-ink-muted" /> : <Moon className="h-5 w-5 text-ink-muted" />}
         </button>
-        <Link to="/notifications" className="relative p-2 rounded-xl hover:bg-surface-2 transition-colors">
+        <Link to="/notifications" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition-colors pressable">
           <Bell className="h-5 w-5 text-ink-muted" />
           {unread > 0 && (
             <span className={cn(
@@ -48,7 +48,7 @@ export function AppHeader() {
           )}
         </Link>
 
-        <Link to="/profile">
+        <Link to="/profile" className="pressable ml-1">
           <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center">
             <span className="text-xs font-bold text-brand-700">{initials}</span>
           </div>

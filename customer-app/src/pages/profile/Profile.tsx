@@ -134,7 +134,8 @@ export function ProfilePage() {
     setLogging(true)
     try { await authApi.logout() } catch { /* ignore */ }
     clearAuth()
-    window.location.href = '/login'
+    qc.clear()
+    navigate('/login', { replace: true })
   }
 
   const push = usePushNotifications()
