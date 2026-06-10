@@ -44,7 +44,12 @@ export async function downloadReceiptController(
       .join(" ") || user?.email || "—";
 
     // ── Provider pretty-name ─────────────────────────────────────────────────
-    const meta     = (tx.metadata ?? {}) as Record<string, unknown>;
+    // Older rows may store metadata as a JSON string rather than a parsed object
+    let rawMeta = tx.metadata;
+    if (typeof rawMeta === "string") {
+      try { rawMeta = JSON.parse(rawMeta); } catch { rawMeta = {}; }
+    }
+    const meta     = (rawMeta ?? {}) as Record<string, unknown>;
     const provResp = (meta.provider_response ?? {}) as Record<string, unknown>;
     const rawProvider = String(
       (tx.provider ?? meta.provider ?? provResp.provider ?? meta.service_id) ?? ""

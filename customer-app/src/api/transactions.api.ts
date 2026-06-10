@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { apiClient } from './client'
 import type {
   Transaction,
@@ -109,16 +110,30 @@ export const transactionsApi = {
 
   /** Download a PDF receipt for any transaction type. */
   downloadReceipt: async (reference: string): Promise<void> => {
-    const resp = await apiClient.get(
-      `/transactions/${reference}/receipt`,
-      { responseType: 'blob' },
-    )
-    const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
-    const objUrl = URL.createObjectURL(blob)
-    const a      = document.createElement('a')
-    a.href       = objUrl
-    a.download   = `hivedata-receipt-${reference}.pdf`
-    a.click()
-    URL.revokeObjectURL(objUrl)
+    try {
+      const resp = await apiClient.get(
+        `/transactions/${reference}/receipt`,
+        { responseType: 'blob' },
+      )
+      const blob   = new Blob([resp.data as BlobPart], { type: 'application/pdf' })
+      const objUrl = URL.createObjectURL(blob)
+      const a      = document.createElement('a')
+      a.href       = objUrl
+      a.download   = `hivedata-receipt-${reference}.pdf`
+      a.click()
+      URL.revokeObjectURL(objUrl)
+    } catch (err) {
+      // When responseType:'blob', error body is a Blob — parse it to surface the real message
+      if (axios.isAxiosError(err) && err.response?.data instanceof Blob) {
+        try {
+          const text = await (err.response.data as Blob).text()
+          const json = JSON.parse(text) as { error?: string; message?: string }
+          throw new Error(json.error ?? json.message ?? 'Could not generate receipt')
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== 'Could not generate receipt') throw parseErr
+        }
+      }
+      throw err
+    }
   },
 }

@@ -246,12 +246,20 @@ export function ProfilePage() {
                   <AlertCircle className="h-3 w-3" /> Email Not Verified
                 </span>
               )}
-              <span className={cn('flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold', kycBadgeStyle(kycLevel))}>
-                {kycLevel >= 2
-                  ? <BadgeCheck className="h-3 w-3" />
-                  : <Shield className="h-3 w-3" />}
-                KYC {KYC_LABEL[kycLevel] ?? 'Not Started'}
-              </span>
+              {kycLevel >= 2 ? (
+                <span className={cn('flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold', kycBadgeStyle(kycLevel))}>
+                  <BadgeCheck className="h-3 w-3" />
+                  KYC {KYC_LABEL[kycLevel] ?? 'Not Started'}
+                </span>
+              ) : (
+                <button
+                  onClick={() => navigate('/kyc')}
+                  className={cn('flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold pressable', kycBadgeStyle(kycLevel))}
+                >
+                  <Shield className="h-3 w-3" />
+                  KYC {KYC_LABEL[kycLevel] ?? 'Not Started'}
+                </button>
+              )}
             </div>
           </div>
 

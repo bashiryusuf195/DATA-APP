@@ -17,10 +17,7 @@ export function useBalanceVisibility() {
           // Keep the user store in sync so future me() calls start correct
           setUser({ ...user, preferences: { ...user.preferences, balance_hidden: next } })
         })
-        .catch(() => {
-          // Revert local state if the server call fails
-          setBalanceHidden(hidden)
-        })
+        .catch(() => { /* keep local state — don't revert the user's choice */ })
     }
   }
 

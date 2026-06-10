@@ -512,8 +512,9 @@ function ActionBar({ tx }: { tx: Transaction }) {
     setDownloading(true)
     try {
       await transactionsApi.downloadReceipt(tx.reference)
-    } catch {
-      toast.error('Could not generate receipt. Please try again.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not generate receipt. Please try again.'
+      toast.error(msg)
     } finally {
       setDownloading(false)
     }
