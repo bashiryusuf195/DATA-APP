@@ -34,14 +34,25 @@ export async function downloadReceiptController(
     }
 
     // ── Fetch customer profile ───────────────────────────────────────────────
-    const user = await db("users")
-      .where({ id: userId })
-      .select("first_name", "last_name", "email", "phone")
-      .first();
+    // users table: email, phone — no name columns
+    // user_profiles table: first_name, last_name, display_name (joined via user_id)
+    const [user, profile] = await Promise.all([
+      db("users")
+        .where({ id: userId })
+        .select("email", "phone")
+        .first(),
+      db("user_profiles")
+        .where({ user_id: userId })
+        .select("first_name", "last_name", "display_name")
+        .first(),
+    ]);
 
-    const fullName = [user?.first_name, user?.last_name]
-      .filter(Boolean)
-      .join(" ") || user?.email || "—";
+    const fullName =
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+      profile?.display_name ||
+      user?.email ||
+      req.user!.email ||
+      "Customer";
 
     // ── Provider pretty-name ─────────────────────────────────────────────────
     // Older rows may store metadata as a JSON string rather than a parsed object
