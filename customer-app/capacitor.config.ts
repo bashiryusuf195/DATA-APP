@@ -10,12 +10,13 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     SplashScreen: {
-      // Do not auto-hide — we call SplashScreen.hide() from App.tsx once React
-      // has rendered so the user never sees the blank WebView loading gap.
       launchAutoHide: false,
-      // Match the app's dark background so the transition is seamless.
       backgroundColor: '#070B12',
       showSpinner: false,
+    },
+    PushNotifications: {
+      // Show the system permission dialog on first launch (Android 13+)
+      presentationOptions: ['alert', 'badge', 'sound'],
     },
   },
 }

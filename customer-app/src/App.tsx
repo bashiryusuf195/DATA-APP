@@ -6,6 +6,9 @@ import { getFirebaseApp } from '@/lib/firebase'
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { App as CapApp } from '@capacitor/app'
+import { PushNotifications } from '@capacitor/push-notifications'
+import toast from 'react-hot-toast'
+import { notificationsApi } from '@/api/notifications.api'
 
 // ── Service worker helpers ─────────────────────────────────────────────────────
 
@@ -131,8 +134,6 @@ export default function App() {
   }, [])
 
   // Android hardware back button — navigate back in SPA history, or exit if at root.
-  // Prevents Capacitor's default behavior of exiting the app on every back press.
-  // No-op on web/PWA (Capacitor.isNativePlatform() is false).
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -146,6 +147,43 @@ export default function App() {
     })
 
     return () => { listenerPromise.then(h => h.remove()) }
+  }, [])
+
+  // Native Android push — global listeners active for the full app lifetime.
+  // • registration  → send FCM token to backend when register() is called
+  // • registrationError → log failure
+  // • pushNotificationReceived → foreground toast (system tray suppressed when app is open)
+  // • pushNotificationActionPerformed → deep-link on notification tap
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const reg = PushNotifications.addListener('registration', async ({ value: token }) => {
+      console.log('[Push:android] FCM token received')
+      try {
+        await notificationsApi.registerPushToken({ token, platform: 'android' })
+      } catch (err) {
+        console.error('[Push:android] Token send failed:', err)
+      }
+    })
+
+    const regErr = PushNotifications.addListener('registrationError', (e) => {
+      console.error('[Push:android] Registration error:', e.error)
+    })
+
+    const received = PushNotifications.addListener('pushNotificationReceived', (n) => {
+      toast(n.title ?? 'New notification', { icon: '🔔', duration: 4000 })
+    })
+
+    const action = PushNotifications.addListener('pushNotificationActionPerformed', (a) => {
+      const link = a.notification.data?.deep_link
+      if (typeof link === 'string' && link.startsWith('/')) {
+        router.navigate(link)
+      }
+    })
+
+    return () => {
+      Promise.all([reg, regErr, received, action]).then((hs) => hs.forEach((h) => h.remove()))
+    }
   }, [])
 
   // Dark fallback matches the app background so lazy-chunk loads are invisible
