@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { SlidersHorizontal, ArrowLeft, Lock, Bell, ShieldCheck, KeyRound, AlertCircle, Fingerprint, Trash2, Plus, ChevronRight, FileText, Eye, EyeOff } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -12,6 +13,7 @@ import { PinSetupModal } from '@/components/shared/PinSetupModal'
 import { useAuthStore } from '@/store/auth.store'
 import { isWebAuthnSupported, isPlatformAuthenticatorAvailable, registerPasskey } from '@/hooks/usePasskey'
 import { usePushNotifications, attachForegroundListener } from '@/hooks/usePushNotifications'
+import { checkNativeBiometricAvailable, performNativeBiometric } from '@/hooks/useBiometricAuth'
 import type { NotificationPreferences } from '@/types'
 import { fmtDateTime } from '@/utils/format'
 
@@ -59,8 +61,10 @@ function ToggleRow({
 export function SettingsPage() {
   const navigate  = useNavigate()
   const qc        = useQueryClient()
-  const user      = useAuthStore((s) => s.user)
-  const setUser   = useAuthStore((s) => s.setUser)
+  const user                = useAuthStore((s) => s.user)
+  const setUser             = useAuthStore((s) => s.setUser)
+  const biometricEnabled    = useAuthStore((s) => s.biometric_enabled)
+  const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled)
 
   // ── Change password ────────────────────────────────────────────────────────
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' })
@@ -238,6 +242,36 @@ export function SettingsPage() {
   // ── Passkeys ───────────────────────────────────────────────────────────────
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [registeringPasskey, setRegisteringPasskey] = useState(false)
+
+  // ── Native biometric (Android only) ────────────────────────────────────────
+  const [nativeBiometricAvailable, setNativeBiometricAvailable] = useState(false)
+  const [nativeBiometricLoading, setNativeBiometricLoading]     = useState(false)
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    checkNativeBiometricAvailable().then(setNativeBiometricAvailable)
+  }, [])
+
+  const handleNativeBiometricToggle = async (shouldEnable: boolean) => {
+    setNativeBiometricLoading(true)
+    try {
+      if (shouldEnable) {
+        const result = await performNativeBiometric('Confirm your identity to enable biometric login')
+        if (result === 'success') {
+          setBiometricEnabled(true)
+          toast.success('Biometric login enabled')
+        } else if (result === 'failed') {
+          toast.error('Biometric verification failed. Please try again.')
+        }
+        // 'cancelled' → do nothing, toggle stays off
+      } else {
+        setBiometricEnabled(false)
+        toast.success('Biometric login disabled')
+      }
+    } finally {
+      setNativeBiometricLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (isWebAuthnSupported()) {
@@ -450,83 +484,109 @@ export function SettingsPage() {
           <div className="flex items-center gap-2 mb-4">
             <Fingerprint className="h-4 w-4 text-ink-muted" />
             <p className="text-sm font-semibold text-ink">Biometric Login</p>
-            {passkeys && passkeys.length > 0 && (
+            {!Capacitor.isNativePlatform() && passkeys && passkeys.length > 0 && (
               <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">
                 {passkeys.length} device{passkeys.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
 
-          {passkeysLoading ? (
-            <div className="space-y-2">
-              {[...Array(2)].map((_, i) => (
-                <div key={i} className="h-11 bg-surface-2 rounded-xl animate-pulse" />
-              ))}
-            </div>
-          ) : passkeys && passkeys.length > 0 ? (
-            <div className="space-y-2 mb-3">
-              {passkeys.map((pk) => (
-                <div
-                  key={pk.id}
-                  className="flex items-center justify-between gap-3 bg-surface-0 rounded-xl px-3.5 py-2.5"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Fingerprint className="h-4 w-4 text-brand-600 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink truncate">
-                        {pk.friendly_name ?? 'Passkey'}
-                        {pk.backed_up && (
-                          <span className="ml-1.5 text-[10px] font-semibold text-ink-faint bg-surface-2 px-1.5 py-0.5 rounded-full">
-                            Synced
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-ink-faint">
-                        {pk.last_used_at
-                          ? `Last used ${fmtDateTime(pk.last_used_at)}`
-                          : `Added ${fmtDateTime(pk.created_at)}`}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => revokePasskeyMutation.mutate(pk.id)}
-                    disabled={revokePasskeyMutation.isPending}
-                    className="shrink-0 p-1.5 rounded-lg text-ink-faint hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
-                    title="Remove passkey"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+          {Capacitor.isNativePlatform() ? (
+            // Android native biometric toggle
+            nativeBiometricAvailable ? (
+              <ToggleRow
+                label="Enable Biometric Login"
+                hint="Use fingerprint or face to sign in"
+                checked={biometricEnabled}
+                onChange={handleNativeBiometricToggle}
+                disabled={nativeBiometricLoading}
+              />
+            ) : (
+              <div className="flex items-start gap-2.5 rounded-xl bg-surface-0 border border-border px-4 py-3">
+                <Fingerprint className="h-4 w-4 text-ink-faint shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-ink-muted">Not available on this device</p>
+                  <p className="text-xs text-ink-faint mt-0.5">
+                    Biometric login requires fingerprint or face recognition to be enrolled on your device.
+                  </p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-ink-muted mb-3">
-              No passkeys registered. Add this device to sign in with biometrics.
-            </p>
-          )}
-
-          {biometricAvailable ? (
-            <Button
-              fullWidth
-              variant="outline"
-              icon={<Plus className="h-4 w-4" />}
-              loading={registeringPasskey}
-              onClick={handleAddPasskey}
-            >
-              Add this device
-            </Button>
-          ) : (
-            <div className="flex items-start gap-2.5 rounded-xl bg-surface-0 border border-border px-4 py-3">
-              <Fingerprint className="h-4 w-4 text-ink-faint shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-ink-muted">Not supported on this device</p>
-                <p className="text-xs text-ink-faint mt-0.5">
-                  Biometric login requires a device with fingerprint, Face ID, or Windows Hello.
-                  Try Chrome or Safari on a supported device.
-                </p>
               </div>
-            </div>
+            )
+          ) : (
+            // Web passkeys
+            <>
+              {passkeysLoading ? (
+                <div className="space-y-2">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="h-11 bg-surface-2 rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : passkeys && passkeys.length > 0 ? (
+                <div className="space-y-2 mb-3">
+                  {passkeys.map((pk) => (
+                    <div
+                      key={pk.id}
+                      className="flex items-center justify-between gap-3 bg-surface-0 rounded-xl px-3.5 py-2.5"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Fingerprint className="h-4 w-4 text-brand-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-ink truncate">
+                            {pk.friendly_name ?? 'Passkey'}
+                            {pk.backed_up && (
+                              <span className="ml-1.5 text-[10px] font-semibold text-ink-faint bg-surface-2 px-1.5 py-0.5 rounded-full">
+                                Synced
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-ink-faint">
+                            {pk.last_used_at
+                              ? `Last used ${fmtDateTime(pk.last_used_at)}`
+                              : `Added ${fmtDateTime(pk.created_at)}`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => revokePasskeyMutation.mutate(pk.id)}
+                        disabled={revokePasskeyMutation.isPending}
+                        className="shrink-0 p-1.5 rounded-lg text-ink-faint hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
+                        title="Remove passkey"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-ink-muted mb-3">
+                  No passkeys registered. Add this device to sign in with biometrics.
+                </p>
+              )}
+
+              {biometricAvailable ? (
+                <Button
+                  fullWidth
+                  variant="outline"
+                  icon={<Plus className="h-4 w-4" />}
+                  loading={registeringPasskey}
+                  onClick={handleAddPasskey}
+                >
+                  Add this device
+                </Button>
+              ) : (
+                <div className="flex items-start gap-2.5 rounded-xl bg-surface-0 border border-border px-4 py-3">
+                  <Fingerprint className="h-4 w-4 text-ink-faint shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-ink-muted">Not supported on this device</p>
+                    <p className="text-xs text-ink-faint mt-0.5">
+                      Biometric login requires a device with fingerprint, Face ID, or Windows Hello.
+                      Try Chrome or Safari on a supported device.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
