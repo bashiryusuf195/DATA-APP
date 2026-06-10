@@ -186,12 +186,7 @@ export function LoginPage() {
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      if (isAxiosError(err)) {
-        setError(err.response?.data?.message ?? 'Invalid credentials.')
-      } else {
-        const msg = (err instanceof Error) ? err.message : String(err)
-        setError(`Error: ${msg}`)
-      }
+      setError(isAxiosError(err) ? (err.response?.data?.message ?? 'Invalid credentials.') : 'Login failed.')
     } finally {
       setLoading(false)
     }
