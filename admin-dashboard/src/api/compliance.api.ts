@@ -50,6 +50,12 @@ export const complianceApi = {
       .then((r) => r.data.data)
   },
 
+  reviewIdentityVerification(userId: string, body: { type: 'nin' | 'bvn'; action: 'approve' | 'reject'; notes?: string }): Promise<KycUser> {
+    return apiClient
+      .patch<{ success: boolean; data: KycUser }>(`/admin/kyc/users/${userId}/verify-identity`, body)
+      .then((r) => r.data.data)
+  },
+
   // ── Risk Flags ────────────────────────────────────────────────────────────────
 
   listRiskFlags(params: {

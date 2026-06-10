@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { AppError } from "../../../shared/errors/AppError";
-import { listKycUsers, listKycVerifications, updateKycStatus } from "../services/kyc.service";
+import { listKycUsers, listKycVerifications, updateKycStatus, reviewIdentityVerification } from "../services/kyc.service";
 import { listRiskFlags, createRiskFlag, updateRiskFlag }       from "../services/risk.service";
 import { listComplianceReports, getComplianceReport }          from "../services/compliance.service";
 import { listBlacklist, addToBlacklist, removeFromBlacklist }  from "../services/blacklist.service";
@@ -25,6 +25,12 @@ function paginationFrom(req: Request): { page: number; limit: number } {
 const KycStatusSchema = z.object({
   kyc_level: z.enum(["none", "tier_1", "tier_2", "tier_3"]),
   notes:     z.string().optional(),
+});
+
+const ReviewVerificationSchema = z.object({
+  type:   z.enum(["nin", "bvn"]),
+  action: z.enum(["approve", "reject"]),
+  notes:  z.string().optional(),
 });
 
 const FLAG_TYPES = [
@@ -143,6 +149,21 @@ export async function updateKycStatusController(
 
     const updated = await updateKycStatus(id, data, actorId, actorEmail);
     res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+}
+
+export async function reviewIdentityVerificationController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id }    = req.params;
+    const data      = ReviewVerificationSchema.parse(req.body);
+    const { id: actorId, email: actorEmail } = actorFrom(req);
+
+    const result = await reviewIdentityVerification(id, data, actorId, actorEmail);
+    res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
 

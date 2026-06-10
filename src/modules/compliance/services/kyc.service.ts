@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { getDbInstance } from "../../../db/knex";
 import { AppError }      from "../../../shared/errors/AppError";
 import { logComplianceAction } from "./complianceAudit.service";
@@ -189,10 +190,40 @@ export async function updateKycStatus(
     throw new AppError(404, "USER_NOT_FOUND", "User not found");
   }
 
+  const now = new Date();
+  const ninShouldVerify = ["tier_1", "tier_2", "tier_3"].includes(input.kyc_level);
+  const bvnShouldVerify = ["tier_2", "tier_3"].includes(input.kyc_level);
+  const verificationNote = `KYC level set to ${input.kyc_level} by admin`;
+
   const [updated] = await db("users")
     .where({ id: userId })
-    .update({ kyc_level: input.kyc_level, updated_at: new Date() })
+    .update({ kyc_level: input.kyc_level, updated_at: now })
     .returning(["id", "email", "phone", "username", "status", "kyc_level", "created_at", "updated_at"]);
+
+  // Sync user_profiles verification flags to match the new level
+  await db("user_profiles")
+    .where({ user_id: userId })
+    .update({ nin_verified: ninShouldVerify, bvn_verified: bvnShouldVerify, updated_at: now });
+
+  // Sync kyc_verifications records: approve or reject pending entries
+  if (ninShouldVerify) {
+    await db("kyc_verifications")
+      .where({ user_id: userId, verification_type: "nin" })
+      .whereIn("status", ["pending", "in_progress", "manual_review"])
+      .update({ status: "verified", verified_at: now, reviewed_by: actorId, reviewed_at: now, notes: verificationNote, updated_at: now });
+  }
+  if (bvnShouldVerify) {
+    await db("kyc_verifications")
+      .where({ user_id: userId, verification_type: "bvn" })
+      .whereIn("status", ["pending", "in_progress", "manual_review"])
+      .update({ status: "verified", verified_at: now, reviewed_by: actorId, reviewed_at: now, notes: verificationNote, updated_at: now });
+  }
+  if (input.kyc_level === "none") {
+    await db("kyc_verifications")
+      .where({ user_id: userId })
+      .whereIn("status", ["pending", "in_progress", "manual_review"])
+      .update({ status: "failed", failure_reason: "KYC level reset by admin", reviewed_by: actorId, reviewed_at: now, notes: input.notes ?? null, updated_at: now });
+  }
 
   await logComplianceAction(db, {
     entity_type:  "user",
@@ -206,4 +237,108 @@ export async function updateKycStatus(
   });
 
   return updated;
+}
+
+export async function reviewIdentityVerification(
+  userId:     string,
+  input:      { type: "nin" | "bvn"; action: "approve" | "reject"; notes?: string },
+  actorId:    string,
+  actorEmail: string,
+) {
+  const user = await db("users")
+    .where({ id: userId })
+    .whereNull("deleted_at")
+    .first("id", "kyc_level");
+
+  if (!user) throw new AppError(404, "USER_NOT_FOUND", "User not found");
+
+  // Check the user has actually submitted this document type
+  const profile = await db("user_profiles").where({ user_id: userId }).first("nin", "bvn", "nin_verified", "bvn_verified");
+  const hasDoc = input.type === "nin" ? !!(profile?.nin) : !!(profile?.bvn);
+  if (!hasDoc) {
+    throw new AppError(422, "NO_DOCUMENT", `User has not submitted a ${input.type.toUpperCase()}`);
+  }
+
+  const now = new Date();
+  const isApprove = input.action === "approve";
+
+  // Update the latest pending/in_progress record, or create one for admin-initiated approvals
+  const pending = await db("kyc_verifications")
+    .where({ user_id: userId, verification_type: input.type })
+    .whereIn("status", ["pending", "in_progress", "manual_review"])
+    .orderBy("created_at", "desc")
+    .first("id");
+
+  if (pending) {
+    await db("kyc_verifications")
+      .where({ id: pending.id })
+      .update({
+        status:         isApprove ? "verified" : "failed",
+        verified_at:    isApprove ? now : null,
+        failure_reason: isApprove ? null : (input.notes ?? "Rejected by admin"),
+        reviewed_by:    actorId,
+        reviewed_at:    now,
+        notes:          input.notes ?? null,
+        updated_at:     now,
+      });
+  } else if (isApprove) {
+    // No pending record — create a verified record for the admin override
+    await db("kyc_verifications").insert({
+      id:                crypto.randomUUID(),
+      user_id:           userId,
+      verification_type: input.type,
+      status:            "verified",
+      initiated_by:      userId,
+      reviewed_by:       actorId,
+      reviewed_at:       now,
+      verified_at:       now,
+      notes:             input.notes ?? "Approved by admin",
+      verification_data: JSON.stringify({}),
+      created_at:        now,
+      updated_at:        now,
+    });
+  }
+
+  // Sync user_profiles flag
+  const flagUpdate = input.type === "nin"
+    ? { nin_verified: isApprove, updated_at: now }
+    : { bvn_verified: isApprove, updated_at: now };
+  await db("user_profiles").where({ user_id: userId }).update(flagUpdate);
+
+  // Auto-advance kyc_level when approving if the new verification unlocks a tier
+  if (isApprove) {
+    const LEVEL_NUM: Record<KycLevel, number> = { none: 0, tier_1: 1, tier_2: 2, tier_3: 3 };
+    const currentNum = LEVEL_NUM[user.kyc_level as KycLevel] ?? 0;
+    let newLevel: KycLevel | null = null;
+
+    if (input.type === "nin" && currentNum < 1) {
+      newLevel = "tier_1";
+    } else if (input.type === "bvn" && currentNum < 2) {
+      const updatedProfile = await db("user_profiles").where({ user_id: userId }).first("nin_verified");
+      if (updatedProfile?.nin_verified) newLevel = "tier_2";
+    }
+
+    if (newLevel) {
+      await db("users").where({ id: userId }).update({ kyc_level: newLevel, updated_at: now });
+    }
+  }
+
+  await logComplianceAction(db, {
+    entity_type:  "user",
+    entity_id:    userId,
+    action:       `${input.type}_${isApprove ? "approved" : "rejected"}`,
+    actor_id:     actorId,
+    actor_email:  actorEmail,
+    before_state: {},
+    after_state:  { [`${input.type}_verified`]: isApprove },
+    notes:        input.notes ?? null,
+  });
+
+  return db("users as u")
+    .leftJoin("user_profiles as p", "p.user_id", "u.id")
+    .where("u.id", userId)
+    .first(
+      "u.id", "u.email", "u.phone", "u.username", "u.status", "u.kyc_level",
+      "p.nin_verified", "p.bvn_verified", "p.nin", "p.bvn",
+    );
 }

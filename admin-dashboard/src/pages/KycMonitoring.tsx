@@ -17,7 +17,7 @@ import { cn } from '@/utils/cn'
 import type { KycUser, KycVerification, KycLevel } from '@/types'
 import {
   ShieldCheck, ShieldAlert, Users, RefreshCw,
-  CheckCircle2, BadgeCheck,
+  CheckCircle2, BadgeCheck, XCircle,
 } from 'lucide-react'
 
 function errMsg(e: unknown, fallback: string) {
@@ -47,6 +47,87 @@ const VERIFY_STATUS_VARIANT: Record<string, 'success' | 'danger' | 'warning' | '
   in_progress:   'info',
   expired:       'neutral',
   manual_review: 'warning',
+}
+
+// ── Review Verification Modal (approve / reject NIN or BVN) ──────────────────
+
+type DocType = 'nin' | 'bvn'
+type ReviewAction = 'approve' | 'reject'
+
+function ReviewVerificationModal({
+  user, docType, action, open, onClose,
+}: {
+  user: KycUser | null
+  docType: DocType | null
+  action: ReviewAction | null
+  open: boolean
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => { if (open) setNotes('') }, [open])
+
+  const mutation = useMutation({
+    mutationFn: () => complianceApi.reviewIdentityVerification(user!.id, {
+      type:   docType!,
+      action: action!,
+      notes:  notes.trim() || undefined,
+    }),
+    onSuccess: () => {
+      toast.success(`${docType?.toUpperCase()} ${action === 'approve' ? 'approved' : 'rejected'}`)
+      qc.invalidateQueries({ queryKey: ['kyc-users'] })
+      qc.invalidateQueries({ queryKey: ['kyc-verifications'] })
+      onClose()
+    },
+    onError: (e) => toast.error(errMsg(e, 'Failed to update verification')),
+  })
+
+  if (!user || !docType || !action) return null
+
+  const isReject = action === 'reject'
+  const label = `${isReject ? 'Reject' : 'Approve'} ${docType.toUpperCase()}`
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={label}
+      subtitle={user.user_name ?? user.email}
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button
+            variant={isReject ? 'danger' : 'primary'}
+            size="sm"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || (isReject && !notes.trim())}
+          >
+            {mutation.isPending ? 'Saving…' : label}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {isReject && (
+          <p className="text-xs text-ink-muted">This will mark the {docType.toUpperCase()} as failed. The customer will need to re-submit.</p>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-ink-muted mb-1.5">
+            {isReject ? 'Reason (required)' : 'Notes (optional)'}
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="w-full rounded-lg border border-border bg-surface-2 text-ink text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none"
+            placeholder={isReject ? 'e.g. NIN does not match name on account' : 'Optional admin note…'}
+          />
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 // ── KYC Level Update Modal ────────────────────────────────────────────────────
@@ -118,37 +199,103 @@ function UpdateKycModal({
 
 // ── User Drawer ───────────────────────────────────────────────────────────────
 
+function maskDoc(val: string | null): string {
+  if (!val) return '—'
+  return val.length > 4 ? `${'•'.repeat(val.length - 4)}${val.slice(-4)}` : '••••'
+}
+
 function KycUserDrawer({
   user, onClose, onEdit,
 }: { user: KycUser | null; onClose: () => void; onEdit: (u: KycUser) => void }) {
+  const [reviewDocType, setReviewDocType] = useState<DocType | null>(null)
+  const [reviewAction,  setReviewAction]  = useState<ReviewAction | null>(null)
+  const [reviewOpen,    setReviewOpen]    = useState(false)
+
+  function openReview(dt: DocType, act: ReviewAction) {
+    setReviewDocType(dt); setReviewAction(act); setReviewOpen(true)
+  }
+
   if (!user) return null
+
+  const docs: Array<{ key: DocType; label: string; value: string | null; verified: boolean }> = [
+    { key: 'nin', label: 'NIN', value: user.nin,  verified: user.nin_verified },
+    { key: 'bvn', label: 'BVN', value: user.bvn,  verified: user.bvn_verified },
+  ]
+
   return (
-    <Drawer open={!!user} onClose={onClose} title={user.user_name ?? user.email} subtitle={user.email} width="md">
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'KYC Level',   value: <Badge variant={KYC_LEVEL_VARIANT[user.kyc_level]}>{KYC_LEVEL_LABEL[user.kyc_level]}</Badge> },
-            { label: 'Status',      value: <Badge variant={user.status === 'active' ? 'success' : 'warning'}>{user.status}</Badge> },
-            { label: 'BVN',         value: user.bvn ? (user.bvn_verified ? <Badge variant="success" dot>Verified</Badge> : <Badge variant="warning" dot>Unverified</Badge>) : <span className="text-xs text-ink-faint">Not provided</span> },
-            { label: 'NIN',         value: user.nin ? (user.nin_verified ? <Badge variant="success" dot>Verified</Badge> : <Badge variant="warning" dot>Unverified</Badge>) : <span className="text-xs text-ink-faint">Not provided</span> },
-            { label: 'Risk Score',  value: <span className="text-sm text-ink">{user.risk_score !== null ? `${user.risk_score} (${user.risk_level ?? '—'})` : '—'}</span> },
-            { label: 'Joined',      value: <span className="text-sm text-ink">{fmtDate(user.created_at)}</span> },
-          ].map(({ label, value }) => (
-            <div key={label} className="rounded-lg bg-surface-2 px-3 py-2">
-              <p className="text-[10px] text-ink-faint uppercase tracking-wide mb-1">{label}</p>
-              {value}
+    <>
+      <Drawer open={!!user} onClose={onClose} title={user.user_name ?? user.email} subtitle={user.email} width="md">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'KYC Level',  value: <Badge variant={KYC_LEVEL_VARIANT[user.kyc_level]}>{KYC_LEVEL_LABEL[user.kyc_level]}</Badge> },
+              { label: 'Status',     value: <Badge variant={user.status === 'active' ? 'success' : 'warning'}>{user.status}</Badge> },
+              { label: 'Risk Score', value: <span className="text-sm text-ink">{user.risk_score !== null ? `${user.risk_score} (${user.risk_level ?? '—'})` : '—'}</span> },
+              { label: 'Joined',     value: <span className="text-sm text-ink">{fmtDate(user.created_at)}</span> },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-lg bg-surface-2 px-3 py-2">
+                <p className="text-[10px] text-ink-faint uppercase tracking-wide mb-1">{label}</p>
+                {value}
+              </div>
+            ))}
+            <div className="col-span-2 rounded-lg bg-surface-2 px-3 py-2">
+              <p className="text-[10px] text-ink-faint uppercase tracking-wide mb-1">Phone</p>
+              <span className="text-sm text-ink">{user.phone ?? '—'}</span>
             </div>
-          ))}
-          <div className="col-span-2 rounded-lg bg-surface-2 px-3 py-2">
-            <p className="text-[10px] text-ink-faint uppercase tracking-wide mb-1">Phone</p>
-            <span className="text-sm text-ink">{user.phone ?? '—'}</span>
           </div>
+
+          {/* Identity documents */}
+          <div>
+            <p className="text-[10px] font-semibold text-ink-faint uppercase tracking-wide mb-2">Identity Documents</p>
+            <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
+              {docs.map(({ key, label, value, verified }) => (
+                <div key={key} className="flex items-center justify-between px-3 py-2.5 bg-surface-1">
+                  <div>
+                    <p className="text-[10px] text-ink-faint uppercase tracking-wide">{label}</p>
+                    <p className="text-sm font-mono text-ink mt-0.5">{maskDoc(value)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!value ? (
+                      <span className="text-xs text-ink-faint">Not submitted</span>
+                    ) : verified ? (
+                      <Badge variant="success" dot>Verified</Badge>
+                    ) : (
+                      <>
+                        <Badge variant="warning" dot>Pending</Badge>
+                        <button
+                          onClick={() => openReview(key, 'approve')}
+                          className="flex items-center gap-1 text-xs font-semibold text-success bg-success/10 hover:bg-success/20 px-2 py-1 rounded-lg transition-colors"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                        </button>
+                        <button
+                          onClick={() => openReview(key, 'reject')}
+                          className="flex items-center gap-1 text-xs font-semibold text-danger bg-danger/10 hover:bg-danger/20 px-2 py-1 rounded-lg transition-colors"
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> Reject
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Button variant="secondary" size="sm" className="w-full" onClick={() => onEdit(user)}>
+            Update KYC Level Manually
+          </Button>
         </div>
-        <Button variant="primary" size="sm" className="w-full" onClick={() => onEdit(user)}>
-          Update KYC Level
-        </Button>
-      </div>
-    </Drawer>
+      </Drawer>
+
+      <ReviewVerificationModal
+        user={user}
+        docType={reviewDocType}
+        action={reviewAction}
+        open={reviewOpen}
+        onClose={() => { setReviewOpen(false); setReviewDocType(null); setReviewAction(null) }}
+      />
+    </>
   )
 }
 

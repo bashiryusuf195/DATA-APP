@@ -6,6 +6,7 @@ import {
   listKycUsersController,
   listKycVerificationsController,
   updateKycStatusController,
+  reviewIdentityVerificationController,
   listRiskFlagsController,
   createRiskFlagController,
   updateRiskFlagController,
@@ -24,7 +25,8 @@ const complianceGuard = [authenticate, requireRole("compliance", "admin", "super
 // ── KYC ───────────────────────────────────────────────────────────────────────
 router.get(   "/kyc/users",            ...complianceGuard, adminRateLimiter,      listKycUsersController);
 router.get(   "/kyc/verifications",    ...complianceGuard, adminRateLimiter,      listKycVerificationsController);
-router.patch( "/kyc/users/:id/status", ...complianceGuard, adminSensitiveLimiter, updateKycStatusController);
+router.patch( "/kyc/users/:id/status",          ...complianceGuard, adminSensitiveLimiter, updateKycStatusController);
+router.patch( "/kyc/users/:id/verify-identity", ...complianceGuard, adminSensitiveLimiter, reviewIdentityVerificationController);
 
 // ── Risk Flags ────────────────────────────────────────────────────────────────
 router.get(   "/risk/flags",     ...complianceGuard, adminRateLimiter,      listRiskFlagsController);
