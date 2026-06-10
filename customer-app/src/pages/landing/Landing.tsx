@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Phone, Wifi, Zap, Tv, Shield, Wallet,
   ArrowRight, CheckCircle, Sun, Moon, Menu, X,
-  Clock, Lock, Tag,
+  Clock, Lock, UserCheck, CreditCard, ShoppingBag,
+  Bell, Headphones, Activity,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
@@ -14,88 +15,88 @@ import { cn } from '@/utils/cn'
 // ── Icon registry (used by CMS-driven feature cards) ─────────────────────────
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
-  Phone, Wifi, Zap, Tv, Shield, Wallet,
+  Phone, Wifi, Zap, Tv, Shield, Wallet, UserCheck,
 }
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const TRUST_BADGES = [
-  { icon: Zap,         label: 'Instant delivery' },
   { icon: Lock,        label: 'Secure wallet' },
-  { icon: Clock,       label: '24/7 service' },
-  { icon: CheckCircle, label: 'Trusted payments' },
+  { icon: Zap,         label: 'Instant delivery' },
+  { icon: Clock,       label: '24/7 access' },
 ]
 
-const WHY_CARDS = [
+const TRUST_FEATURES = [
   {
-    icon: Zap,
-    title: 'Fast Transactions',
-    description: 'Top ups and bill payments processed in under 3 seconds, every time.',
-    iconBg: 'bg-amber-500/10 dark:bg-amber-500/15',
-    iconColor: 'text-amber-500',
-    border: 'border-amber-500/15 dark:border-amber-500/20',
-  },
-  {
-    icon: Tag,
-    title: 'Affordable Pricing',
-    description: 'Best-in-class rates across all networks with zero hidden fees.',
-    iconBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
-    iconColor: 'text-emerald-500',
-    border: 'border-emerald-500/15 dark:border-emerald-500/20',
-  },
-  {
-    icon: Lock,
-    title: 'Secure Wallet',
-    description: 'Bank-grade encryption and KYC verification protect every naira.',
-    iconBg: 'bg-brand-600/10 dark:bg-brand-600/15',
-    iconColor: 'text-brand-500 dark:text-brand-400',
-    border: 'border-brand-500/15 dark:border-brand-500/20',
+    icon: Wallet,
+    title: 'Secure wallet',
+    description: 'Your funds are protected with bank-grade encryption and two-factor authentication.',
   },
   {
     icon: Clock,
-    title: 'Always Available',
-    description: '24/7 access from any device, anywhere in Nigeria.',
-    iconBg: 'bg-purple-500/10 dark:bg-purple-500/15',
-    iconColor: 'text-purple-500',
-    border: 'border-purple-500/15 dark:border-purple-500/20',
+    title: 'Full transaction history',
+    description: 'Every purchase is logged, searchable, and downloadable as a PDF receipt.',
+  },
+  {
+    icon: Bell,
+    title: 'Real-time notifications',
+    description: 'Instant push alerts for every payment, top-up, and account activity.',
+  },
+  {
+    icon: Headphones,
+    title: '24/7 customer support',
+    description: 'Our team is always available to help you resolve any issue quickly.',
+  },
+  {
+    icon: Activity,
+    title: 'Service uptime monitoring',
+    description: 'We continuously monitor all service providers to guarantee reliability.',
   },
 ]
 
 const SERVICE_COLORS = [
-  { bg: 'bg-emerald-500/10 dark:bg-emerald-500/12', icon: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-500/20' },
-  { bg: 'bg-blue-500/10 dark:bg-blue-500/12',       icon: 'text-blue-600 dark:text-blue-400',       border: 'border-blue-200 dark:border-blue-500/20'       },
-  { bg: 'bg-amber-500/10 dark:bg-amber-500/12',     icon: 'text-amber-600 dark:text-amber-400',     border: 'border-amber-200 dark:border-amber-500/20'     },
-  { bg: 'bg-purple-500/10 dark:bg-purple-500/12',   icon: 'text-purple-600 dark:text-purple-400',   border: 'border-purple-200 dark:border-purple-500/20'   },
-  { bg: 'bg-rose-500/10 dark:bg-rose-500/12',       icon: 'text-rose-600 dark:text-rose-400',       border: 'border-rose-200 dark:border-rose-500/20'       },
-  { bg: 'bg-brand-500/10 dark:bg-brand-500/12',     icon: 'text-brand-600 dark:text-brand-400',     border: 'border-brand-200 dark:border-brand-500/20'     },
+  { bg: 'bg-emerald-500/10 dark:bg-emerald-500/12', icon: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-500/20', glow: 'group-hover:shadow-[0_8px_28px_rgba(16,185,129,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(16,185,129,0.12)]' },
+  { bg: 'bg-blue-500/10 dark:bg-blue-500/12',       icon: 'text-blue-600 dark:text-blue-400',       border: 'border-blue-200 dark:border-blue-500/20',       glow: 'group-hover:shadow-[0_8px_28px_rgba(59,130,246,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(59,130,246,0.12)]' },
+  { bg: 'bg-amber-500/10 dark:bg-amber-500/12',     icon: 'text-amber-600 dark:text-amber-400',     border: 'border-amber-200 dark:border-amber-500/20',     glow: 'group-hover:shadow-[0_8px_28px_rgba(245,158,11,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(245,158,11,0.12)]' },
+  { bg: 'bg-purple-500/10 dark:bg-purple-500/12',   icon: 'text-purple-600 dark:text-purple-400',   border: 'border-purple-200 dark:border-purple-500/20',   glow: 'group-hover:shadow-[0_8px_28px_rgba(168,85,247,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(168,85,247,0.12)]' },
+  { bg: 'bg-rose-500/10 dark:bg-rose-500/12',       icon: 'text-rose-600 dark:text-rose-400',       border: 'border-rose-200 dark:border-rose-500/20',       glow: 'group-hover:shadow-[0_8px_28px_rgba(244,63,94,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(244,63,94,0.12)]' },
+  { bg: 'bg-brand-500/10 dark:bg-brand-500/12',     icon: 'text-brand-600 dark:text-brand-400',     border: 'border-brand-200 dark:border-brand-500/20',     glow: 'group-hover:shadow-[0_8px_28px_rgba(53,53,217,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(53,53,217,0.12)]' },
+  { bg: 'bg-teal-500/10 dark:bg-teal-500/12',       icon: 'text-teal-600 dark:text-teal-400',       border: 'border-teal-200 dark:border-teal-500/20',       glow: 'group-hover:shadow-[0_8px_28px_rgba(20,184,166,0.15)] dark:group-hover:shadow-[0_8px_28px_rgba(20,184,166,0.12)]' },
 ]
 
 const STATS = [
   { value: '10K+',   label: 'Active Users' },
   { value: '₦500M+', label: 'Processed' },
-  { value: '6',      label: 'Services' },
+  { value: '7',      label: 'Services' },
   { value: '99.9%',  label: 'Uptime' },
+]
+
+const STEP_META = [
+  { icon: UserCheck,   bg: 'bg-brand-600/10 dark:bg-brand-600/15',     color: 'text-brand-600 dark:text-brand-400'   },
+  { icon: CreditCard,  bg: 'bg-emerald-500/10 dark:bg-emerald-500/15', color: 'text-emerald-600 dark:text-emerald-400' },
+  { icon: ShoppingBag, bg: 'bg-purple-500/10 dark:bg-purple-500/15',   color: 'text-purple-600 dark:text-purple-400' },
 ]
 
 const DEFAULT_CONTENT: LandingContent = {
   app_name: 'Hive Data',
-  hero_title: 'Buy Data, Airtime & Pay Bills Instantly',
+  hero_title: 'Fast VTU Payments, Built for Everyday Nigerians',
   hero_subtitle:
-    'Fast, secure and affordable VTU services for airtime, data, electricity, cable TV, exam PINs and wallet payments.',
-  hero_cta_primary: 'Get Started Free',
+    'Buy airtime, data, electricity, cable TV, exam PINs, and verify your identity — all from one secure wallet. Instant delivery, guaranteed.',
+  hero_cta_primary: 'Create Free Account',
   hero_cta_secondary: 'Sign In',
   features: [
-    { icon: 'Phone',  title: 'Airtime Top-up',   description: 'Instant airtime for MTN, Airtel, Glo and 9mobile at the best rates.' },
-    { icon: 'Wifi',   title: 'Data Bundles',      description: 'Affordable data plans for all networks — daily, weekly or monthly.' },
-    { icon: 'Zap',    title: 'Electricity Bills', description: 'Pay all DISCOs with a meter token delivered in seconds.' },
-    { icon: 'Tv',     title: 'Cable TV',          description: 'Renew DSTV, GOTV and Startimes without leaving the app.' },
-    { icon: 'Shield', title: 'Exam PINs',         description: 'Scratch cards for WAEC, NECO, JAMB and other examinations.' },
-    { icon: 'Wallet', title: 'Secure Wallet',     description: 'Fund once and transact anywhere, anytime, instantly.' },
+    { icon: 'Phone',     title: 'Airtime Top-up',          description: 'Instant airtime for MTN, Airtel, Glo and 9mobile at the best rates.' },
+    { icon: 'Wifi',      title: 'Data Bundles',             description: 'Affordable data plans for all networks — daily, weekly or monthly.' },
+    { icon: 'Zap',       title: 'Electricity Bills',        description: 'Pay all DISCOs with a meter token delivered in seconds.' },
+    { icon: 'Tv',        title: 'Cable TV',                 description: 'Renew DSTV, GOTV and Startimes without leaving the app.' },
+    { icon: 'Shield',    title: 'Exam PINs',                description: 'Scratch cards for WAEC, NECO, JAMB and other examinations.' },
+    { icon: 'Wallet',    title: 'Secure Wallet',            description: 'Fund once and transact anywhere, anytime, instantly.' },
+    { icon: 'UserCheck', title: 'Identity Verification',    description: 'Verify your BVN and NIN to unlock higher wallet limits and benefits.' },
   ],
   how_it_works: [
     { step: 1, title: 'Create an account',  description: 'Sign up in under 2 minutes with just your email address.' },
     { step: 2, title: 'Fund your wallet',   description: 'Transfer to your dedicated bank account or pay with a card.' },
-    { step: 3, title: 'Enjoy services',     description: 'Purchase any VTU service instantly at competitive rates.' },
+    { step: 3, title: 'Buy services',       description: 'Purchase any VTU service instantly at competitive rates.' },
   ],
 }
 
@@ -109,14 +110,14 @@ function AppMockup() {
     { icon: Tv,     label: 'Cable',   color: 'bg-purple-500/20 text-purple-400'   },
   ]
   const MOCK_TXN = [
-    { icon: Phone, label: 'Airtime Top-up',   sub: 'MTN · Just now',    amount: '-₦500',    color: 'bg-emerald-500/20 text-emerald-400' },
-    { icon: Wifi,  label: '10GB Data Bundle', sub: 'Airtel · 2m ago',   amount: '-₦3,500',  color: 'bg-blue-500/20 text-blue-400'       },
+    { icon: Phone, label: 'Airtime Top-up',   sub: 'MTN · Just now',  amount: '-₦500',   color: 'bg-emerald-500/20 text-emerald-400' },
+    { icon: Wifi,  label: '10GB Data Bundle', sub: 'Airtel · 2m ago', amount: '-₦3,500', color: 'bg-blue-500/20 text-blue-400'       },
   ]
 
   return (
     <div className="relative mx-auto w-[270px]">
-      {/* Ambient glow behind the phone */}
-      <div className="pointer-events-none absolute -inset-10 rounded-full bg-brand-600/20 dark:bg-brand-600/30 blur-3xl" />
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute -inset-10 rounded-full bg-brand-600/20 dark:bg-brand-600/35 blur-3xl" />
 
       {/* Phone shell */}
       <div className="relative rounded-[2.8rem] bg-gray-900/90 p-[10px] shadow-[0_40px_80px_-10px_rgba(0,0,0,0.55)] ring-1 ring-white/10">
@@ -139,7 +140,6 @@ function AppMockup() {
           <div className="flex justify-between items-center px-5 py-1">
             <span className="text-[10px] text-white/50 font-medium tabular-nums">9:41</span>
             <div className="flex items-center gap-1">
-              {/* Signal bars */}
               {[2, 3, 4, 5].map((h) => (
                 <div key={h} className={cn('w-[3px] rounded-sm bg-white/50', h === 2 ? 'h-[6px]' : h === 3 ? 'h-[8px]' : h === 4 ? 'h-[10px]' : 'h-[12px]')} />
               ))}
@@ -157,19 +157,17 @@ function AppMockup() {
 
           {/* Wallet balance card */}
           <div className="mx-4 rounded-2xl p-4 bg-gradient-to-br from-brand-700 via-brand-600 to-purple-700 shadow-brand relative overflow-hidden">
-            {/* Decorative circles */}
             <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/5" />
             <div className="pointer-events-none absolute -right-1 -bottom-5 h-16 w-16 rounded-full bg-white/5" />
-
             <p className="text-[9px] text-white/60 uppercase tracking-widest mb-1">Wallet Balance</p>
             <p className="text-[22px] font-black text-white leading-none mb-3">
               ₦24,500<span className="text-sm font-normal opacity-70">.00</span>
             </p>
             <div className="flex gap-2">
-              <div className="flex-1 bg-white/15 hover:bg-white/20 rounded-xl py-1.5 text-center">
+              <div className="flex-1 bg-white/15 rounded-xl py-1.5 text-center">
                 <p className="text-[10px] text-white font-bold">+ Fund</p>
               </div>
-              <div className="flex-1 bg-white/15 hover:bg-white/20 rounded-xl py-1.5 text-center">
+              <div className="flex-1 bg-white/15 rounded-xl py-1.5 text-center">
                 <p className="text-[10px] text-white font-bold">History</p>
               </div>
             </div>
@@ -190,7 +188,6 @@ function AppMockup() {
             </div>
           </div>
 
-          {/* Divider */}
           <div className="mx-4 my-3 h-px bg-white/5" />
 
           {/* Recent transactions */}
@@ -225,6 +222,11 @@ function AppMockup() {
         </div>
       </div>
 
+      {/* Notification badge on card */}
+      <div className="absolute top-12 right-0 h-5 w-5 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
+        <span className="text-[9px] text-white font-black">3</span>
+      </div>
+
       {/* Floating card — bottom left */}
       <div className="absolute -bottom-3 -left-8 flex items-center gap-2 bg-white dark:bg-[#1C2230] border border-gray-100 dark:border-white/10 rounded-2xl px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
         <div className="h-7 w-7 rounded-full bg-brand-600/15 flex items-center justify-center shrink-0">
@@ -246,14 +248,14 @@ function ServiceCard({ feature, index }: { feature: LandingFeature; index: numbe
   const color = SERVICE_COLORS[index % SERVICE_COLORS.length]
   return (
     <div className={cn(
-      'group relative rounded-2xl border p-6 transition-all duration-200 cursor-default',
+      'group relative rounded-2xl border p-6 transition-all duration-200 motion-reduce:transition-none motion-reduce:transform-none cursor-default',
       'bg-white dark:bg-white/[0.03]',
       'hover:bg-gray-50 dark:hover:bg-white/[0.06]',
-      'hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.35)]',
-      'hover:-translate-y-0.5',
+      'hover:-translate-y-1',
       color.border,
+      color.glow,
     )}>
-      <div className={cn('h-12 w-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110', color.bg)}>
+      <div className={cn('h-12 w-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-200 motion-reduce:transition-none group-hover:scale-110', color.bg)}>
         <Icon className={cn('h-6 w-6', color.icon)} />
       </div>
       <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-1.5">{feature.title}</h3>
@@ -262,39 +264,30 @@ function ServiceCard({ feature, index }: { feature: LandingFeature; index: numbe
   )
 }
 
-// ── Why card ──────────────────────────────────────────────────────────────────
-
-function WhyCard({ icon: Icon, title, description, iconBg, iconColor, border }: typeof WHY_CARDS[0]) {
-  return (
-    <div className={cn(
-      'group rounded-2xl border p-6 transition-all duration-200',
-      'bg-white dark:bg-white/[0.03]',
-      'hover:bg-gray-50 dark:hover:bg-white/[0.06]',
-      'hover:shadow-[0_8px_28px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.30)]',
-      'hover:-translate-y-0.5',
-      border,
-    )}>
-      <div className={cn('h-11 w-11 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110', iconBg)}>
-        <Icon className={cn('h-5 w-5', iconColor)} />
-      </div>
-      <p className="text-[15px] font-bold text-gray-900 dark:text-white mb-1.5">{title}</p>
-      <p className="text-sm text-gray-500 dark:text-white/45 leading-relaxed">{description}</p>
-    </div>
-  )
-}
-
-// ── How it works step ─────────────────────────────────────────────────────────
+// ── How it works step card ────────────────────────────────────────────────────
 
 function StepCard({ step }: { step: HowItWorksStep }) {
+  const meta = STEP_META[(step.step - 1) % STEP_META.length]
+  const Icon = meta.icon
   return (
-    <div className="flex gap-5 items-start group">
-      <div className="h-11 w-11 rounded-2xl bg-brand-600 flex items-center justify-center shrink-0 shadow-brand transition-transform group-hover:scale-105">
-        <span className="text-sm font-black text-white">{step.step}</span>
+    <div className={cn(
+      'group relative rounded-2xl border border-gray-200 dark:border-white/[0.08] p-6 text-center',
+      'bg-white dark:bg-white/[0.03]',
+      'hover:bg-gray-50 dark:hover:bg-white/[0.06]',
+      'hover:-translate-y-1 hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)] dark:hover:shadow-[0_8px_28px_rgba(0,0,0,0.35)]',
+      'transition-all duration-200 motion-reduce:transition-none motion-reduce:transform-none',
+    )}>
+      {/* Step badge */}
+      <div className="relative inline-flex mb-5">
+        <div className={cn('h-14 w-14 rounded-2xl flex items-center justify-center transition-transform duration-200 motion-reduce:transition-none group-hover:scale-105', meta.bg)}>
+          <Icon className={cn('h-7 w-7', meta.color)} />
+        </div>
+        <div className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-brand-600 flex items-center justify-center text-white text-[11px] font-black shadow-brand">
+          {step.step}
+        </div>
       </div>
-      <div className="pt-1">
-        <p className="font-bold text-gray-900 dark:text-white mb-1.5">{step.title}</p>
-        <p className="text-sm text-gray-500 dark:text-white/45 leading-relaxed">{step.description}</p>
-      </div>
+      <p className="font-bold text-gray-900 dark:text-white mb-2">{step.title}</p>
+      <p className="text-sm text-gray-500 dark:text-white/45 leading-relaxed">{step.description}</p>
     </div>
   )
 }
@@ -320,16 +313,18 @@ export function LandingPage() {
   if (token) return <Navigate to="/dashboard" replace />
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#070B12] text-gray-900 dark:text-white font-sans transition-colors duration-200">
+    <div className="min-h-screen overflow-x-hidden bg-white dark:bg-[#070B12] text-gray-900 dark:text-white font-sans transition-colors duration-200">
 
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-gray-200 dark:border-white/[0.06] bg-white/90 dark:bg-[#070B12]/90 backdrop-blur-md transition-colors duration-200">
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="h-9 w-9 rounded-xl bg-brand-600 flex items-center justify-center shadow-brand transition-transform group-hover:scale-105">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-base font-black tracking-tight text-gray-900 dark:text-white">{appName}</span>
+          <Link to="/" className="flex items-center group">
+            <img
+              src="/logo-horizontal.png"
+              alt={appName}
+              className="h-8 object-contain motion-reduce:transition-none"
+              style={{ filter: dark ? 'brightness(0) invert(1)' : undefined }}
+            />
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
@@ -353,7 +348,7 @@ export function LandingPage() {
             </Link>
             <Link
               to="/register"
-              className="hidden md:flex items-center gap-1.5 text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl transition-all shadow-brand hover:shadow-[0_4px_20px_rgba(53,53,217,0.45)] hover:-translate-y-px"
+              className="hidden md:flex items-center gap-1.5 text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl transition-all motion-reduce:transition-none shadow-brand hover:shadow-[0_4px_20px_rgba(53,53,217,0.45)] hover:-translate-y-px"
             >
               {c.hero_cta_primary}
               <ArrowRight className="h-3.5 w-3.5" />
@@ -385,11 +380,12 @@ export function LandingPage() {
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 px-5">
-        {/* Background blobs — clipped independently so content can overflow */}
+        {/* Mobile gradient header tint */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-brand-600/10 dark:bg-brand-600/18 blur-[130px]" />
-          <div className="absolute -top-20 right-0 translate-x-1/3 h-[400px] w-[500px] rounded-full bg-purple-600/8 dark:bg-purple-600/12 blur-[110px]" />
-          <div className="absolute bottom-0 left-0 -translate-x-1/4 h-[300px] w-[450px] rounded-full bg-brand-400/5 dark:bg-brand-400/8 blur-[90px]" />
+          <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-brand-600/[0.06] to-transparent sm:hidden" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-brand-600/10 dark:bg-brand-600/20 blur-[130px]" />
+          <div className="absolute -top-20 right-0 translate-x-1/3 h-[400px] w-[500px] rounded-full bg-purple-600/8 dark:bg-purple-600/15 blur-[110px]" />
+          <div className="absolute bottom-0 left-0 -translate-x-1/4 h-[300px] w-[450px] rounded-full bg-brand-400/5 dark:bg-brand-400/10 blur-[90px]" />
         </div>
 
         <div className="relative max-w-6xl mx-auto">
@@ -407,11 +403,11 @@ export function LandingPage() {
               <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] xl:text-[4rem] font-black leading-[1.08] tracking-tight text-gray-900 dark:text-white mb-5">
                 {isDefaultTitle ? (
                   <>
-                    Buy Data, Airtime{' '}
-                    <span className="whitespace-nowrap">&amp; Pay Bills</span>{' '}
+                    Fast VTU Payments,{' '}
+                    <span className="whitespace-nowrap">Built for Everyday</span>{' '}
                     <span className="relative inline-block">
-                      <span className="relative z-10 text-brand-600">Instantly</span>
-                      <span className="pointer-events-none absolute -inset-1 -bottom-1 rounded-lg bg-brand-600/10 dark:bg-brand-600/15 blur-sm" />
+                      <span className="relative z-10 text-brand-600 dark:text-brand-400">Nigerians</span>
+                      <span className="pointer-events-none absolute -inset-1 -bottom-1 rounded-lg bg-brand-600/12 dark:bg-brand-600/20 blur-sm" />
                     </span>
                   </>
                 ) : (
@@ -425,28 +421,28 @@ export function LandingPage() {
               </p>
 
               {/* CTA buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 mb-8">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-3 mb-8">
                 <Link
                   to="/register"
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white font-bold px-8 py-4 rounded-2xl text-base shadow-brand transition-all hover:shadow-[0_6px_24px_rgba(53,53,217,0.50)] hover:-translate-y-0.5 active:translate-y-0"
+                  className="flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white font-bold px-8 py-4 rounded-2xl text-base shadow-brand transition-all motion-reduce:transition-none hover:shadow-[0_6px_24px_rgba(53,53,217,0.50)] hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {c.hero_cta_primary}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   to="/login"
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 border border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-white/40 bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/[0.07] text-gray-800 dark:text-white font-semibold px-8 py-4 rounded-2xl text-base transition-all hover:-translate-y-0.5 active:translate-y-0"
+                  className="flex items-center justify-center gap-2 border border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-white/40 bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/[0.07] text-gray-800 dark:text-white font-semibold px-8 py-4 rounded-2xl text-base transition-all motion-reduce:transition-none hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {c.hero_cta_secondary}
                 </Link>
               </div>
 
-              {/* Trust badges */}
+              {/* Trust row */}
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
                 {TRUST_BADGES.map(({ icon: Icon, label }) => (
                   <div
                     key={label}
-                    className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-white/50 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] px-3 py-1.5 rounded-full"
+                    className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-white/50 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.08] px-3 py-1.5 rounded-full"
                   >
                     <Icon className="h-3 w-3 text-brand-500 dark:text-brand-400 shrink-0" />
                     {label}
@@ -484,50 +480,73 @@ export function LandingPage() {
             <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest mb-3">Services</p>
             <h2 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white mb-3">Everything you need, in one app</h2>
             <p className="text-gray-400 dark:text-white/40 max-w-md mx-auto text-sm leading-relaxed">
-              One wallet. Six services. All of Nigeria covered.
+              One wallet. Seven services. All of Nigeria covered.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {c.features.map((f, i) => <ServiceCard key={i} feature={f} index={i} />)}
           </div>
         </div>
       </section>
 
-      {/* ── Why choose Hive Data ─────────────────────────────────────────────── */}
+      {/* ── Why customers trust Hive Data ────────────────────────────────────── */}
       <section className="py-20 px-5 relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[700px] rounded-full bg-brand-600/5 dark:bg-brand-600/8 blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[800px] rounded-full bg-brand-600/5 dark:bg-brand-600/10 blur-[140px]" />
         </div>
         <div className="relative max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest mb-3">Why Hive Data</p>
-            <h2 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white mb-3">Built for Nigeria, made to last</h2>
-            <p className="text-gray-400 dark:text-white/40 max-w-md mx-auto text-sm leading-relaxed">
-              We've optimized every aspect so your experience is as smooth as possible.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {WHY_CARDS.map((card) => <WhyCard key={card.title} {...card} />)}
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+
+            {/* Left: heading */}
+            <div>
+              <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest mb-3">Trust &amp; Security</p>
+              <h2 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white mb-4 leading-tight">
+                Why customers trust{' '}
+                <span className="text-brand-600 dark:text-brand-400">Hive Data</span>
+              </h2>
+              <p className="text-gray-500 dark:text-white/45 leading-relaxed mb-8 max-w-md">
+                We've built every feature with your security and convenience in mind — so you can transact confidently, every day.
+              </p>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white font-bold px-6 py-3 rounded-xl text-sm shadow-brand transition-all motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(53,53,217,0.45)]"
+              >
+                Get started free
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            {/* Right: bullet list */}
+            <div className="space-y-4">
+              {TRUST_FEATURES.map(({ icon: Icon, title, description }) => (
+                <div
+                  key={title}
+                  className="flex items-start gap-4 rounded-2xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.03] px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.06] hover:border-brand-200 dark:hover:border-brand-500/25 transition-all duration-200 motion-reduce:transition-none group"
+                >
+                  <div className="h-9 w-9 rounded-xl bg-brand-600/10 dark:bg-brand-600/15 flex items-center justify-center shrink-0 transition-transform duration-200 motion-reduce:transition-none group-hover:scale-110">
+                    <Icon className="h-4.5 w-4.5 text-brand-600 dark:text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-gray-900 dark:text-white mb-0.5">{title}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/45 leading-relaxed">{description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── How it works ─────────────────────────────────────────────────────── */}
       <section id="how-it-works" className="py-20 px-5">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-widest mb-3">Get started</p>
             <h2 className="text-2xl md:text-4xl font-black text-gray-900 dark:text-white mb-3">Up and running in minutes</h2>
             <p className="text-gray-400 dark:text-white/40 text-sm">Three simple steps to access all services.</p>
           </div>
-
-          {/* Steps with connecting line */}
-          <div className="relative">
-            {/* Vertical connector */}
-            <div className="absolute left-[21px] top-11 bottom-11 w-px bg-gradient-to-b from-brand-600/50 via-brand-600/20 to-transparent hidden sm:block" />
-            <div className="flex flex-col gap-8">
-              {c.how_it_works.map((s) => <StepCard key={s.step} step={s} />)}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {c.how_it_works.map((s) => <StepCard key={s.step} step={s} />)}
           </div>
         </div>
       </section>
@@ -536,36 +555,32 @@ export function LandingPage() {
       <section className="py-20 px-5">
         <div className="max-w-3xl mx-auto">
           <div className="relative rounded-3xl overflow-hidden">
-            {/* Background gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-brand-600 to-purple-700" />
-            {/* Decorative blobs */}
             <div className="pointer-events-none absolute -top-8 -right-8 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
             <div className="pointer-events-none absolute -bottom-8 -left-8 h-48 w-48 rounded-full bg-purple-400/20 blur-2xl" />
-            {/* Dot grid overlay */}
             <div
               className="pointer-events-none absolute inset-0 opacity-[0.06]"
               style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '24px 24px' }}
             />
-            {/* Content */}
             <div className="relative text-center px-8 py-14 md:py-16">
-              <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-4">Join thousands of users</p>
+              <p className="text-xs font-bold text-white/70 uppercase tracking-widest mb-4">Join thousands of Nigerians</p>
               <h2 className="text-2xl md:text-4xl font-black text-white mb-4 leading-tight">
-                Ready to get started?
+                Ready to simplify your<br className="hidden sm:block" /> digital payments?
               </h2>
               <p className="text-white/70 mb-8 leading-relaxed max-w-md mx-auto text-sm md:text-base">
-                Join thousands of Nigerians enjoying fast and affordable VTU services every day.
+                Create your Hive Data account and start buying services instantly.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
                 <Link
                   to="/register"
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-brand-700 font-bold px-8 py-4 rounded-2xl text-base transition-all hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
+                  className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-brand-700 font-bold px-8 py-4 rounded-2xl text-base transition-all motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
                 >
-                  Create free account
+                  Create Free Account
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   to="/login"
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 border-2 border-white/40 hover:border-white/70 text-white font-semibold px-8 py-4 rounded-2xl text-base transition-all hover:-translate-y-0.5 hover:bg-white/10 active:translate-y-0"
+                  className="flex items-center justify-center gap-2 border-2 border-white/40 hover:border-white/70 text-white font-semibold px-8 py-4 rounded-2xl text-base transition-all motion-reduce:transition-none hover:-translate-y-0.5 hover:bg-white/10 active:translate-y-0"
                 >
                   Sign in instead
                 </Link>
@@ -580,12 +595,12 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col items-center gap-6">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-brand-600 flex items-center justify-center shadow-brand">
-                <Zap className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-black text-sm text-gray-900 dark:text-white">{appName}</span>
-            </div>
+            <img
+              src="/logo-horizontal.png"
+              alt={appName}
+              className="h-7 object-contain"
+              style={{ filter: dark ? 'brightness(0) invert(1)' : undefined }}
+            />
 
             {/* Nav links */}
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
@@ -599,7 +614,6 @@ export function LandingPage() {
               <Link to="/register"         className="text-xs text-gray-400 dark:text-white/35 hover:text-gray-700 dark:hover:text-white transition-colors">Sign up</Link>
             </div>
 
-            {/* Divider */}
             <div className="w-full max-w-xs h-px bg-gray-200 dark:bg-white/[0.06]" />
 
             <p className="text-xs text-gray-400 dark:text-white/25 text-center">
