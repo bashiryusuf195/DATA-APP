@@ -10,15 +10,15 @@ import { useQueryClient } from '@tanstack/react-query'
 const PROMPT_KEY       = 'hive-push-prompt'
 const DISMISS_COOLDOWN = 30 * 24 * 60 * 60 * 1000   // 30 days in ms
 
-type PromptRecord = { decision: 'granted' | 'dismissed'; ts: number }
+type PromptRecord = { decision: 'granted' | 'dismissed' | 'never'; ts: number }
 
 /**
- * Returns true if the onboarding prompt should be shown.
+ * Returns true if the onboarding prompt should be shown on web.
  * – Never shows when the browser has already granted or hard-denied permission.
  * – Never shows if push is not supported in this browser.
  * – On a first visit (no stored record): always shows.
  * – After "Maybe Later": re-shows once 30 days have elapsed.
- * – After "Enable" (granted or browser-denied): never shows again.
+ * – After "Enable" or "Don't ask again": never shows again.
  */
 export function shouldShowNotificationPrompt(): boolean {
   if (typeof Notification === 'undefined') return false
@@ -26,12 +26,27 @@ export function shouldShowNotificationPrompt(): boolean {
   if (Notification.permission === 'denied')  return false
   try {
     const raw = localStorage.getItem(PROMPT_KEY)
-    if (!raw) return true                                       // first visit
+    if (!raw) return true
     const { decision, ts } = JSON.parse(raw) as PromptRecord
-    if (decision === 'granted')   return false                  // already set up
+    if (decision === 'granted' || decision === 'never') return false
     if (decision === 'dismissed') return Date.now() - ts >= DISMISS_COOLDOWN
   } catch { /* ignore corrupt storage */ }
   return true
+}
+
+/**
+ * Returns true if the push prompt should NOT be shown — works on both web and
+ * native Android (does not depend on the Notification browser API).
+ */
+export function isPushPromptSuppressed(): boolean {
+  try {
+    const raw = localStorage.getItem(PROMPT_KEY)
+    if (!raw) return false
+    const { decision, ts } = JSON.parse(raw) as PromptRecord
+    if (decision === 'granted' || decision === 'never') return true
+    if (decision === 'dismissed') return Date.now() - ts < DISMISS_COOLDOWN
+  } catch { /* ignore */ }
+  return false
 }
 
 function saveDecision(decision: PromptRecord['decision']): void {
@@ -234,6 +249,14 @@ export function NotificationPromptModal({ onClose }: { onClose: () => void }) {
                 className="w-full py-2.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
               >
                 Maybe Later
+              </button>
+
+              <button
+                onClick={() => { saveDecision('never'); onClose() }}
+                disabled={phase === 'loading'}
+                className="w-full py-2 text-xs text-ink-faint hover:text-ink-muted transition-colors disabled:opacity-50"
+              >
+                Don't ask again
               </button>
             </div>
           </>

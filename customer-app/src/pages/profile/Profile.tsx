@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight, Lock, Shield, Hash,
-  Bell, Mail, Moon, Sun, LogOut, BadgeCheck, Edit2, AlertCircle,
+  Bell, Mail, Moon, Sun, LogOut, BadgeCheck, Edit2, AlertCircle, Settings,
 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -201,8 +201,15 @@ export function ProfilePage() {
   return (
     <div className="space-y-4 pb-2">
       {/* ── Page heading ───────────────────────────────────────────── */}
-      <div className="pt-1">
+      <div className="flex items-center justify-between pt-1">
         <h1 className="text-xl font-bold text-ink">Profile</h1>
+        <button
+          onClick={() => navigate('/settings')}
+          className="p-2 rounded-xl hover:bg-surface-2 transition-colors"
+          aria-label="Settings"
+        >
+          <Settings className="h-5 w-5 text-ink-muted" />
+        </button>
       </div>
 
       {/* ── Desktop 2-col / mobile single-col ─────────────────────── */}

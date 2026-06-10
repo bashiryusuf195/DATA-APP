@@ -40,7 +40,11 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
 
       clearAuth: () =>
-        set({ access_token: null, refresh_token: null, session_id: null, user: null }),
+        set((s) => s.biometric_enabled
+          // Keep refresh_token + session_id so biometric re-login works after logout
+          ? { access_token: null, user: null }
+          : { access_token: null, refresh_token: null, session_id: null, user: null }
+        ),
 
       setBiometricEnabled: (v) => set({ biometric_enabled: v }),
     }),

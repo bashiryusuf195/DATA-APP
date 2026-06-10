@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, ScrollRestoration } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { Capacitor } from '@capacitor/core'
 import { Sidebar }                from './Sidebar'
 import { BottomNav }              from './BottomNav'
 import { AppHeader }              from './AppHeader'
 import { PinSetupModal }          from '@/components/shared/PinSetupModal'
 import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
 import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
-import { NotificationPromptModal, shouldShowNotificationPrompt } from '@/components/shared/NotificationPromptModal'
+import { NotificationPromptModal, shouldShowNotificationPrompt, isPushPromptSuppressed } from '@/components/shared/NotificationPromptModal'
+import { BiometricPromptModal, isBiometricPromptSuppressed } from '@/components/shared/BiometricPromptModal'
 import { SupportWidget }          from '@/components/shared/SupportWidget'
 import { PwaInstallSheet }        from '@/components/shared/PwaInstallSheet'
 import { PageTransition }         from '@/components/shared/PageTransition'
@@ -17,13 +19,17 @@ import { useAuthStore }           from '@/store/auth.store'
 import { useThemeStore }          from '@/store/theme.store'
 import { usePwaInstall }          from '@/hooks/usePwaInstall'
 import { usePullToRefresh }       from '@/hooks/usePullToRefresh'
+import { usePushNotifications }   from '@/hooks/usePushNotifications'
+import { checkNativeBiometricAvailable } from '@/hooks/useBiometricAuth'
 import { authApi }                from '@/api/auth.api'
 
 export function AppLayout() {
   const user             = useAuthStore((s) => s.user)
   const setUser          = useAuthStore((s) => s.setUser)
+  const biometricEnabled = useAuthStore((s) => s.biometric_enabled)
   const setBalanceHidden = useThemeStore((s) => s.setBalanceHidden)
   const dark             = useThemeStore((s) => s.dark)
+  const push             = usePushNotifications()
 
   // Sync Android status-bar / browser chrome colour with the app theme
   useEffect(() => {
@@ -53,18 +59,41 @@ export function AppLayout() {
   const [dismissed, setDismissed] = useState(false)
   const showSetup = !!user && !user.has_transaction_pin && !dismissed
 
-  // Push notification onboarding prompt — shown once on first visit,
-  // re-shown after 30 days if dismissed with "Maybe Later".
+  // ── Biometric onboarding prompt (Android native only) ─────────────────────
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false)
+
+  useEffect(() => {
+    if (!user || !Capacitor.isNativePlatform()) return
+    if (isBiometricPromptSuppressed(biometricEnabled)) return
+    let cancelled = false
+    checkNativeBiometricAvailable().then((available) => {
+      if (!cancelled && available) {
+        // Slight delay so the prompt doesn't collide with page load animations
+        setTimeout(() => setShowBiometricPrompt(true), 2500)
+      }
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!user, biometricEnabled])
+
+  // ── Push notification onboarding prompt ────────────────────────────────────
+  // Web: uses Notification browser API. Native Android: uses push.permission.
+  // Re-shown after 30 days if dismissed with "Maybe Later".
   const [showNotifPrompt, setShowNotifPrompt] = useState(false)
+
+  // Compute at render time so the check uses the latest push.permission value
+  // (avoids a race where permission resolves to 'granted' after scheduling).
+  const pushPromptAllowed = Capacitor.isNativePlatform()
+    ? push.permission === 'default' && !isPushPromptSuppressed()
+    : shouldShowNotificationPrompt()
 
   useEffect(() => {
     if (!user) return
-    if (!shouldShowNotificationPrompt()) return
-    // Slight delay so the prompt doesn't collide with page load animations
-    const t = setTimeout(() => setShowNotifPrompt(true), 2500)
+    if (!pushPromptAllowed) return
+    const t = setTimeout(() => setShowNotifPrompt(true), 3500)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!user])
+  }, [!!user, pushPromptAllowed])
 
   // Pull-to-refresh — invalidates all active queries; disabled until user is loaded
   const queryClient  = useQueryClient()
@@ -157,13 +186,18 @@ export function AppLayout() {
         <PopupAnnouncement announcements={popups} />
       )}
 
-      {/* Push notification onboarding — only after higher-priority modals are gone */}
-      {!showSetup && showNotifPrompt && (
+      {/* Biometric login onboarding — Android only, after PIN setup */}
+      {!showSetup && showBiometricPrompt && (
+        <BiometricPromptModal onClose={() => setShowBiometricPrompt(false)} />
+      )}
+
+      {/* Push notification onboarding — after biometric prompt */}
+      {!showSetup && !showBiometricPrompt && showNotifPrompt && pushPromptAllowed && (
         <NotificationPromptModal onClose={() => setShowNotifPrompt(false)} />
       )}
 
       {/* PWA install prompt — deferred until higher-priority modals are gone */}
-      {!showSetup && !showNotifPrompt && showPwaSheet && (
+      {!showSetup && !showBiometricPrompt && !showNotifPrompt && showPwaSheet && (
         <PwaInstallSheet
           isIos={pwa.isIos}
           onInstall={pwa.install}
