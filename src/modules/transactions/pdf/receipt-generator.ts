@@ -82,7 +82,6 @@ export interface ReceiptData {
   customerEmail: string;
   customerPhone?: string | null;
   createdAt:     string | Date;
-  provider?:     string | null;
   metadata?:     Record<string, unknown>;
 }
 
@@ -255,15 +254,11 @@ function renderReceipt(doc: PDFKit.PDFDocument, data: ReceiptData): void {
   y = renderRow(doc, y, "Date",      fmtDate(data.createdAt), false);
   y = renderRow(doc, y, "Time",      fmtTime(data.createdAt), true);
 
-  if (data.provider) {
-    y = renderRow(doc, y, "Provider", data.provider, false);
-  }
-
   // Balance fields from metadata
   const bBefore = meta.balance_before ?? meta.previous_balance;
   const bAfter  = meta.balance_after  ?? meta.new_balance;
   if (bBefore != null && !isNaN(Number(bBefore))) {
-    y = renderRow(doc, y, "Prev Balance", fmtAmt(Number(bBefore)), !data.provider);
+    y = renderRow(doc, y, "Prev Balance", fmtAmt(Number(bBefore)), false);
   }
   if (bAfter != null && !isNaN(Number(bAfter))) {
     y = renderRow(doc, y, "New Balance",  fmtAmt(Number(bAfter)),  !!(bBefore != null));
