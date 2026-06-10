@@ -487,7 +487,7 @@ function ActionBar({ tx }: { tx: Transaction }) {
     const uiStatus = getUIStatus(tx.status)
     const cfg = STATUS_CFG[uiStatus]
     const text = [
-      'Hive Data - Transaction Receipt',
+      'Hive Data Transaction Receipt',
       '',
       `Service: ${TYPE_LABEL[tx.type] ?? tx.type}`,
       `Amount: ${fmtCurrency(tx.amount)}`,
@@ -495,7 +495,8 @@ function ActionBar({ tx }: { tx: Transaction }) {
       `Reference: ${tx.reference}`,
       `Date: ${fmtDateTime(tx.created_at)}`,
       '',
-      'hivedata.ng',
+      'Support: support@hivedata.ng',
+      'App: app.hivedata.ng',
     ].join('\n')
 
     if (Capacitor.isNativePlatform()) {
