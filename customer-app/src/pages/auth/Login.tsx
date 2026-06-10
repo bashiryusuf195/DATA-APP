@@ -17,6 +17,7 @@ import {
   WebAuthnAbortService,
   startConditionalAuthentication,
 } from '@/hooks/usePasskey'
+import { checkNativeBiometricAvailable, performNativeBiometric } from '@/hooks/useBiometricAuth'
 
 type Step = 'credentials' | '2fa'
 
@@ -33,7 +34,15 @@ export function LoginPage() {
   const [biometricLoading, setBiometricLoading]     = useState(false)
 
   const { setAuth, access_token, _hasHydrated } = useAuthStore()
+  const biometricEnabled    = useAuthStore((s) => s.biometric_enabled)
+  const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled)
+  const refresh_token       = useAuthStore((s) => s.refresh_token)
+  const storedUser          = useAuthStore((s) => s.user)
+  const storedSessionId     = useAuthStore((s) => s.session_id)
   const navigate = useNavigate()
+
+  const [nativeBiometricReady,   setNativeBiometricReady]   = useState(false)
+  const [nativeBiometricLoading, setNativeBiometricLoading] = useState(false)
 
   // Show a toast if the user was redirected here because their session expired.
   useEffect(() => {
@@ -88,6 +97,12 @@ export function LoginPage() {
     }
   }, [navigate])
 
+  // Native Android: check if biometric is available on device
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !biometricEnabled || !refresh_token) return
+    checkNativeBiometricAvailable().then(setNativeBiometricReady)
+  }, [biometricEnabled, refresh_token])
+
   if (!_hasHydrated) return null
   if (access_token) return <Navigate to="/dashboard" replace />
 
@@ -111,6 +126,35 @@ export function LoginPage() {
       setError(msg)
     } finally {
       setBiometricLoading(false)
+    }
+  }
+
+  const handleNativeBiometric = async () => {
+    setNativeBiometricLoading(true)
+    setError('')
+    try {
+      const result = await performNativeBiometric('Sign in to Hive Data')
+      if (result !== 'success') return // cancelled — stay on login, no error
+      if (!refresh_token || !storedUser) {
+        setBiometricEnabled(false)
+        setError('Session expired. Please sign in with your password.')
+        return
+      }
+      const tokens = await authApi.refresh(refresh_token)
+      setAuth({
+        access_token:  tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        session_id:    storedSessionId ?? '',
+        user:          storedUser,
+      })
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`
+      toast.success('Welcome back!')
+      navigate('/dashboard', { replace: true })
+    } catch {
+      setBiometricEnabled(false)
+      setError('Session expired. Please sign in with your password.')
+    } finally {
+      setNativeBiometricLoading(false)
     }
   }
 
@@ -221,6 +265,24 @@ export function LoginPage() {
         {error && <p className="text-xs text-danger">{error}</p>}
         <Button type="submit" loading={loading} fullWidth>Sign in</Button>
       </form>
+      {Capacitor.isNativePlatform() && biometricEnabled && nativeBiometricReady && !!refresh_token && (
+        <>
+          <div className="flex items-center gap-3 mt-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-ink-faint">or</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <button
+            type="button"
+            disabled={nativeBiometricLoading}
+            onClick={handleNativeBiometric}
+            className="mt-3 w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl border border-border bg-surface-1 text-sm font-semibold text-ink hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Fingerprint className="h-5 w-5 text-brand-600" />
+            {nativeBiometricLoading ? 'Verifying…' : 'Sign in with Biometrics'}
+          </button>
+        </>
+      )}
       {biometricAvailable && (
         <>
           <div className="flex items-center gap-3 mt-5">
