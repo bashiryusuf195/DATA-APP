@@ -2,6 +2,35 @@ import type { Request, Response, NextFunction } from "express";
 import { getDbInstance } from "../../../db/knex";
 import { getReferralSettings } from "../services/referral-settings.service";
 
+// ── GET /referrals/public-settings ────────────────────────────────────────────
+// No authentication required — returns the reward display values for the app banner.
+
+export async function getPublicReferralSettingsController(
+  _req: Request,
+  res:  Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const settings = await getReferralSettings();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        is_enabled:            settings?.is_enabled            ?? false,
+        reward_type:           settings?.reward_type           ?? "fixed",
+        reward_value:          settings ? Number(settings.reward_value) : 0,
+        reward_recipient:      settings?.reward_recipient      ?? "referrer",
+        referred_reward_value: settings?.referred_reward_value != null
+          ? Number(settings.referred_reward_value)
+          : null,
+        reward_trigger:        settings?.reward_trigger        ?? "signup",
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 const db = getDbInstance();
 
 const APP_URL = process.env.APP_URL ?? "https://app.vtu.ng";
