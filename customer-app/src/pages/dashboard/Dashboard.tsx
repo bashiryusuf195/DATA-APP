@@ -8,6 +8,7 @@ import { useThemeStore } from '@/store/theme.store'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useReferralSettings } from '@/hooks/useReferrals'
 import { WalletBalanceCard } from '@/components/shared/WalletBalanceCard'
 import { TransactionCard } from '@/components/shared/TransactionCard'
 import { KycStatusCard } from '@/components/shared/KycStatusCard'
@@ -35,6 +36,20 @@ const QUICK_ACTIONS = [
 ]
 
 function ReferralBanner() {
+  const { data: settings } = useReferralSettings()
+
+  if (settings && !settings.is_enabled) return null
+
+  const rewardLabel = settings
+    ? settings.reward_type === 'percentage'
+      ? `${settings.reward_value}%`
+      : `₦${settings.reward_value.toLocaleString()}`
+    : '₦200'
+
+  const subtitle = settings?.reward_recipient === 'both' && settings.referred_reward_value
+    ? 'You & your friend both earn'
+    : 'Invite friends, earn instantly'
+
   return (
     <div
       className="relative overflow-hidden rounded-3xl p-4"
@@ -50,9 +65,9 @@ function ReferralBanner() {
             <Gift className="h-3.5 w-3.5" /> Refer &amp; Earn
           </p>
           <p className="text-white font-black text-xl leading-none">
-            ₦200 <span className="text-sm font-semibold text-white/70">per friend</span>
+            {rewardLabel} <span className="text-sm font-semibold text-white/70">per friend</span>
           </p>
-          <p className="text-white/60 text-xs mt-1">Invite friends, earn instantly</p>
+          <p className="text-white/60 text-xs mt-1">{subtitle}</p>
         </div>
         <Link
           to="/referrals"
