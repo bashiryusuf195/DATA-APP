@@ -54,26 +54,12 @@ export async function downloadReceiptController(
       req.user!.email ||
       "Customer";
 
-    // ── Provider pretty-name ─────────────────────────────────────────────────
-    // Older rows may store metadata as a JSON string rather than a parsed object
+    // ── Parse metadata ───────────────────────────────────────────────────────
     let rawMeta = tx.metadata;
     if (typeof rawMeta === "string") {
       try { rawMeta = JSON.parse(rawMeta); } catch { rawMeta = {}; }
     }
-    const meta     = (rawMeta ?? {}) as Record<string, unknown>;
-    const provResp = (meta.provider_response ?? {}) as Record<string, unknown>;
-    const rawProvider = String(
-      (tx.provider ?? meta.provider ?? provResp.provider ?? meta.service_id) ?? ""
-    ).trim();
-
-    const PROVIDER_NAMES: Record<string, string> = {
-      vtpass:      "VTPass",
-      VTPASS:      "VTPass",
-      paystack:    "Paystack",
-      squad:       "Squad",
-      flutterwave: "Flutterwave",
-    };
-    const provider = (PROVIDER_NAMES[rawProvider] ?? PROVIDER_NAMES[rawProvider?.toLowerCase()] ?? rawProvider) || null;
+    const meta = (rawMeta ?? {}) as Record<string, unknown>;
 
     // ── Build receipt data ───────────────────────────────────────────────────
     const receiptData: ReceiptData = {
@@ -87,7 +73,6 @@ export async function downloadReceiptController(
       customerEmail: user?.email ?? req.user!.email,
       customerPhone: user?.phone ?? tx.phone ?? null,
       createdAt:     tx.created_at,
-      provider:      provider || null,
       metadata:      meta,
     };
 
