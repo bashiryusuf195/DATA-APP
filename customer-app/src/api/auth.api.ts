@@ -82,11 +82,15 @@ export const authApi = {
       | ApiResponse<{ requires_2fa: true; challenge_id: string }>
       | ApiResponse<BackendAuthData>
     const r = await apiClient.post<LoginRaw>('/auth/login', body)
-    const d = r.data.data as Record<string, unknown>
+    const payload = r.data as unknown as Record<string, unknown>
+    const d = (payload['data'] ?? payload) as Record<string, unknown>
+    if (!d || typeof d !== 'object') {
+      throw new Error(`Unexpected login response: ${JSON.stringify(payload).slice(0, 200)}`)
+    }
     if (d['requires_2fa'] === true) {
       return { requires_2fa: true, challenge_id: d['challenge_id'] as string }
     }
-    const { user, tokens, session_id } = r.data.data as BackendAuthData
+    const { user, tokens, session_id } = d as unknown as BackendAuthData
     return {
       requires_2fa: false,
       access_token:  tokens.access_token,
