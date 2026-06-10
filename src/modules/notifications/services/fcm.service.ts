@@ -117,10 +117,9 @@ async function sendBatch(
     },
     android: {
       notification: {
-        title:        payload.title,
-        body:         payload.body,
-        icon:         payload.icon ?? "ic_notification",
-        clickAction:  "FLUTTER_NOTIFICATION_CLICK",
+        title: payload.title,
+        body:  payload.body,
+        icon:  payload.icon ?? "ic_notification",
         ...(payload.image ? { imageUrl: payload.image } : {}),
       },
       data: {
