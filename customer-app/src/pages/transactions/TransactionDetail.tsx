@@ -5,6 +5,9 @@ import {
   Share2, CheckCircle2, XCircle, Clock, Search, RefreshCw,
   ArrowDownLeft,
 } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { Share } from '@capacitor/share'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { cn } from '@/utils/cn'
 import { useTransaction } from '@/hooks/useTransactions'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -494,6 +497,13 @@ function ActionBar({ tx }: { tx: Transaction }) {
       '─────────────────────────────',
     ].join('\n')
 
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Share.share({ title: 'Transaction Receipt', text, dialogTitle: 'Share Receipt' })
+      } catch { /* user cancelled */ }
+      return
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Transaction Receipt', text })
@@ -511,7 +521,30 @@ function ActionBar({ tx }: { tx: Transaction }) {
   const handleDownload = useCallback(async () => {
     setDownloading(true)
     try {
-      await transactionsApi.downloadReceipt(tx.reference)
+      if (Capacitor.isNativePlatform()) {
+        const { blob, filename } = await transactionsApi.fetchReceiptBlob(tx.reference)
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const result = reader.result as string
+            resolve(result.split(',')[1])
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+        const writeResult = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        })
+        await Share.share({
+          title: 'Transaction Receipt',
+          files: [writeResult.uri],
+          dialogTitle: 'Save or Share Receipt',
+        })
+      } else {
+        await transactionsApi.downloadReceipt(tx.reference)
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not generate receipt. Please try again.'
       toast.error(msg)

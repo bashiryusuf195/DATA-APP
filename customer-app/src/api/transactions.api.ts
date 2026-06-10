@@ -108,7 +108,7 @@ export const transactionsApi = {
     URL.revokeObjectURL(objUrl)
   },
 
-  /** Download a PDF receipt for any transaction type. */
+  /** Download a PDF receipt for any transaction type (web/PWA — anchor-click). */
   downloadReceipt: async (reference: string): Promise<void> => {
     try {
       const resp = await apiClient.get(
@@ -124,6 +124,31 @@ export const transactionsApi = {
       URL.revokeObjectURL(objUrl)
     } catch (err) {
       // When responseType:'blob', error body is a Blob — parse it to surface the real message
+      if (axios.isAxiosError(err) && err.response?.data instanceof Blob) {
+        try {
+          const text = await (err.response.data as Blob).text()
+          const json = JSON.parse(text) as { error?: string; message?: string }
+          throw new Error(json.error ?? json.message ?? 'Could not generate receipt')
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== 'Could not generate receipt') throw parseErr
+        }
+      }
+      throw err
+    }
+  },
+
+  /** Fetch the PDF receipt as a Blob (native path — used before writing to cache). */
+  fetchReceiptBlob: async (reference: string): Promise<{ blob: Blob; filename: string }> => {
+    try {
+      const resp = await apiClient.get(
+        `/transactions/${reference}/receipt`,
+        { responseType: 'blob' },
+      )
+      return {
+        blob: new Blob([resp.data as BlobPart], { type: 'application/pdf' }),
+        filename: `hivedata-receipt-${reference}.pdf`,
+      }
+    } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data instanceof Blob) {
         try {
           const text = await (err.response.data as Blob).text()
