@@ -305,7 +305,7 @@ export function ReferralsPage() {
           </div>
 
           {/* Referral code */}
-          {data && (
+          {data ? (
             <>
               <p className="text-white/60 text-[11px] font-semibold uppercase tracking-wider mb-1.5">
                 Your Referral Code
@@ -349,7 +349,7 @@ export function ReferralsPage() {
       </div>
 
       {/* ── Stats grid (2×3) ───────────────────────────────────────────── */}
-      {data && (
+      {data ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard
             icon={<Users className="h-4.5 w-4.5 text-blue-600" />}

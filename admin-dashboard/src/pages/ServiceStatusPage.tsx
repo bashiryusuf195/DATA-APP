@@ -10,7 +10,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import {
   Phone, Wifi, Zap, Tv, ShieldCheck, Building2,
-  CheckCircle2, Clock, Wrench, XCircle, RefreshCw, Save, Calendar,
+  CheckCircle2, Clock, RefreshCw, Save, Calendar,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -288,8 +288,8 @@ export function ServiceStatusPage() {
         </Button>
       </div>
 
-      {isLoading && <SkeletonTable rows={4} cols={3} />}
-      {error     && <ErrorMessage message={errMsg(error, 'Failed to load service statuses')} />}
+      {isLoading && <SkeletonTable rows={4} />}
+      {error     && <ErrorMessage error={error} />}
 
       {!isLoading && rows.length > 0 && (
         <>

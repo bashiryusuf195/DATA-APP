@@ -10,7 +10,6 @@ import { TransactionCard, TYPE_ICON, TYPE_LABEL, TYPE_BG, TYPE_COLOR } from '@/c
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { EmptyTransactions } from '@/components/shared/empty-states'
-import { Button } from '@/components/ui'
 import { TransactionsSkeleton } from '@/components/skeletons'
 import { fmtCurrency, fmtDateTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
