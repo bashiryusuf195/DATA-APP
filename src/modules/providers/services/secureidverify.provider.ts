@@ -287,6 +287,7 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       const altKeys = ["image","passport","passportPhoto","photograph","picture","profilePhoto","base64Image"];
       console.log("[PHOTO-PROVIDER-RAW]", JSON.stringify({
         verification_type:      "nin",
+        variation_code:         input.variation_code,
         keys:                   Object.keys(d),
         photo_exists:           "photo" in d,
         photo_type:             typeof d.photo,
@@ -323,6 +324,36 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
         photo_type:   typeof ninNormalized.photo,
         photo_length: typeof ninNormalized.photo === "string" ? ninNormalized.photo.length : 0,
         photo_prefix: typeof ninNormalized.photo === "string" ? ninNormalized.photo.slice(0, 100) : null,
+      }, null, 2));
+    }
+
+    // ── [FIELD-INVENTORY] — safe field presence audit (no PII values) ────────
+    if (ninNormalized) {
+      const n = ninNormalized;
+      console.log("[FIELD-INVENTORY]", JSON.stringify({
+        variation_code:  input.variation_code,
+        verify_method:   verifyMethod,
+        raw_keys:        Object.keys((raw.data ?? {}) as Record<string, unknown>),
+        core: {
+          has_first_name:  !!n.first_name,
+          has_last_name:   !!n.last_name,
+          has_middle_name: !!n.middle_name,
+          has_dob:         !!n.date_of_birth,
+          has_gender:      !!n.gender,
+          has_nin:         !!n.nin,
+          has_phone:       !!n.phone,
+          has_photo:       !!n.photo,
+          photo_length:    n.photo ? n.photo.length : 0,
+        },
+        extended: {
+          has_tracking_id:     !!n.tracking_id,
+          has_residence_state: !!n.residence_state,
+          has_birth_state:     !!n.birth_state,
+          has_residence_lga:   !!n.residence_lga,
+          has_birth_lga:       !!n.birth_lga,
+          has_address:         !!n.address,
+          address_length:      n.address ? n.address.length : 0,
+        },
       }, null, 2));
     }
 
@@ -412,6 +443,7 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       const altKeys = ["image","passport","passportPhoto","photograph","picture","profilePhoto","base64Image"];
       console.log("[PHOTO-PROVIDER-RAW]", JSON.stringify({
         verification_type:      "bvn",
+        variation_code:         input.variation_code,
         keys:                   Object.keys(d),
         photo_exists:           "photo" in d,
         photo_type:             typeof d.photo,
@@ -447,6 +479,38 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
         photo_type:   typeof bvnNormalized.photo,
         photo_length: typeof bvnNormalized.photo === "string" ? bvnNormalized.photo.length : 0,
         photo_prefix: typeof bvnNormalized.photo === "string" ? bvnNormalized.photo.slice(0, 100) : null,
+      }, null, 2));
+    }
+
+    // ── [FIELD-INVENTORY] — safe field presence audit (no PII values) ────────
+    if (bvnNormalized) {
+      const n = bvnNormalized;
+      console.log("[FIELD-INVENTORY]", JSON.stringify({
+        variation_code: input.variation_code,
+        raw_keys:       Object.keys((raw.data ?? {}) as Record<string, unknown>),
+        core: {
+          has_first_name:  !!n.first_name,
+          has_last_name:   !!n.last_name,
+          has_middle_name: !!n.middle_name,
+          has_dob:         !!n.date_of_birth,
+          has_gender:      !!n.gender,
+          has_bvn:         !!n.bvn,
+          has_phone:       !!n.phone,
+          has_photo:       !!n.photo,
+          photo_length:    n.photo ? n.photo.length : 0,
+        },
+        extended: {
+          has_nin:                    !!n.nin,
+          has_marital_status:         !!n.marital_status,
+          has_enrollment_institution: !!n.enrollment_institution,
+          has_enrollment_branch:      !!n.enrollment_branch,
+          has_origin_state:           !!n.origin_state,
+          has_origin_lga:             !!n.origin_lga,
+          has_residence_state:        !!n.residence_state,
+          has_residence_lga:          !!n.residence_lga,
+          has_address:                !!n.address,
+          address_length:             n.address ? n.address.length : 0,
+        },
       }, null, 2));
     }
 
