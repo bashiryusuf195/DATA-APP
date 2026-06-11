@@ -354,11 +354,12 @@ export class VTPassProvider extends HttpVTUProvider {
     }
 
     console.log("[VTPASS] purchase →", {
-      service:   input.service_type,
-      serviceID: payload["serviceID"],
-      amount:    input.amount,
-      phone:     maskPhone(input.phone),
-      reference: input.reference,
+      service:        input.service_type,
+      serviceID:      payload["serviceID"],
+      variation_code: payload["variation_code"] ?? "(none — airtime)",
+      amount:         input.amount,
+      phone:          maskPhone(input.phone),
+      reference:      input.reference,
     });
 
     const url      = `${this.baseUrl}/pay`;
@@ -461,6 +462,24 @@ export class VTPassProvider extends HttpVTUProvider {
       currency:     "NGN",
       raw_response: raw,
     };
+  }
+
+  async getServiceVariations(serviceID: string): Promise<unknown> {
+    this.assertCredentials();
+    const url      = `${this.baseUrl}/service-variations?serviceID=${encodeURIComponent(serviceID)}`;
+    const response = await this.fetchWithTimeout(url, {
+      method:  "GET",
+      headers: this.readHeaders(),
+    });
+    const text = await response.text().catch(() => "");
+    if (!response.ok) {
+      throw new Error(`VTPass /service-variations failed (HTTP ${response.status}): ${text.slice(0, 300)}`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`VTPass /service-variations returned non-JSON: ${text.slice(0, 300)}`);
+    }
   }
 
   async healthCheck(): Promise<ProviderHealthResult> {

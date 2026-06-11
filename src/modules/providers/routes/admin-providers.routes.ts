@@ -12,6 +12,7 @@ import {
   updateProviderController,
   disableProviderController,
   fetchProviderPlansController,
+  getVtpassVariationsController,
 } from "../controllers/admin-providers.controller";
 
 const router = Router();
@@ -35,5 +36,7 @@ router.post(  "/providers/:providerCode/health-check",          ...adminGuard, a
 router.post(  "/providers/:providerCode/credential-diagnostic", ...adminGuard, adminRateLimiter, credentialDiagnosticController);
 // Fetch available plans for any provider (?service=data|cable_tv &network=mtn|airtel|glo|9mobile)
 router.get(   "/providers/:providerCode/plans",                 ...adminGuard, adminRateLimiter, fetchProviderPlansController);
+// Fetch VTPass service catalog (?serviceID=mtn-data|dstv|ikeja-electric|…)
+router.get(   "/providers/vtpass/service-variations",           ...adminGuard, adminRateLimiter, getVtpassVariationsController);
 
 export { router as adminProvidersRouter };
