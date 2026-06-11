@@ -125,16 +125,32 @@ class SecureIDVerifyPortalService {
   // ── Main lookup flow ────────────────────────────────────────────────────────
 
   private async lookupAndDownloadPdf(page: Page, idType: PortalIdType, idNumber: string): Promise<string> {
-    // Derive the portal origin from the login URL so lookup paths are always
-    // rooted at the domain root, not appended onto /auth/login.
-    const portalOrigin = new URL(this.cfg.url).origin;
-    const lookupUrl    = `${portalOrigin}${this.getLookupPath(idType)}`;
-    const slipLabel    = SLIP_TYPE_LABEL[idType];
-    let step           = 'navigate_to_verification';
+    // Always derive routes from the origin of the login URL.
+    // SECUREIDVERIFY_PORTAL_URL is the /auth/login page; appending paths to it
+    // produces broken URLs like /auth/login/user/service/...
+    const loginUrl     = this.cfg.url;
+    const portalOrigin = new URL(loginUrl).origin;
+    const routes = {
+      login:         loginUrl,
+      dashboard:     `${portalOrigin}/user/dashboard`,
+      nin:           `${portalOrigin}/user/service/nin-verification`,
+      bvn:           `${portalOrigin}/user/service/bvn-verification`,
+      verifications: `${portalOrigin}/user/verifications`,
+    };
+    logger.info(`[SIDV-PORTAL] routes ${JSON.stringify(routes)}`);
+
+    const lookupUrl = idType === 'bvn_basic' ? routes.bvn : routes.nin;
+    const slipLabel = SLIP_TYPE_LABEL[idType];
+    let step        = 'navigate_to_verification';
+
+    // Hard guard: catch any future regression where the login path bleeds into lookup URL.
+    if (lookupUrl.includes('/auth/login/user/service')) {
+      throw new Error(`portal_bad_lookup_url: ${lookupUrl}`);
+    }
 
     try {
       // ── 1. Navigate to the verification form ──────────────────────────────
-      logger.info(`[SIDV-PORTAL] lookup step: navigate id_type=${idType} url=${lookupUrl}`);
+      logger.info(`[SIDV-PORTAL] goto_lookup_url ${lookupUrl}`);
       await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
       const afterNavUrl   = page.url();
@@ -276,7 +292,7 @@ class SecureIDVerifyPortalService {
         id_type: idType,
         reason:  'DOWNLOAD SLIP button not found or download event not captured on detail page',
       });
-      return await this.downloadFromVerificationsList(page, portalOrigin, idNumber, idType, slipLabel);
+      return await this.downloadFromVerificationsList(page, routes.verifications, idNumber, idType, slipLabel);
 
     } catch (err) {
       const e = err as Error;
@@ -335,12 +351,11 @@ class SecureIDVerifyPortalService {
 
   private async downloadFromVerificationsList(
     page: Page,
-    portalOrigin: string,
+    listUrl: string,
     idNumber: string,
     idType: PortalIdType,
     slipLabel: string,
   ): Promise<string> {
-    const listUrl = `${portalOrigin}/user/verifications`;
     await page.goto(listUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForSelector('table, [class*="verification"], [class*="list"]', { timeout: 30_000 }).catch(() => {});
 
@@ -568,9 +583,9 @@ class SecureIDVerifyPortalService {
 
 export const secureidverifyPortalService = new SecureIDVerifyPortalService();
 
-logger.info('[SIDV-PORTAL-CONFIG]', {
-  has_url:      !!config.secureidverifyPortal.url,
-  has_username: !!config.secureidverifyPortal.username,
-  has_password: !!config.secureidverifyPortal.password,
-  timeout_ms:   config.secureidverifyPortal.timeoutMs,
-});
+(() => {
+  const _loginUrl     = config.secureidverifyPortal.url;
+  const _origin       = _loginUrl ? new URL(_loginUrl).origin : '(no_url)';
+  logger.info(`[SIDV-PORTAL-CONFIG] has_url=${!!_loginUrl} has_username=${!!config.secureidverifyPortal.username} has_password=${!!config.secureidverifyPortal.password} timeout_ms=${config.secureidverifyPortal.timeoutMs}`);
+  logger.info(`[SIDV-PORTAL-CONFIG] login_url=${_loginUrl} origin=${_origin} nin_url=${_origin}/user/service/nin-verification bvn_url=${_origin}/user/service/bvn-verification`);
+})();
