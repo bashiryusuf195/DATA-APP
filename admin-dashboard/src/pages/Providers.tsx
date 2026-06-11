@@ -413,8 +413,8 @@ export function ProvidersPage() {
                 )}
               </div>
 
-              {/* Clubkonnect credential diagnostic */}
-              {selected.provider_code === 'clubkonnect' && (
+              {/* Provider credential diagnostic — Clubkonnect and VTPass */}
+              {(selected.provider_code === 'clubkonnect' || selected.provider_code === 'vtpass') && (
                 <div className="border-t border-border pt-3 space-y-3">
                   <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Credential Diagnostic</p>
                   <Button
@@ -446,7 +446,7 @@ export function ProvidersPage() {
                             <p className="text-[11px] text-ink-faint">UserID length: {diagResult.details.userId_length} chars</p>
                           )}
                           {diagResult.details.apiKey_length !== undefined && (
-                            <p className="text-[11px] text-ink-faint">APIKey length: {diagResult.details.apiKey_length} chars</p>
+                            <p className="text-[11px] text-ink-faint">API key length: {diagResult.details.apiKey_length} chars (prefix: {(diagResult.details as Record<string, unknown>).apiKey_prefix as string})</p>
                           )}
                           {diagResult.details.baseUrl && (
                             <p className="text-[11px] text-ink-faint font-mono">{diagResult.details.baseUrl}</p>
@@ -456,6 +456,11 @@ export function ProvidersPage() {
                           )}
                           {diagResult.details.raw_status && (
                             <p className="text-[11px] text-ink-faint font-mono">{diagResult.details.raw_status}</p>
+                          )}
+                          {(diagResult.details as Record<string, unknown>).raw_response && (
+                            <p className="text-[11px] text-amber-300 font-mono break-all">
+                              {String((diagResult.details as Record<string, unknown>).raw_response)}
+                            </p>
                           )}
                         </div>
                       )}
