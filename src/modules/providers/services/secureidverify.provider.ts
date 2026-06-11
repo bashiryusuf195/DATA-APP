@@ -300,30 +300,23 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       });
 
       if (portalIdType && idNumber) {
-        try {
-          const pdfBase64 = await secureidverifyPortalService.getPdfSlip(portalIdType, idNumber);
-          result = {
-            ...result,
-            report_data: { ...result.report_data, portal_pdf_data: pdfBase64 },
-          };
-          logger.info("[SIDV-PORTAL] portal_pdf_data attached", {
-            reference:  input.reference,
-            id_type:    portalIdType,
-            pdf_length: pdfBase64.length,
-          });
-        } catch (err) {
-          logger.warn("[SIDV-PORTAL] fallback_to_template", {
-            reference: input.reference,
-            id_type:   portalIdType,
-            reason:    (err as Error).message,
-          });
-        }
-      } else {
-        logger.warn("[SIDV-PORTAL] skipped — missing portal_id_type or id_number", {
-          portal_id_type: portalIdType,
-          has_id_number:  !!idNumber,
-          reference:      input.reference,
+        // Template fallback is disabled — portal PDF is required.
+        // Any error here propagates up and marks the transaction as failed.
+        const pdfBase64 = await secureidverifyPortalService.getPdfSlip(portalIdType, idNumber);
+        result = {
+          ...result,
+          report_data: { ...result.report_data, portal_pdf_data: pdfBase64 },
+        };
+        logger.info("[SIDV-PORTAL] portal_pdf_data attached", {
+          reference:  input.reference,
+          id_type:    portalIdType,
+          pdf_length: pdfBase64.length,
         });
+      } else {
+        throw new Error(
+          `[SIDV-PORTAL] cannot resolve portal_id_type or id_number — ` +
+          `variation_code=${variationCode} portal_id_type=${portalIdType} has_id_number=${!!idNumber}`
+        );
       }
     }
 
