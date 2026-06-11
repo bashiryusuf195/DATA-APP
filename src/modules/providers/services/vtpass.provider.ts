@@ -256,7 +256,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const base    = input.network_operator.replace(/-data$/i, "").toLowerCase();
     const network = NETWORK_MAP[base] ?? base;
     return {
-      request_id:     input.reference,
+      request_id:     this.vtpassRequestId(input.reference),
       serviceID:      `${network}-data`,
       billersCode:    input.phone,
       variation_code: variationCode,
@@ -279,7 +279,7 @@ export class VTPassProvider extends HttpVTUProvider {
       throw new Error("VTPass cable TV purchase requires variation_code (subscription package)");
     }
     return {
-      request_id:        input.reference,
+      request_id:        this.vtpassRequestId(input.reference),
       serviceID:         input.network_operator,       // e.g. "dstv"
       billersCode:       input.smartcard_number,
       variation_code:    input.variation_code,
@@ -302,7 +302,7 @@ export class VTPassProvider extends HttpVTUProvider {
     }
     const meterType = input.plan_category ?? input.variation_code ?? "prepaid";
     return {
-      request_id:     input.reference,
+      request_id:     this.vtpassRequestId(input.reference),
       serviceID:      input.network_operator,          // e.g. "ikeja-electric"
       billersCode:    input.meter_number,
       variation_code: meterType,                       // "prepaid" | "postpaid"
@@ -322,7 +322,7 @@ export class VTPassProvider extends HttpVTUProvider {
       throw new Error("VTPass exam pin purchase requires variation_code");
     }
     return {
-      request_id:     input.reference,
+      request_id:     this.vtpassRequestId(input.reference),
       serviceID:      input.network_operator,
       billersCode:    input.phone,
       variation_code: input.variation_code,
