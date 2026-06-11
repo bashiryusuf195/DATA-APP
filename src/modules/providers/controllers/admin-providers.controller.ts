@@ -17,6 +17,7 @@ import { LegitDataWayProvider } from "../services/legitdataway.provider";
 import { SmshikaProvider }      from "../services/smshika.provider";
 import type { ProviderServiceType } from "../types/provider.types";
 import { logger } from "../../../lib/logger";
+import { config } from "../../../config";
 
 // ── POST /admin/providers ─────────────────────────────────────────────────────
 
@@ -281,8 +282,71 @@ export async function credentialDiagnosticController(
   try {
     const { providerCode } = req.params;
 
+    // ── VTPass diagnostic ─────────────────────────────────────────────────────
+    if (providerCode === "vtpass") {
+      const apiKey    = config.vtpass.apiKey;
+      const secretKey = config.vtpass.secretKey;
+      const baseUrl   = config.vtpass.baseUrl || "https://sandbox.vtpass.com/api";
+
+      logger.info("vtpass_credential_diagnostic_start", {
+        apiKey_length:    apiKey.length,
+        apiKey_prefix:    apiKey.slice(0, 6),
+        secretKey_length: secretKey.length,
+        secretKey_prefix: secretKey.slice(0, 3),
+        baseUrl,
+      });
+
+      if (!apiKey) {
+        res.status(200).json({ success: true, data: { valid: false, message: "VTPASS_API_KEY is not set in Railway env vars.", details: { baseUrl } } });
+        return;
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15_000);
+      let httpStatus = 0;
+      let rawBody    = "";
+
+      try {
+        const response = await fetch(`${baseUrl}/balance`, {
+          method:  "GET",
+          headers: { "Content-Type": "application/json", "api-key": apiKey },
+          signal:  controller.signal,
+        });
+        httpStatus = response.status;
+        rawBody    = await response.text();
+      } catch (fetchErr) {
+        clearTimeout(timer);
+        const msg = (fetchErr as Error).name === "AbortError"
+          ? "Request to VTPass timed out after 15s — check VTPASS_BASE_URL."
+          : `Network error: ${(fetchErr as Error).message}`;
+        res.status(200).json({ success: true, data: { valid: false, message: msg, details: { baseUrl, apiKey_prefix: apiKey.slice(0, 6) } } });
+        return;
+      }
+      clearTimeout(timer);
+
+      logger.info("vtpass_credential_diagnostic_response", { httpStatus, rawBody: rawBody.slice(0, 300) });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          valid:   httpStatus === 200,
+          message: httpStatus === 200 ? "VTPass /balance succeeded — credentials valid" : `VTPass returned HTTP ${httpStatus}`,
+          details: {
+            http_status:   httpStatus,
+            raw_response:  rawBody.slice(0, 500),
+            apiKey_length: apiKey.length,
+            apiKey_prefix: apiKey.slice(0, 6),
+            secretKey_length: secretKey.length,
+            secretKey_prefix: secretKey.slice(0, 3),
+            baseUrl,
+          },
+        },
+      });
+      return;
+    }
+
     if (providerCode !== "clubkonnect") {
-      res.status(400).json({ success: false, message: "Credential diagnostic is only supported for Clubkonnect." });
+      res.status(400).json({ success: false, message: "Credential diagnostic is only supported for Clubkonnect and VTPass." });
       return;
     }
 

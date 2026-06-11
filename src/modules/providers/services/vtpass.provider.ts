@@ -425,12 +425,14 @@ export class VTPassProvider extends HttpVTUProvider {
     });
 
     if (response.status === 401) {
+      const body = await response.text().catch(() => "");
       throw new Error(
-        "VTPass: HTTP 401 authentication failure on /balance — verify VTPASS_API_KEY."
+        `VTPass: HTTP 401 on /balance — api-key prefix: ${this.apiKey.slice(0, 6)}... — VTPass said: ${body.slice(0, 300)}`
       );
     }
     if (!response.ok) {
-      throw new Error(`VTPass balance check failed with HTTP ${response.status}`);
+      const body = await response.text().catch(() => "");
+      throw new Error(`VTPass balance check failed with HTTP ${response.status}: ${body.slice(0, 200)}`);
     }
 
     const raw = await this.parseJson<VTPassBalanceResponse>(response, "balance");
@@ -464,7 +466,7 @@ export class VTPassProvider extends HttpVTUProvider {
       const latency_ms = Date.now() - start;
 
       if (msg.includes("401")) {
-        return { healthy: false, latency_ms, message: "VTPass authentication failed (HTTP 401) — verify VTPASS_API_KEY" };
+        return { healthy: false, latency_ms, message: msg };
       }
       if (msg.includes("timed out")) {
         return { healthy: false, latency_ms, message: "VTPass health check timed out — check VTPASS_BASE_URL" };
