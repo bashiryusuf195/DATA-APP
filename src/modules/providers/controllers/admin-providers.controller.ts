@@ -15,6 +15,7 @@ import { providerRegistry } from "../services/provider-registry.service";
 import { HttpVTUProvider } from "../services/http-vtu.provider";
 import { LegitDataWayProvider } from "../services/legitdataway.provider";
 import { SmshikaProvider }      from "../services/smshika.provider";
+import { VTPassProvider }       from "../services/vtpass.provider";
 import type { ProviderServiceType } from "../types/provider.types";
 import { logger } from "../../../lib/logger";
 import { config } from "../../../config";
@@ -659,6 +660,29 @@ export async function fetchProviderPlansController(
     }
 
     res.status(200).json({ success: true, data: { service, network: network ?? null, plans } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── GET /admin/providers/vtpass/service-variations ────────────────────────────
+// ?serviceID=mtn-data|glo-data|airtel-data|etisalat-data|dstv|gotv|ikeja-electric|…
+// Returns raw VTPass catalog so admin can map variation_codes to existing plans.
+
+export async function getVtpassVariationsController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const serviceID = (req.query.serviceID as string | undefined)?.trim();
+    if (!serviceID) {
+      res.status(400).json({ success: false, message: "Query param 'serviceID' is required" });
+      return;
+    }
+    const provider = new VTPassProvider();
+    const data = await provider.getServiceVariations(serviceID);
+    res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);
   }
