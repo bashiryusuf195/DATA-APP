@@ -571,7 +571,7 @@ export async function getMe(db: Knex, userId: string): Promise<AuthUserWithProfi
       "p.first_name", "p.last_name", "p.display_name",
       "p.avatar_url", "p.country", "p.city", "p.address_line1", "p.gender", "p.date_of_birth",
       db.raw("u.transaction_pin_hash IS NOT NULL AS has_transaction_pin"),
-      "u.preferences",
+      "p.preferences",
     ]);
 
   if (!row) throw new AuthAppError(404, "NOT_FOUND", "User not found");
@@ -621,8 +621,8 @@ export async function updateUserPreferences(
   userId: string,
   patch:  Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const [updated] = await db("users")
-    .where({ id: userId })
+  const [updated] = await db("user_profiles")
+    .where({ user_id: userId })
     .update({
       preferences: db.raw(
         "COALESCE(preferences, '{}'::jsonb) || ?::jsonb",
