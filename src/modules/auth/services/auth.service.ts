@@ -26,8 +26,9 @@ import {
   rotateSession,
   upsertDevice,
 } from "./session.service";
-import { resolveUserRbac, assignRole } from "./rbac.service";
-import { revokeAllBiometricDevices }   from "./biometric-device.service";
+import { resolveUserRbac, assignRole }              from "./rbac.service";
+import { revokeAllBiometricDevices }               from "./biometric-device.service";
+import { issueBiometricTokenPair, isBiometricRefreshToken } from "./jwt.service";
 import { writeAuditLog }               from "./audit.service";
 import { createChallenge }             from "./challenge.service";
 import { AppError as AuthAppError }                    from "../../../shared/errors/AppError";
@@ -532,9 +533,24 @@ export async function refreshTokens(
     throw new AuthAppError(401, "REFRESH_TOKEN_INVALID", "Invalid or expired refresh token");
   }
 
-  // Supabase refresh
-  const newSupabaseSession = await supabaseRefreshSession(rawRefreshToken);
-  const tokens              = supabaseSessionToTokenPair(newSupabaseSession);
+  let tokens: TokenPair;
+
+  if (isBiometricRefreshToken(rawRefreshToken)) {
+    // Biometric path — refresh token is a UUID; Supabase has no record of it.
+    // Re-issue our own HS256 access_token + new UUID refresh_token.
+    const user = await db("users")
+      .where({ id: session.user_id })
+      .whereNull("deleted_at")
+      .first<{ auth_id: string; email: string } | undefined>(["auth_id", "email"]);
+    if (!user?.auth_id) {
+      throw new AuthAppError(401, "ACCOUNT_NOT_FOUND", "User not found");
+    }
+    tokens = await issueBiometricTokenPair({ auth_id: user.auth_id, email: user.email });
+  } else {
+    // Supabase path — normal email/password or passkey session.
+    const newSupabaseSession = await supabaseRefreshSession(rawRefreshToken);
+    tokens = supabaseSessionToTokenPair(newSupabaseSession);
+  }
 
   // Rotate: revoke old session, insert new
   const sessionId = await rotateSession(db, session.id, {

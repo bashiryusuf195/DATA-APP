@@ -5,12 +5,12 @@
 
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Knex } from "knex";
-import { logger }    from "../../../lib/logger";
-import { env }       from "../../../shared/config/env";
-import { AppError }  from "../../../shared/errors/AppError";
-import { getAnonClient, getAdminClient } from "./supabase.service";
-import { createSession }                 from "./session.service";
-import type { AuthUser, TokenPair }      from "../types";
+import { logger }                from "../../../lib/logger";
+import { env }                   from "../../../shared/config/env";
+import { AppError }              from "../../../shared/errors/AppError";
+import { createSession }         from "./session.service";
+import { issueBiometricTokenPair } from "./jwt.service";
+import type { AuthUser, TokenPair } from "../types";
 
 // ── Hashing ───────────────────────────────────────────────────────────────────
 // device_secret is 32 random bytes (256-bit entropy) so we use HMAC-SHA256
@@ -133,22 +133,24 @@ export async function biometricLogin(
     throw new AppError(403, "ACCOUNT_DISABLED", "Account is not active");
   }
 
-  // 4. Issue fresh Supabase tokens — same approach as passkey authentication.
-  //    generateLink creates a magic-link OTP without sending an email;
-  //    verifyOtp exchanges it for a real Supabase session.
-  const supabaseSession = await issueSupabaseSession(user.email as string);
+  // 4. Issue HS256 tokens signed with BACKEND_JWT_SECRET.
+  //    No Supabase API call — fully self-contained and immune to OTP changes.
+  if (!user.auth_id) {
+    throw new AppError(500, "INTERNAL_ERROR", "User has no auth_id");
+  }
+  const tokens = await issueBiometricTokenPair({
+    auth_id: user.auth_id as string,
+    email:   user.email   as string,
+  });
 
-  const expiresIn  = supabaseSession.expires_in ?? 3600;
-  const expiresAt  = new Date(Date.now() + expiresIn * 1000);
-
-  // 5. Record our own session.
+  // 5. Record session.
   const sessionId = await createSession(db, {
     userId:       user.id,
-    accessToken:  supabaseSession.access_token,
-    refreshToken: supabaseSession.refresh_token ?? undefined,
-    ipAddress:    input.ipAddress  ?? null,
-    userAgent:    input.userAgent  ?? null,
-    expiresAt,
+    accessToken:  tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    ipAddress:    input.ipAddress ?? null,
+    userAgent:    input.userAgent ?? null,
+    expiresAt:    tokens.refresh_token_expires_at,
   });
 
   // 6. Update last_used_at on the biometric device.
@@ -158,43 +160,7 @@ export async function biometricLogin(
 
   logger.info("biometric_login_success", { user_id: user.id, device_id: input.deviceId });
 
-  return {
-    user,
-    tokens: {
-      access_token:             supabaseSession.access_token,
-      refresh_token:            supabaseSession.refresh_token,
-      access_token_expires_at:  expiresAt,
-      refresh_token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    },
-    session_id: sessionId,
-  };
-}
-
-// ── Supabase session issuance ──────────────────────────────────────────────────
-// Mirrors passkey.service.ts: generateLink (no email sent) + verifyOtp to get
-// a real Supabase session without knowing the user's password.
-
-async function issueSupabaseSession(email: string) {
-  const { data: linkData, error: linkError } =
-    await getAdminClient().auth.admin.generateLink({ type: "magiclink", email });
-
-  if (linkError || !linkData?.properties?.hashed_token) {
-    logger.error("biometric_login_generate_link_error", { error: linkError?.message });
-    throw new AppError(500, "SESSION_CREATE_FAILED", "Failed to generate auth session");
-  }
-
-  const { data: sessionData, error: sessionError } =
-    await getAnonClient().auth.verifyOtp({
-      token_hash: linkData.properties.hashed_token,
-      type:       "magiclink",
-    });
-
-  if (sessionError || !sessionData?.session) {
-    logger.error("biometric_login_verify_otp_error", { error: sessionError?.message });
-    throw new AppError(500, "SESSION_CREATE_FAILED", "Failed to verify auth session");
-  }
-
-  return sessionData.session;
+  return { user, tokens, session_id: sessionId };
 }
 
 // ── Device management ─────────────────────────────────────────────────────────
