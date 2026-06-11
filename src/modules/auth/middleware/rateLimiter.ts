@@ -103,6 +103,37 @@ export const passkeyAuthCompleteLimiter = rateLimit({
   handler:         jsonHandler("passkey authentication"),
 });
 
+/** Biometric device registration: 5 per hour per user. */
+export const biometricRegisterLimiter = rateLimit({
+  windowMs:        60 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         jsonHandler("biometric registration"),
+  keyGenerator: (req) => {
+    const userId = (req as { user?: { id?: string } }).user?.id ?? "anon";
+    return `bio-reg:${userId}`;
+  },
+});
+
+/**
+ * Biometric login: 10 per 15 min, keyed by device_id from the body.
+ * Tight per-device window limits brute-force on individual installations.
+ */
+export const biometricLoginLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         jsonHandler("biometric login"),
+  keyGenerator: (req) => {
+    const deviceId = ((req.body as { device_id?: string })?.device_id ?? "").slice(0, 36);
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim()
+               ?? req.socket.remoteAddress ?? "unknown";
+    return `bio-login:${ip}:${deviceId}`;
+  },
+});
+
 /** Global catch-all: 300 requests per 15 min per IP. */
 export const generalLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,

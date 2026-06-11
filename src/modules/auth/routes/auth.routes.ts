@@ -11,6 +11,8 @@ import {
   changePasswordLimiter,
   passkeyAuthBeginLimiter,
   passkeyAuthCompleteLimiter,
+  biometricRegisterLimiter,
+  biometricLoginLimiter,
 } from "../middleware/rateLimiter";
 import {
   loginRateLimiter,
@@ -44,6 +46,12 @@ import {
 } from "../controllers/passkey.controller";
 import { verifyLoginTotpController } from "../controllers/login-2fa.controller";
 import { twoFactorVerifyLimiter } from "../../../middleware/rateLimiter.redis";
+import {
+  registerBiometricDeviceController,
+  biometricLoginController,
+  listBiometricDevicesController,
+  revokeBiometricDeviceController,
+} from "../controllers/biometric-device.controller";
 
 const router = Router();
 
@@ -82,5 +90,13 @@ router.post("/passkey/auth/complete", passkeyAuthCompleteLimiter, completeAuthen
 // Device management
 router.get(   "/passkey",     authenticate, listPasskeysController);
 router.delete("/passkey/:id", authenticate, deletePasskeyController);
+
+// ── Biometric device login (device_secret-based, long-lived) ──────────────────
+// Registration requires an active session (user must be logged in to enable).
+// Login is public — the device_secret proves possession without a session.
+router.post(  "/biometric/register",       authenticate, biometricRegisterLimiter, registerBiometricDeviceController);
+router.post(  "/biometric/login",          biometricLoginLimiter,                  biometricLoginController);
+router.get(   "/biometric/devices",        authenticate,                            listBiometricDevicesController);
+router.delete("/biometric/devices/:id",    authenticate,                            revokeBiometricDeviceController);
 
 export { router as authRouter };

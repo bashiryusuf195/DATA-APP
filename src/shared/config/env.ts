@@ -10,4 +10,8 @@ export const env = {
 
   // Customer-facing frontend URL — used as the redirectTo base in password-reset emails.
   CUSTOMER_APP_URL: process.env.CUSTOMER_APP_URL ?? "http://localhost:5174",
+
+  // HMAC key used server-side to hash biometric device secrets before storage.
+  // Must be set in production; in dev a fallback is used so the server starts.
+  BIOMETRIC_HMAC_SECRET: process.env.BIOMETRIC_HMAC_SECRET ?? "dev-biometric-hmac-secret-change-in-prod",
 };

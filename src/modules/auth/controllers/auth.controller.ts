@@ -418,9 +418,10 @@ export async function resetPasswordController(
 ): Promise<void> {
   try {
     const { access_token, password } = ResetPasswordSchema.parse(req.body);
+    const db = getDbInstance();
 
     // access_token and password are NOT spread into any log statement.
-    await resetPassword(access_token, password);
+    await resetPassword(access_token, password, db);
 
     res.status(200).json({
       success: true,

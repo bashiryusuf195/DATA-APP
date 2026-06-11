@@ -27,6 +27,7 @@ import {
   upsertDevice,
 } from "./session.service";
 import { resolveUserRbac, assignRole } from "./rbac.service";
+import { revokeAllBiometricDevices }   from "./biometric-device.service";
 import { writeAuditLog }               from "./audit.service";
 import { createChallenge }             from "./challenge.service";
 import { AppError as AuthAppError }                    from "../../../shared/errors/AppError";
@@ -671,8 +672,9 @@ export async function changePassword(
     password_hash: await bcrypt.hash(input.new_password, env.BCRYPT_ROUNDS),
   });
 
-  // Revoke all sessions — force re-login
+  // Revoke all sessions and biometric devices — force re-login and re-enrolment.
   await revokeAllUserSessions(db, userId);
+  await revokeAllBiometricDevices(db, userId);
 
   writeAuditLog(db, req, {
     actorId:      userId,
@@ -712,10 +714,20 @@ export async function forgotPassword(email: string): Promise<void> {
 export async function resetPassword(
   accessToken:  string,
   newPassword:  string,
+  db?:          Knex,
 ): Promise<void> {
   // Throws AppError 401 if the token is expired or invalid.
   const payload = await verifySupabaseJwt(accessToken);
   await supabaseUpdatePassword(payload.sub, newPassword);
+
+  // Best-effort: revoke biometric devices so the user must re-enroll after reset.
+  if (db) {
+    const user = await db("users").where({ auth_id: payload.sub }).first<{ id: string } | undefined>(["id"]);
+    if (user) {
+      await revokeAllBiometricDevices(db, user.id);
+      await revokeAllUserSessions(db, user.id);
+    }
+  }
 }
 
 // ── Verify access token (used by authenticate middleware) ──────
