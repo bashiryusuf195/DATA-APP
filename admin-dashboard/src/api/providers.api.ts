@@ -60,6 +60,18 @@ export const providersApi = {
       .post<{ success: boolean; data: { provider_code: string; healthy: boolean; latency_ms: number; message: string } }>(`/admin/providers/${code}/health-check`)
       .then((r) => r.data.data),
 
+  getVtpassVariations: (serviceID: string): Promise<{
+    content?: {
+      ServiceName?: string
+      serviceID?:   string
+      variations?:  Array<{ variation_code: string; name: string; variation_amount: string; fixedPrice?: string }>
+    }
+    response_description?: string
+  }> =>
+    apiClient
+      .get<{ success: boolean; data: unknown }>(`/admin/providers/vtpass/service-variations`, { params: { serviceID } })
+      .then((r) => r.data.data as { content?: { ServiceName?: string; serviceID?: string; variations?: Array<{ variation_code: string; name: string; variation_amount: string; fixedPrice?: string }> }; response_description?: string }),
+
   credentialDiagnostic: (code: string): Promise<{
     valid:    boolean
     message:  string

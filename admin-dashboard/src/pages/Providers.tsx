@@ -11,7 +11,7 @@ import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtDate, fmtPercent } from '@/utils/format'
 import type { Provider, UpdateProviderInput, ProviderCircuitState } from '@/types'
-import { RefreshCw, Edit, Activity, ShieldOff, ShieldCheck, KeyRound, CheckCircle2, XCircle } from 'lucide-react'
+import { RefreshCw, Edit, Activity, ShieldOff, ShieldCheck, KeyRound, CheckCircle2, XCircle, List } from 'lucide-react'
 import { ENDPOINTS } from '@/config/endpoints'
 import toast from 'react-hot-toast'
 import axios from 'axios'
@@ -46,8 +46,53 @@ export function ProvidersPage() {
     message: string
   } | null>(null)
 
+  const VTPASS_SERVICE_IDS = [
+    { value: 'mtn-data',       label: 'MTN Data' },
+    { value: 'airtel-data',    label: 'Airtel Data' },
+    { value: 'glo-data',       label: 'Glo Data' },
+    { value: 'etisalat-data',  label: '9mobile Data' },
+    { value: 'dstv',           label: 'DSTV' },
+    { value: 'gotv',           label: 'GOtv' },
+    { value: 'startimes',      label: 'StarTimes' },
+    { value: 'ikeja-electric', label: 'Ikeja Electric' },
+    { value: 'eko-electric',   label: 'Eko Electric' },
+    { value: 'kano-electric',  label: 'Kano Electric' },
+    { value: 'phed',           label: 'PHED (Port Harcourt)' },
+    { value: 'eedc',           label: 'EEDC (Enugu)' },
+    { value: 'ibedc',          label: 'IBEDC (Ibadan)' },
+    { value: 'abuja-electric', label: 'Abuja Electric' },
+    { value: 'jos-electric',   label: 'JOS Electric' },
+    { value: 'waec',           label: 'WAEC Result Checker' },
+    { value: 'waec-registration', label: 'WAEC Registration' },
+    { value: 'jamb',           label: 'JAMB' },
+  ]
+  const [catalogServiceId, setCatalogServiceId] = useState(VTPASS_SERVICE_IDS[0].value)
+  const [catalogResult, setCatalogResult] = useState<Array<{ variation_code: string; name: string; variation_amount: string }> | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState<string | null>(null)
+
+  async function fetchCatalog() {
+    setCatalogLoading(true); setCatalogError(null); setCatalogResult(null)
+    try {
+      const res = await providersApi.getVtpassVariations(catalogServiceId)
+      const variations = res?.content?.variations
+      if (!variations || variations.length === 0) {
+        setCatalogError('No variations returned — serviceID may be wrong or sandbox does not support it.')
+      } else {
+        setCatalogResult(variations)
+      }
+    } catch (e) {
+      setCatalogError(e instanceof Error ? e.message : 'Failed to fetch catalog')
+    } finally {
+      setCatalogLoading(false)
+    }
+  }
+
   // Reset per-provider results whenever the selected provider changes
-  useEffect(() => { setDiagResult(null); setHealthResult(null) }, [selected])
+  useEffect(() => {
+    setDiagResult(null); setHealthResult(null)
+    setCatalogResult(null); setCatalogError(null)
+  }, [selected])
 
   const { data: providers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['providers'],
@@ -470,6 +515,60 @@ export function ProvidersPage() {
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* VTPass service catalog browser */}
+              {selected.provider_code === 'vtpass' && (
+                <div className="border-t border-border pt-3 space-y-3">
+                  <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Service Catalog</p>
+                  <p className="text-[11px] text-ink-faint">Fetch VTPass variation codes to map against your plans.</p>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <select
+                        value={catalogServiceId}
+                        onChange={(e) => setCatalogServiceId(e.target.value)}
+                        className="w-full text-xs bg-surface-2 border border-border rounded-md px-2 py-1.5 text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {VTPASS_SERVICE_IDS.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label} ({s.value})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<List className="h-3.5 w-3.5" />}
+                      loading={catalogLoading}
+                      onClick={() => void fetchCatalog()}
+                    >
+                      Fetch
+                    </Button>
+                  </div>
+                  {catalogError && (
+                    <p className="text-[11px] text-rose-400">{catalogError}</p>
+                  )}
+                  {catalogResult && (
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <div className="bg-surface-2 px-3 py-1.5 text-[11px] font-semibold text-ink-muted uppercase tracking-wider grid grid-cols-[1fr_auto] gap-2">
+                        <span>Plan Name / Variation Code</span>
+                        <span className="text-right">Amount</span>
+                      </div>
+                      <div className="divide-y divide-border max-h-64 overflow-y-auto">
+                        {catalogResult.map((v) => (
+                          <div key={v.variation_code} className="px-3 py-2 grid grid-cols-[1fr_auto] gap-2 hover:bg-surface-2/50">
+                            <div>
+                              <p className="text-xs text-ink leading-tight">{v.name}</p>
+                              <p className="text-[11px] text-ink-faint font-mono mt-0.5">{v.variation_code}</p>
+                            </div>
+                            <span className="text-xs text-emerald-400 font-semibold whitespace-nowrap self-center">
+                              ₦{Number(v.variation_amount).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
