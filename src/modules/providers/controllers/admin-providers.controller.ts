@@ -283,62 +283,83 @@ export async function credentialDiagnosticController(
     const { providerCode } = req.params;
 
     // ── VTPass diagnostic ─────────────────────────────────────────────────────
+    // Tries every known VTPass auth method and reports which one succeeds.
     if (providerCode === "vtpass") {
-      const apiKey    = config.vtpass.apiKey;
+      const apiKey   = config.vtpass.apiKey;
       const secretKey = config.vtpass.secretKey;
+      const username  = config.vtpass.username;
+      const password  = config.vtpass.password;
       const baseUrl   = config.vtpass.baseUrl || "https://sandbox.vtpass.com/api";
+      const balanceUrl = `${baseUrl}/balance`;
 
-      logger.info("vtpass_credential_diagnostic_start", {
-        apiKey_length:    apiKey.length,
-        apiKey_prefix:    apiKey.slice(0, 6),
-        secretKey_length: secretKey.length,
-        secretKey_prefix: secretKey.slice(0, 3),
-        baseUrl,
+      // Helper — one attempt, returns { status, body }
+      async function attempt(headers: Record<string, string>): Promise<{ status: number; body: string }> {
+        const ctrl = new AbortController();
+        const t    = setTimeout(() => ctrl.abort(), 10_000);
+        try {
+          const r = await fetch(balanceUrl, { method: "GET", headers, signal: ctrl.signal });
+          const b = await r.text();
+          return { status: r.status, body: b };
+        } catch {
+          return { status: 0, body: "timeout/network error" };
+        } finally {
+          clearTimeout(t);
+        }
+      }
+
+      // 1. api-key header with VTPASS_API_KEY (current approach)
+      const r1 = await attempt({ "Content-Type": "application/json", "api-key": apiKey });
+
+      // 2. api-key header with username (some VTPass sandbox docs use email as api-key)
+      const r2 = username
+        ? await attempt({ "Content-Type": "application/json", "api-key": username })
+        : { status: 0, body: "VTPASS_USERNAME not set" };
+
+      // 3. HTTP Basic auth (username:password base64 encoded)
+      const basicToken = username && password
+        ? Buffer.from(`${username}:${password}`).toString("base64")
+        : null;
+      const r3 = basicToken
+        ? await attempt({ "Content-Type": "application/json", "Authorization": `Basic ${basicToken}` })
+        : { status: 0, body: "VTPASS_USERNAME or VTPASS_PASSWORD not set" };
+
+      // 4. api-key + secret-key together (some docs require both even for balance)
+      const r4 = await attempt({ "Content-Type": "application/json", "api-key": apiKey, "secret-key": secretKey });
+
+      const passing = [
+        { method: "api-key header (VTPASS_API_KEY)",              ...r1 },
+        { method: "api-key header using VTPASS_USERNAME as key",   ...r2 },
+        { method: "Authorization: Basic (username:password)",      ...r3 },
+        { method: "api-key + secret-key headers together",         ...r4 },
+      ].filter(r => r.status === 200);
+
+      const valid = passing.length > 0;
+
+      logger.info("vtpass_credential_diagnostic_multi", {
+        baseUrl, apiKey_prefix: apiKey.slice(0, 6), apiKey_length: apiKey.length,
+        r1: r1.status, r2: r2.status, r3: r3.status, r4: r4.status,
       });
-
-      if (!apiKey) {
-        res.status(200).json({ success: true, data: { valid: false, message: "VTPASS_API_KEY is not set in Railway env vars.", details: { baseUrl } } });
-        return;
-      }
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15_000);
-      let httpStatus = 0;
-      let rawBody    = "";
-
-      try {
-        const response = await fetch(`${baseUrl}/balance`, {
-          method:  "GET",
-          headers: { "Content-Type": "application/json", "api-key": apiKey },
-          signal:  controller.signal,
-        });
-        httpStatus = response.status;
-        rawBody    = await response.text();
-      } catch (fetchErr) {
-        clearTimeout(timer);
-        const msg = (fetchErr as Error).name === "AbortError"
-          ? "Request to VTPass timed out after 15s — check VTPASS_BASE_URL."
-          : `Network error: ${(fetchErr as Error).message}`;
-        res.status(200).json({ success: true, data: { valid: false, message: msg, details: { baseUrl, apiKey_prefix: apiKey.slice(0, 6) } } });
-        return;
-      }
-      clearTimeout(timer);
-
-      logger.info("vtpass_credential_diagnostic_response", { httpStatus, rawBody: rawBody.slice(0, 300) });
 
       res.status(200).json({
         success: true,
         data: {
-          valid:   httpStatus === 200,
-          message: httpStatus === 200 ? "VTPass /balance succeeded — credentials valid" : `VTPass returned HTTP ${httpStatus}`,
+          valid,
+          message: valid
+            ? `Working auth method found: ${passing[0].method}`
+            : "All 4 auth methods returned non-200. Account may not be activated on VTPass sandbox.",
           details: {
-            http_status:   httpStatus,
-            raw_response:  rawBody.slice(0, 500),
-            apiKey_length: apiKey.length,
-            apiKey_prefix: apiKey.slice(0, 6),
-            secretKey_length: secretKey.length,
-            secretKey_prefix: secretKey.slice(0, 3),
             baseUrl,
+            apiKey_length:  apiKey.length,
+            apiKey_prefix:  apiKey.slice(0, 6),
+            has_username:   Boolean(username),
+            has_password:   Boolean(password),
+            has_secret_key: Boolean(secretKey),
+            attempts: [
+              { method: "api-key header (VTPASS_API_KEY)",             status: r1.status, body: r1.body.slice(0, 200) },
+              { method: "api-key header using VTPASS_USERNAME as key",  status: r2.status, body: r2.body.slice(0, 200) },
+              { method: "Authorization: Basic (username:password)",     status: r3.status, body: r3.body.slice(0, 200) },
+              { method: "api-key + secret-key headers together",        status: r4.status, body: r4.body.slice(0, 200) },
+            ],
           },
         },
       });
