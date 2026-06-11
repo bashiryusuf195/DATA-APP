@@ -45,8 +45,11 @@ interface VTPassPurchaseResponse {
 }
 
 interface VTPassBalanceResponse {
-  code: string;
+  code?: string;
   balance?: string | number;
+  balance_details?: { balance?: string | number; bonus_balance?: string | number };
+  contents?: { balance?: string | number };
+  data?: { balance?: string | number };
 }
 
 // Merchant verify covers both meter and cable TV — fields differ per service.
@@ -456,9 +459,18 @@ export class VTPassProvider extends HttpVTUProvider {
     }
 
     const raw = await this.parseJson<VTPassBalanceResponse>(response, "balance");
+    console.log("[VTPASS] balance raw response:", JSON.stringify(raw));
+
+    // VTPass sandbox and live may nest the balance differently — try all known locations.
+    const balanceValue =
+      raw.balance ??
+      raw.balance_details?.balance ??
+      raw.contents?.balance ??
+      raw.data?.balance ??
+      0;
 
     return {
-      available:    Number(raw.balance ?? 0),
+      available:    Number(balanceValue),
       currency:     "NGN",
       raw_response: raw,
     };
