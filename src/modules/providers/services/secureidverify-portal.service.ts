@@ -4,6 +4,14 @@ import { logger } from '../../../lib/logger';
 
 export type PortalIdType = 'nin_information' | 'nin_standard' | 'nin_premium' | 'bvn_basic';
 
+// Maps our internal product tier to the label shown in the portal's slip-type selector.
+const SLIP_TYPE_LABEL: Record<PortalIdType, string> = {
+  nin_information: 'Information Slip',
+  nin_standard:    'Standard Slip',
+  nin_premium:     'Premium Slip',
+  bvn_basic:       'Basic Slip',
+};
+
 // ── Browser singleton ─────────────────────────────────────────────────────────
 // One browser + one context per process life-cycle.  The context keeps the
 // authenticated session alive so we only log in once per deployment.
@@ -89,8 +97,8 @@ class SecureIDVerifyPortalService {
       const afterNavUrl   = page.url();
       const afterNavTitle = await page.title().catch(() => '(title_error)');
       logger.info('[SIDV-PORTAL] login step: after_navigate', {
-        current_url:   afterNavUrl,
-        page_title:    afterNavTitle,
+        current_url: afterNavUrl,
+        page_title:  afterNavTitle,
       });
 
       // ── Step 2: find username field ───────────────────────────────────────
@@ -148,7 +156,7 @@ class SecureIDVerifyPortalService {
       }
       await page.locator(foundButton).first().click();
 
-      // ── Step 5: wait for redirect away from login ─────────────────────────
+      // ── Step 5: wait for redirect to dashboard ────────────────────────────
       step = 'wait_for_post_login_redirect';
       await page.waitForURL(
         (url) => !url.href.toLowerCase().includes('login'),
@@ -185,52 +193,62 @@ class SecureIDVerifyPortalService {
     idType: PortalIdType,
     idNumber: string,
   ): Promise<string> {
-    const lookupUrl = `${this.cfg.url.replace(/\/$/, '')}${this.getLookupPath(idType)}`;
-    let step = 'navigate_to_lookup';
+    const base        = this.cfg.url.replace(/\/$/, '');
+    const lookupUrl   = `${base}${this.getLookupPath(idType)}`;
+    const slipLabel   = SLIP_TYPE_LABEL[idType];
+    let step          = 'navigate_to_verification';
+
     try {
-      // ── Step 1: navigate to lookup page ────────────────────────────────────
+      // ── Step 1: navigate to the verification page ─────────────────────────
       logger.info('[SIDV-PORTAL] lookup step: navigate', { id_type: idType, url: lookupUrl });
       await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const afterNavUrl   = page.url();
-      const afterNavTitle = await page.title().catch(() => '(title_error)');
+      let afterNavUrl   = page.url();
+      let afterNavTitle = await page.title().catch(() => '(title_error)');
       logger.info('[SIDV-PORTAL] lookup step: after_navigate', {
         current_url: afterNavUrl,
         page_title:  afterNavTitle,
         id_type:     idType,
       });
 
-      // Detect session expiry — portal redirected us back to login.
+      // Session expiry: redirected back to login.
       if (afterNavUrl.toLowerCase().includes('login')) {
         logger.info('[SIDV-PORTAL] lookup step: session_expired_relogin', { current_url: afterNavUrl });
         this.loggedIn = false;
         step = 'relogin';
         await this.ensureLoggedIn();
-        step = 'navigate_to_lookup_after_relogin';
+        step = 'navigate_to_verification_after_relogin';
         await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        afterNavUrl   = page.url();
+        afterNavTitle = await page.title().catch(() => '(title_error)');
         logger.info('[SIDV-PORTAL] lookup step: after_relogin_navigate', {
-          current_url: page.url(),
-          page_title:  await page.title().catch(() => '(title_error)'),
+          current_url: afterNavUrl,
+          page_title:  afterNavTitle,
         });
       }
 
-      // ── Step 2: fill ID number field ────────────────────────────────────────
-      step = 'find_id_field';
+      // ── Step 2: close welcome modal if present ────────────────────────────
+      step = 'dismiss_modal';
+      const modalClosed = await this.dismissModal(page);
+      logger.info('[SIDV-PORTAL] modal_closed', { was_present: modalClosed });
+
+      // ── Step 3: fill the NIN / BVN input ─────────────────────────────────
+      step = 'fill_id_number';
       const idSelectors = [
         'input[name="nin"]',
         'input[name="bvn"]',
         'input[name="id_number"]',
         'input[name="idNumber"]',
-        'input[placeholder*="NIN"]',
-        'input[placeholder*="BVN"]',
+        'input[placeholder*="NIN" i]',
+        'input[placeholder*="BVN" i]',
         'input[placeholder*="number" i]',
         'input[type="text"]',
       ];
       const foundIdField = await this.findFirstSelector(page, idSelectors);
       logger.info('[SIDV-PORTAL] lookup step: id_field', {
-        id_type:  idType,
-        found:    foundIdField !== null,
-        selector: foundIdField,
+        id_type:     idType,
+        found:       foundIdField !== null,
+        selector:    foundIdField,
         current_url: page.url(),
       });
       if (!foundIdField) {
@@ -238,95 +256,61 @@ class SecureIDVerifyPortalService {
       }
       await page.locator(foundIdField).first().fill(idNumber);
 
-      // ── Step 3: strategy 1 — intercept download event ──────────────────────
-      step = 'click_submit_watch_download';
-      const submitSelectors = [
-        'button[type="submit"]',
-        'input[type="submit"]',
-        'button:has-text("Search")',
+      // ── Step 4: select slip type ──────────────────────────────────────────
+      step = 'select_slip_type';
+      await this.selectSlipType(page, slipLabel);
+      logger.info('[SIDV-PORTAL] lookup step: slip_type_selected', {
+        id_type:    idType,
+        slip_label: slipLabel,
+      });
+
+      // ── Step 5: tick consent checkbox ─────────────────────────────────────
+      step = 'tick_consent';
+      await this.tickConsent(page);
+      logger.info('[SIDV-PORTAL] consent_checked');
+
+      // ── Step 6: click VERIFY & GET THE INFO ──────────────────────────────
+      step = 'click_verify';
+      const verifySelectors = [
+        'button:has-text("VERIFY & GET THE INFO")',
+        'button:has-text("Verify & Get The Info")',
         'button:has-text("Verify")',
-        'button:has-text("Submit")',
+        'input[value*="VERIFY" i]',
+        'button[type="submit"]',
       ];
-      const foundSubmit = await this.findFirstSelector(page, submitSelectors);
-      logger.info('[SIDV-PORTAL] lookup step: submit_button', {
-        found:    foundSubmit !== null,
-        selector: foundSubmit,
+      const foundVerify = await this.findFirstSelector(page, verifySelectors);
+      logger.info('[SIDV-PORTAL] lookup step: verify_button', {
+        found:    foundVerify !== null,
+        selector: foundVerify,
       });
-
-      const downloadRace = page
-        .waitForEvent('download', { timeout: 90_000 })
-        .then((dl) => this.readDownload(dl, idType))
-        .catch(() => null);
-
-      if (foundSubmit) {
-        await page.locator(foundSubmit).first().click();
-      } else {
-        throw new Error(`portal_click_no_match: submit button — tried ${submitSelectors.join(', ')}`);
+      if (!foundVerify) {
+        throw new Error(`portal_click_no_match: verify button — tried ${verifySelectors.join(', ')}`);
       }
+      await page.locator(foundVerify).first().click();
+      logger.info('[SIDV-PORTAL] verification_submitted', { id_type: idType });
 
-      const downloaded = await downloadRace;
-      logger.info('[SIDV-PORTAL] lookup step: strategy1_download', {
-        id_type:     idType,
-        downloaded:  downloaded !== null,
-        current_url: page.url(),
-      });
-      if (downloaded) return downloaded;
+      // ── Step 7: wait for verification to complete ─────────────────────────
+      step = 'wait_for_verification_complete';
+      await this.waitForVerificationComplete(page);
+      logger.info('[SIDV-PORTAL] verification_completed', { id_type: idType });
 
-      // ── Step 4: strategy 2 — find download link after result renders ────────
-      step = 'find_download_link';
-      const dlLinkSelector = 'a[href*=".pdf"], a:has-text("Download"), a:has-text("Print PDF"), button:has-text("Download PDF")';
-      const dlLinkHref = await page
-        .locator(dlLinkSelector)
-        .first()
-        .getAttribute('href', { timeout: 60_000 })
-        .catch(() => null);
+      // ── Step 8: navigate to the verifications list ────────────────────────
+      step = 'navigate_to_verifications_list';
+      const verificationsUrl = `${base}/user/verifications`;
+      await page.goto(verificationsUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      logger.info('[SIDV-PORTAL] lookup step: strategy2_download_link', {
-        id_type:    idType,
-        found:      dlLinkHref !== null,
-        href:       dlLinkHref,
-        current_url: page.url(),
-        page_title:  await page.title().catch(() => '(title_error)'),
+      const listUrl   = page.url();
+      const listTitle = await page.title().catch(() => '(title_error)');
+      logger.info('[SIDV-PORTAL] verifications_page_loaded', {
+        current_url: listUrl,
+        page_title:  listTitle,
       });
 
-      if (dlLinkHref !== null) {
-        step = 'click_download_link';
-        const dl2Race = page.waitForEvent('download', { timeout: 30_000 });
-        await page.locator(dlLinkSelector).first().click();
-        const dl2 = await dl2Race.catch(() => null);
-        logger.info('[SIDV-PORTAL] lookup step: strategy2_click_result', {
-          id_type:    idType,
-          downloaded: dl2 !== null,
-        });
-        if (dl2) return this.readDownload(dl2, idType);
-      }
-
-      // ── Step 5: strategy 3 — page.pdf() of result page ─────────────────────
-      step = 'wait_for_result_selector';
-      const resultSelector = '.result, .report, #report, [class*="result"], [class*="report"], [class*="slip"]';
-      const resultEl = await page
-        .waitForSelector(resultSelector, { timeout: 60_000 })
-        .catch(() => null);
-
-      logger.info('[SIDV-PORTAL] lookup step: strategy3_result_element', {
-        id_type:     idType,
-        found:       resultEl !== null,
-        current_url: page.url(),
-        page_title:  await page.title().catch(() => '(title_error)'),
-      });
-
-      if (!resultEl) {
-        throw new Error(`portal_result_not_found: none of "${resultSelector}" appeared within 60s`);
-      }
-
-      step = 'page_pdf_render';
-      const pdfBuf = await page.pdf({ format: 'A4', printBackground: true });
-      const b64 = Buffer.from(pdfBuf).toString('base64');
-      logger.info('[SIDV-PORTAL] lookup step: strategy3_pdf_rendered', {
-        id_type:    idType,
-        size_bytes: pdfBuf.length,
-      });
-      return b64;
+      // ── Step 9: download the PDF for the newest matching verification ──────
+      step = 'download_pdf';
+      const pdfBase64 = await this.downloadNewestVerificationPdf(page, idNumber, idType);
+      logger.info('[SIDV-PORTAL] pdf_downloaded', { id_type: idType, size_bytes: pdfBase64.length });
+      return pdfBase64;
 
     } catch (err) {
       const e = err as Error;
@@ -340,14 +324,170 @@ class SecureIDVerifyPortalService {
     }
   }
 
+  // ── Sub-tasks ───────────────────────────────────────────────────────────────
+
+  /** Closes the welcome modal if one appears within 5 seconds. Returns true if a modal was dismissed. */
+  private async dismissModal(page: Page): Promise<boolean> {
+    const closeSelectors = [
+      'button:has-text("Close")',
+      'button:has-text("close")',
+      '[aria-label="Close"]',
+      '[aria-label="close"]',
+      '.modal button.close',
+      '.modal-close',
+      'button.btn-close',
+    ];
+    for (const sel of closeSelectors) {
+      const loc = page.locator(sel).first();
+      const visible = await loc.isVisible({ timeout: 5_000 }).catch(() => false);
+      if (visible) {
+        await loc.click();
+        // Wait for the modal to disappear.
+        await loc.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Clicks the slip-type radio button / option that matches slipLabel. */
+  private async selectSlipType(page: Page, slipLabel: string): Promise<void> {
+    // Try radio button or clickable label with matching text first.
+    const byText = page.locator(`label:has-text("${slipLabel}"), button:has-text("${slipLabel}"), li:has-text("${slipLabel}")`).first();
+    if (await byText.count() > 0) {
+      await byText.click();
+      return;
+    }
+
+    // Fallback: find an <option> in a <select> and select it.
+    const selectEl = page.locator('select').first();
+    if (await selectEl.count() > 0) {
+      await selectEl.selectOption({ label: slipLabel });
+      return;
+    }
+
+    throw new Error(`portal_slip_type_not_found: "${slipLabel}" — no matching label, button, li, or select option`);
+  }
+
+  /** Ticks the first unchecked consent checkbox on the page. */
+  private async tickConsent(page: Page): Promise<void> {
+    const consentSelectors = [
+      'input[type="checkbox"][name*="consent" i]',
+      'input[type="checkbox"][id*="consent" i]',
+      'label:has-text("consent") input[type="checkbox"]',
+      'label:has-text("agree") input[type="checkbox"]',
+      // Fallback: first checkbox on the page.
+      'input[type="checkbox"]',
+    ];
+    for (const sel of consentSelectors) {
+      const loc = page.locator(sel).first();
+      if (await loc.count() > 0) {
+        const checked = await loc.isChecked().catch(() => false);
+        if (!checked) await loc.click();
+        return;
+      }
+    }
+    throw new Error('portal_consent_checkbox_not_found');
+  }
+
+  /**
+   * Waits for verification to finish.  Tries several heuristics:
+   * 1. A success toast / alert with "success" text.
+   * 2. A spinner / loading indicator disappearing.
+   * 3. Fixed 10-second settle wait as a last resort.
+   */
+  private async waitForVerificationComplete(page: Page): Promise<void> {
+    // Heuristic 1: success message appears.
+    const successAppeared = await page
+      .waitForSelector(
+        '[class*="success"], .alert-success, .toast-success, [role="alert"]:has-text("success"), [role="alert"]:has-text("complet"), [role="status"]:has-text("success")',
+        { timeout: 90_000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+
+    if (successAppeared) return;
+
+    // Heuristic 2: any spinner / loader disappears.
+    await page
+      .waitForSelector(
+        '[class*="spinner"], [class*="loading"], [class*="loader"]',
+        { state: 'hidden', timeout: 90_000 },
+      )
+      .catch(() => {});
+
+    // Heuristic 3: fixed settle wait.
+    await page.waitForTimeout(10_000);
+  }
+
+  /**
+   * Navigates the verifications list, finds the row for the newest verification
+   * matching idNumber (best-effort), and downloads its PDF.
+   */
+  private async downloadNewestVerificationPdf(
+    page: Page,
+    idNumber: string,
+    idType: PortalIdType,
+  ): Promise<string> {
+    // Wait for the table / list to load.
+    await page
+      .waitForSelector('table, [class*="verification"], [class*="list"]', { timeout: 30_000 })
+      .catch(() => {});
+
+    // Try to find a row containing the submitted ID number.
+    // If not found (masked), fall back to the first/newest row.
+    const rowSelector = `tr:has-text("${idNumber}"), [class*="row"]:has-text("${idNumber}"), li:has-text("${idNumber}")`;
+    const hasIdRow    = await page.locator(rowSelector).count() > 0;
+
+    const targetRow = hasIdRow
+      ? page.locator(rowSelector).first()
+      : page.locator('table tbody tr, [class*="verification-item"], [class*="list-item"]').first();
+
+    logger.info('[SIDV-PORTAL] lookup step: verifications_row', {
+      id_type:      idType,
+      matched_by_id: hasIdRow,
+    });
+
+    // Click the download / PDF button within that row, intercepting the download.
+    const dlButtonSelectors = [
+      'a:has-text("Download")',
+      'a:has-text("PDF")',
+      'button:has-text("Download")',
+      'button:has-text("PDF")',
+      'a[href*=".pdf"]',
+      'a[href*="download"]',
+      '[title*="Download" i]',
+    ];
+
+    for (const sel of dlButtonSelectors) {
+      const btn = targetRow.locator(sel).first();
+      if (await btn.count() > 0) {
+        const dl = await Promise.race([
+          page.waitForEvent('download', { timeout: 30_000 }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('download_event_timeout')), 30_000)),
+        ]);
+        await btn.click();
+        return this.readDownload(dl, idType);
+      }
+    }
+
+    // Fallback: page.pdf() of the verifications page itself.
+    logger.info('[SIDV-PORTAL] lookup step: verifications_pdf_fallback', { id_type: idType });
+    const pdfBuf = await page.pdf({ format: 'A4', printBackground: true });
+    return Buffer.from(pdfBuf).toString('base64');
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
+  /** Maps our PortalIdType to the actual SecureIDVerify portal route. */
   private getLookupPath(idType: PortalIdType): string {
     switch (idType) {
-      case 'nin_information': return '/nin-information';
-      case 'nin_standard':    return '/nin-standard';
-      case 'nin_premium':     return '/nin-premium';
-      case 'bvn_basic':       return '/bvn-basic';
+      case 'nin_information':
+      case 'nin_standard':
+      case 'nin_premium':
+        return '/user/service/nin-verification';
+      case 'bvn_basic':
+        return '/user/service/bvn-verification';
     }
   }
 
