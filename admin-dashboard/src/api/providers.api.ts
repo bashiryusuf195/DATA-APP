@@ -72,6 +72,16 @@ export const providersApi = {
       .get<{ success: boolean; data: unknown }>(`/admin/providers/vtpass/service-variations`, { params: { serviceID } })
       .then((r) => r.data.data as { content?: { ServiceName?: string; serviceID?: string; variations?: Array<{ variation_code: string; name: string; variation_amount: string; fixedPrice?: string }> }; response_description?: string }),
 
+  updateServiceMode: (code: string, mode: 'api' | 'automation'): Promise<{ provider_code: string; service_mode: string }> =>
+    apiClient
+      .patch<{ success: boolean; data: { provider_code: string; service_mode: string } }>(`/admin/providers/${code}/service-mode`, { mode })
+      .then((r) => r.data.data),
+
+  getServiceMode: (code: string): Promise<string> =>
+    apiClient
+      .get<{ success: boolean; data: { credentials: { metadata: Record<string, unknown> } | null } }>(`/admin/providers/${code}`)
+      .then((r) => (r.data.data?.credentials?.metadata?.['service_mode'] as string | undefined) ?? 'api'),
+
   credentialDiagnostic: (code: string): Promise<{
     valid:    boolean
     message:  string

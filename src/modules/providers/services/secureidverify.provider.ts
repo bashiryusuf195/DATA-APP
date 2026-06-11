@@ -7,7 +7,6 @@ import type {
   ProviderHealthResult,
 } from "../types/provider.types";
 import { getProviderCredentials } from "./provider-credentials.service";
-import { config } from "../../../config";
 import { logger } from "../../../lib/logger";
 import {
   secureidverifyPortalService,
@@ -239,7 +238,86 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
   // ── VTUProvider interface ─────────────────────────────────────────────────
 
   async purchase(input: ProviderPurchaseInput): Promise<ProviderPurchaseResult> {
-    const creds = await this.requireCredentials();
+    const creds         = await this.requireCredentials();
+    const variationCode = input.variation_code ?? "";
+    const idNumber      = (input.metadata?.id_number as string | undefined) ?? undefined;
+
+    // service_mode is stored in provider_credentials.metadata by the admin panel.
+    // 'automation' — portal only, no REST API call.
+    // 'api'        — REST API only, no portal (default when unset).
+    const serviceMode = (creds.metadata as Record<string, unknown>)?.["service_mode"] as string | undefined;
+    const mode        = serviceMode === "automation" ? "automation" : "api";
+
+    logger.info("[SIDV] service_mode", {
+      mode,
+      variation_code: variationCode,
+      reference:      input.reference,
+    });
+
+    if (mode === "automation") {
+      return this.purchaseViaPortal(input, variationCode, idNumber);
+    }
+
+    return this.purchaseViaApi(input, variationCode, idNumber, creds);
+  }
+
+  // ── Automation-only path ─────────────────────────────────────────────────────
+  // Skips the REST API entirely. Portal failure → throws → transaction failed.
+
+  private async purchaseViaPortal(
+    input:         ProviderPurchaseInput,
+    variationCode: string,
+    idNumber:      string | undefined,
+  ): Promise<ProviderPurchaseResult> {
+    const portalIdType = variationCodeToPortalIdType(variationCode);
+    if (!portalIdType) {
+      throw new Error(
+        `SecureIDVerify automation: unknown variation_code '${variationCode}'. ` +
+        `Valid codes: nin-information, nin-standard, nin-premium, bvn-basic`
+      );
+    }
+    if (!idNumber) {
+      throw new Error(
+        "SecureIDVerify automation: id_number is required but was not provided"
+      );
+    }
+
+    logger.info("[SIDV-PORTAL] portal_id_type resolved", {
+      variation_code: variationCode,
+      portal_id_type: portalIdType,
+      reference:      input.reference,
+    });
+
+    const pdfBase64 = await secureidverifyPortalService.getPdfSlip(portalIdType, idNumber);
+
+    logger.info("[SIDV-PORTAL] portal_pdf_data attached", {
+      reference:  input.reference,
+      id_type:    portalIdType,
+      pdf_length: pdfBase64.length,
+    });
+
+    return {
+      success:            true,
+      provider_reference: input.reference,
+      provider:           this.name,
+      message:            "Identity verification successful (portal)",
+      status:             "successful",
+      report_data: {
+        id_type:         variationCode.startsWith("bvn-") ? "bvn" : "nin",
+        portal_pdf_data: pdfBase64,
+      },
+    };
+  }
+
+  // ── API-only path ────────────────────────────────────────────────────────────
+  // Original REST API flow, no portal call.
+
+  private async purchaseViaApi(
+    input:         ProviderPurchaseInput,
+    variationCode: string,
+    idNumber:      string | undefined,
+    creds:         Awaited<ReturnType<typeof this.requireCredentials>>,
+  ): Promise<ProviderPurchaseResult> {
     const apiKey  = creds.api_key_encrypted;
     const baseUrl = creds.base_url;
 
@@ -254,73 +332,18 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
       );
     }
 
-    const variationCode = input.variation_code ?? "";
-
-    // id_number (NIN or BVN) is passed through purchase_input.metadata by the
-    // vtu-purchase worker — it is NOT a top-level ProviderPurchaseInput field.
-    const idNumber = (input.metadata?.id_number as string | undefined) ?? undefined;
-    const phone    = input.phone;
-
-    let result: ProviderPurchaseResult;
+    const phone = input.phone;
 
     if (isNinVariation(variationCode)) {
-      result = await this.verifyNIN(input, idNumber, phone, apiKey, baseUrl);
-    } else if (isBvnVariation(variationCode)) {
-      result = await this.verifyBVN(input, idNumber, apiKey, baseUrl);
-    } else {
-      throw new Error(
-        `SecureIDVerify: unknown variation_code '${variationCode}'. ` +
-        `Valid codes: nin-information, nin-standard, nin-premium, bvn-basic`
-      );
+      return this.verifyNIN(input, idNumber, phone, apiKey, baseUrl);
     }
-
-    // ── Portal PDF enhancement ───────────────────────────────────────────────
-    // When SECUREIDVERIFY_USE_PORTAL_PDF=true, download the official PDF slip
-    // from the SecureIDVerify web portal and attach it to report_data.
-    // If the portal fails, we still return the successful API result — the
-    // identity-report controller will fall back to template rendering.
-    logger.info("[SIDV-PORTAL] enabled?", {
-      use_pdf:         config.secureidverifyPortal.usePdf,
-      api_status:      result.status,
-      has_report_data: !!result.report_data,
-      reference:       input.reference,
-    });
-
-    if (
-      result.status === "successful" &&
-      result.report_data &&
-      config.secureidverifyPortal.usePdf
-    ) {
-      const portalIdType = variationCodeToPortalIdType(variationCode);
-      logger.info("[SIDV-PORTAL] portal_id_type resolved", {
-        variation_code: variationCode,
-        portal_id_type: portalIdType,
-        has_id_number:  !!idNumber,
-        reference:      input.reference,
-      });
-
-      if (portalIdType && idNumber) {
-        // Template fallback is disabled — portal PDF is required.
-        // Any error here propagates up and marks the transaction as failed.
-        const pdfBase64 = await secureidverifyPortalService.getPdfSlip(portalIdType, idNumber);
-        result = {
-          ...result,
-          report_data: { ...result.report_data, portal_pdf_data: pdfBase64 },
-        };
-        logger.info("[SIDV-PORTAL] portal_pdf_data attached", {
-          reference:  input.reference,
-          id_type:    portalIdType,
-          pdf_length: pdfBase64.length,
-        });
-      } else {
-        throw new Error(
-          `[SIDV-PORTAL] cannot resolve portal_id_type or id_number — ` +
-          `variation_code=${variationCode} portal_id_type=${portalIdType} has_id_number=${!!idNumber}`
-        );
-      }
+    if (isBvnVariation(variationCode)) {
+      return this.verifyBVN(input, idNumber, apiKey, baseUrl);
     }
-
-    return result;
+    throw new Error(
+      `SecureIDVerify: unknown variation_code '${variationCode}'. ` +
+      `Valid codes: nin-information, nin-standard, nin-premium, bvn-basic`
+    );
   }
 
   // ── NIN verification ──────────────────────────────────────────────────────

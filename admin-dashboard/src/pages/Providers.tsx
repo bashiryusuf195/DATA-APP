@@ -88,6 +88,8 @@ export function ProvidersPage() {
     }
   }
 
+  const [sidvMode, setSidvMode] = useState<'api' | 'automation'>('api')
+
   // Reset per-provider results whenever the selected provider changes
   useEffect(() => {
     setDiagResult(null); setHealthResult(null)
@@ -150,6 +152,24 @@ export function ProvidersPage() {
     mutationFn: (code: string) => providersApi.credentialDiagnostic(code),
     onSuccess: (data) => setDiagResult(data),
     onError:   (err)  => setDiagResult({ valid: false, message: errMsg(err, 'Diagnostic failed') }),
+  })
+
+  const { data: fetchedSidvMode } = useQuery({
+    queryKey: ['sidv-service-mode'],
+    queryFn:  () => providersApi.getServiceMode('secureidverify'),
+    enabled:  selected?.provider_code === 'secureidverify',
+  })
+  useEffect(() => {
+    if (fetchedSidvMode) setSidvMode(fetchedSidvMode as 'api' | 'automation')
+  }, [fetchedSidvMode])
+
+  const sidvModeMutation = useMutation({
+    mutationFn: (mode: 'api' | 'automation') => providersApi.updateServiceMode('secureidverify', mode),
+    onSuccess: (data) => {
+      setSidvMode(data.service_mode as 'api' | 'automation')
+      toast.success(`SecureIDVerify mode set to ${data.service_mode}`)
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to update service mode')),
   })
 
   const openEdit = (p: Provider) => {
@@ -570,6 +590,43 @@ export function ProvidersPage() {
                         ))}
                       </div>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* SecureIDVerify service mode toggle */}
+              {selected.provider_code === 'secureidverify' && (
+                <div className="border-t border-border pt-3 space-y-3">
+                  <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Service Mode</p>
+                  <p className="text-[11px] text-ink-faint">
+                    Choose how identity verifications are fulfilled.
+                  </p>
+                  <div className="flex gap-2">
+                    {(['api', 'automation'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        disabled={sidvModeMutation.isPending}
+                        onClick={() => sidvModeMutation.mutate(m)}
+                        className={`flex-1 rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors ${
+                          sidvMode === m
+                            ? 'bg-accent-subtle border-accent/40 text-accent'
+                            : 'border-border text-ink-muted hover:border-border-strong hover:text-ink'
+                        }`}
+                      >
+                        <span className="block font-semibold capitalize">{m === 'api' ? 'API' : 'Automation'}</span>
+                        <span className="block text-[10px] mt-0.5 font-normal opacity-80">
+                          {m === 'api'
+                            ? 'REST API · template PDF'
+                            : 'Portal browser · official PDF'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {sidvMode === 'automation' && (
+                    <p className="text-[11px] text-amber-400/80">
+                      Automation mode: if the portal fails, the transaction fails. No API fallback.
+                    </p>
                   )}
                 </div>
               )}
