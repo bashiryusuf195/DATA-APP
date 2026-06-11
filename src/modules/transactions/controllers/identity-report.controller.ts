@@ -70,8 +70,12 @@ export async function identityReportController(
     const pd3      = (typeof provResp === "object" && !provResp.data) ? provResp : {};
 
     // Getter: tries unmasked report_data first, then each fallback in order.
-    const g = (key: string): string =>
-      s(rd[key] ?? pd[key] ?? pd2[key] ?? pd3[key]);
+    // Guards against "[object Object]" strings that may have been stored by an
+    // older version of the normalizer before the object-aware str() fix.
+    const g = (key: string): string => {
+      const val = s(rd[key] ?? pd[key] ?? pd2[key] ?? pd3[key]);
+      return val === "[object Object]" ? "" : val;
+    };
 
     const variationCode = s(meta.variation_code ?? "");
     const idTypeRaw     = s(rd.id_type);

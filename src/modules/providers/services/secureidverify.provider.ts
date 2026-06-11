@@ -80,26 +80,60 @@ interface SecureIDVerifyBVNResponse {
 
 function str(v: unknown): string {
   if (v == null) return "";
-  return typeof v === "string" ? v.trim() : String(v).trim();
+  if (typeof v === "string") return v.trim();
+  // Objects (e.g. { name: "KANO", code: "KN" }) — extract readable text
+  // rather than producing "[object Object]".
+  if (typeof v === "object" && !Array.isArray(v)) {
+    const obj = v as Record<string, unknown>;
+    for (const key of ["name", "value", "label", "description"]) {
+      if (typeof obj[key] === "string" && (obj[key] as string).trim()) {
+        return (obj[key] as string).trim();
+      }
+    }
+    // Last resort: join all non-empty string values
+    const parts = Object.values(obj)
+      .filter((x): x is string => typeof x === "string" && !!x.trim())
+      .map(x => x.trim());
+    return parts.join(" ");
+  }
+  return String(v).trim();
 }
 
 function normalizeNinReportData(d: Record<string, unknown>) {
+  function field(name: string, raw: unknown): string {
+    const normalized = str(raw);
+    const origType  = Array.isArray(raw) ? "array" : typeof raw;
+    if (origType !== "string" && raw != null) {
+      // Log only when the raw value is not a plain string — this is the
+      // interesting case where objects/numbers could have produced "[object Object]".
+      console.log("[FIELD-NORMALIZATION]", JSON.stringify({
+        field:      name,
+        orig_type:  origType,
+        orig_value: origType === "object"
+          ? JSON.stringify(raw).slice(0, 120)
+          : String(raw).slice(0, 120),
+        normalized: normalized.slice(0, 120),
+      }));
+    }
+    return normalized;
+  }
+
   return {
-    first_name:      str(d.first_name      ?? d.firstName),
-    middle_name:     str(d.middle_name     ?? d.middleName),
-    last_name:       str(d.last_name       ?? d.lastName),
-    date_of_birth:   str(d.date_of_birth   ?? d.dateOfBirth),
-    gender:          str(d.gender),
-    phone:           str(d.phone),
-    nin:             str(d.nin),
-    id_number:       str(d.nin),
+    first_name:      field("first_name",      d.first_name      ?? d.firstName),
+    middle_name:     field("middle_name",      d.middle_name     ?? d.middleName),
+    last_name:       field("last_name",        d.last_name       ?? d.lastName),
+    date_of_birth:   field("date_of_birth",    d.date_of_birth   ?? d.dateOfBirth),
+    gender:          field("gender",           d.gender),
+    phone:           field("phone",            d.phone           ?? d.phone_number ?? d.phoneNumber),
+    nin:             field("nin",              d.nin),
+    id_number:       field("id_number",        d.nin),
     // NIN Information detail fields (returned for full-data tiers)
-    tracking_id:     str(d.tracking_id     ?? d.trackingId),
-    residence_state: str(d.residence_state ?? d.residenceState),
-    birth_state:     str(d.birth_state     ?? d.birthState),
-    residence_lga:   str(d.residence_lga   ?? d.residenceLga   ?? d.residence_lga_name),
-    birth_lga:       str(d.birth_lga       ?? d.birthLga),
-    address:         str(d.address         ?? d.residential_address),
+    tracking_id:     field("tracking_id",      d.tracking_id     ?? d.trackingId),
+    residence_state: field("residence_state",  d.residence_state ?? d.residenceState),
+    birth_state:     field("birth_state",      d.birth_state     ?? d.birthState),
+    residence_lga:   field("residence_lga",    d.residence_lga   ?? d.residenceLga   ?? d.residence_lga_name),
+    birth_lga:       field("birth_lga",        d.birth_lga       ?? d.birthLga),
+    address:         field("address",          d.address         ?? d.residential_address),
     // Provider returns photo under "image" key; "signature" is checked as a
     // secondary fallback for providers that use that field name instead.
     photo:           typeof d.photo     === "string" ? d.photo
