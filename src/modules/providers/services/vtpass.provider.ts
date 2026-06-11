@@ -213,8 +213,11 @@ export class VTPassProvider extends HttpVTUProvider {
   private buildAirtimePayload(input: ProviderPurchaseInput): Record<string, unknown> {
     // VTPass airtime serviceID is the bare network name: mtn | glo | airtel | etisalat
     // variation_code may arrive as "mtn-airtime" (other-provider format) — strip the suffix.
+    // 9mobile is stored internally as "9mobile" but VTPass uses the legacy name "etisalat".
+    const NETWORK_MAP: Record<string, string> = { "9mobile": "etisalat" };
     const raw     = input.network_operator ?? input.variation_code ?? "";
-    const network = raw.split("-")[0].toLowerCase();
+    const base    = raw.split("-")[0].toLowerCase();
+    const network = NETWORK_MAP[base] ?? base;
     if (!network) {
       throw new Error(
         "VTPass airtime requires network_operator or variation_code (mtn | glo | airtel | etisalat)"
