@@ -10,6 +10,7 @@ import { createNotification } from "../../notifications/services/notification.se
 import { getPlanByVariationCode } from "../../catalog/services/catalog.service";
 import type { PlanProviderOverrides } from "../../providers/services/provider-execution-engine.service";
 import { logger } from "../../../lib/logger";
+import db from "../../../db/knex";
 
 export const vtuPurchaseWorker = createWorker(
   "vtu-purchases",
@@ -40,8 +41,23 @@ export const vtuPurchaseWorker = createWorker(
 
     await updateTransactionStatus(data.reference, { status: "processing" });
 
+    // If the purchase didn't include a phone (cable TV schema makes it optional),
+    // fall back to the user's registered phone. VTPass requires it for all purchases.
+    let effectivePhone = data.phone;
+    if (!effectivePhone) {
+      const userRow = await db("users")
+        .where({ id: transaction.user_id })
+        .select("phone")
+        .first()
+        .catch(() => null);
+      if (userRow?.phone) {
+        // Convert E.164 (+2348XXXXXXXX) → local Nigerian format (08XXXXXXXX)
+        effectivePhone = (userRow.phone as string).replace(/^\+234/, "0");
+      }
+    }
+
     // TEST-ONLY: simulate an unrecoverable infrastructure crash
-    if (data.phone === "09999999999") {
+    if (effectivePhone === "09999999999") {
       throw new Error("Forced worker crash");
     }
 
@@ -91,7 +107,7 @@ export const vtuPurchaseWorker = createWorker(
       purchase_input: {
         service_type:            data.service_type,
         amount:                  data.amount,
-        phone:                   data.phone,
+        phone:                   effectivePhone,
         smartcard_number:        data.smartcard_number,
         meter_number:            data.meter_number,
         variation_code:          data.variation_code,
