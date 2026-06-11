@@ -20,15 +20,18 @@ class SecureIDVerifyPortalService {
   // ── Public API ──────────────────────────────────────────────────────────────
 
   async getPdfSlip(idType: PortalIdType, idNumber: string): Promise<string> {
+    logger.info('[SIDV-PORTAL] attempting portal download', { id_type: idType });
     await this.ensureBrowser();
     await this.ensureLoggedIn();
 
     const page = await this.context!.newPage();
     try {
-      return await Promise.race([
+      const result = await Promise.race([
         this.lookupAndDownloadPdf(page, idType, idNumber),
         this.timeout('portal_pdf_request_timeout'),
       ]);
+      logger.info('[SIDV-PORTAL] pdf downloaded', { id_type: idType, size_bytes: result.length });
+      return result;
     } finally {
       await page.close().catch(() => {});
     }
@@ -107,7 +110,7 @@ class SecureIDVerifyPortalService {
       );
 
       this.loggedIn = true;
-      logger.info('portal_login_success');
+      logger.info('[SIDV-PORTAL] login success');
     } finally {
       await page.close().catch(() => {});
     }
@@ -247,3 +250,13 @@ class SecureIDVerifyPortalService {
 }
 
 export const secureidverifyPortalService = new SecureIDVerifyPortalService();
+
+// Startup log — fires once when this module is first imported (i.e. at provider registry boot).
+// Shows whether the feature flag and credentials are present WITHOUT logging the values.
+logger.info('[SIDV-PORTAL-CONFIG]', {
+  enabled:      config.secureidverifyPortal.usePdf,
+  has_url:      !!config.secureidverifyPortal.url,
+  has_username: !!config.secureidverifyPortal.username,
+  has_password: !!config.secureidverifyPortal.password,
+  timeout_ms:   config.secureidverifyPortal.timeoutMs,
+});

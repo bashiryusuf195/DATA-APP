@@ -133,6 +133,17 @@ export async function identityReportController(
       ? rd["portal_pdf_data"] as string
       : null;
 
+    logger.info("[SIDV-REPORT]", {
+      reference,
+      report_data_keys:       Object.keys(rd),
+      has_portal_pdf_data:    portalPdfData !== null,
+      portal_pdf_data_type:   typeof rd["portal_pdf_data"],
+      portal_pdf_data_length: typeof rd["portal_pdf_data"] === "string"
+        ? (rd["portal_pdf_data"] as string).length
+        : 0,
+      source: portalPdfData !== null ? "portal" : "template",
+    });
+
     if (portalPdfData) {
       logger.info("report_served_portal_pdf", { reference });
       const pdfBytes = Buffer.from(portalPdfData, "base64");
