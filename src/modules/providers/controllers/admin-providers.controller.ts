@@ -315,13 +315,12 @@ export async function credentialDiagnosticController(
         }
       }
 
-      // 1. api-key header with VTPASS_API_KEY (current approach)
-      const r1 = await attempt({ "Content-Type": "application/json", "api-key": apiKey });
+      // 1. api-key + public-key (correct per VTPass docs for GET requests)
+      const publicKey = config.vtpass.publicKey;
+      const r1 = await attempt({ "Content-Type": "application/json", "api-key": apiKey, "public-key": publicKey });
 
-      // 2. api-key header with username (some VTPass sandbox docs use email as api-key)
-      const r2 = username
-        ? await attempt({ "Content-Type": "application/json", "api-key": username })
-        : { status: 0, body: "VTPASS_USERNAME not set" };
+      // 2. api-key only (old assumption)
+      const r2 = await attempt({ "Content-Type": "application/json", "api-key": apiKey });
 
       // 3. HTTP Basic auth (username:password base64 encoded)
       const basicToken = username && password
@@ -331,14 +330,14 @@ export async function credentialDiagnosticController(
         ? await attempt({ "Content-Type": "application/json", "Authorization": `Basic ${basicToken}` })
         : { status: 0, body: "VTPASS_USERNAME or VTPASS_PASSWORD not set" };
 
-      // 4. api-key + secret-key together (some docs require both even for balance)
+      // 4. api-key + secret-key together
       const r4 = await attempt({ "Content-Type": "application/json", "api-key": apiKey, "secret-key": secretKey });
 
       const passing = [
-        { method: "api-key header (VTPASS_API_KEY)",              ...r1 },
-        { method: "api-key header using VTPASS_USERNAME as key",   ...r2 },
-        { method: "Authorization: Basic (username:password)",      ...r3 },
-        { method: "api-key + secret-key headers together",         ...r4 },
+        { method: "api-key + public-key (correct per VTPass docs)", ...r1 },
+        { method: "api-key only",                                    ...r2 },
+        { method: "Authorization: Basic (username:password)",        ...r3 },
+        { method: "api-key + secret-key",                            ...r4 },
       ].filter(r => r.status === 200);
 
       const valid = passing.length > 0;
@@ -364,10 +363,10 @@ export async function credentialDiagnosticController(
             has_password:   Boolean(password),
             has_secret_key: Boolean(secretKey),
             attempts: [
-              { method: "api-key header (VTPASS_API_KEY)",             status: r1.status, body: r1.body.slice(0, 200) },
-              { method: "api-key header using VTPASS_USERNAME as key",  status: r2.status, body: r2.body.slice(0, 200) },
-              { method: "Authorization: Basic (username:password)",     status: r3.status, body: r3.body.slice(0, 200) },
-              { method: "api-key + secret-key headers together",        status: r4.status, body: r4.body.slice(0, 200) },
+              { method: "api-key + public-key (correct per VTPass docs)", status: r1.status, body: r1.body.slice(0, 200) },
+              { method: "api-key only",                                    status: r2.status, body: r2.body.slice(0, 200) },
+              { method: "Authorization: Basic (username:password)",        status: r3.status, body: r3.body.slice(0, 200) },
+              { method: "api-key + secret-key",                           status: r4.status, body: r4.body.slice(0, 200) },
             ],
           },
         },

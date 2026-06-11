@@ -79,11 +79,13 @@ function maskPhone(phone?: string): string {
 export class VTPassProvider extends HttpVTUProvider {
   readonly name = "vtpass";
 
-  // Only the three values actually sent in API headers are stored.
-  // VTPASS_USERNAME / VTPASS_PASSWORD are dashboard credentials (not API auth).
-  // VTPASS_PUBLIC_KEY is for client-side SDK integrations, not REST API calls.
+  // VTPass API key authentication (from their docs):
+  //   GET  requests → api-key + public-key headers
+  //   POST requests → api-key + secret-key headers
+  // VTPASS_USERNAME / VTPASS_PASSWORD are dashboard-login only, not used in API calls.
   private readonly baseUrl:   string;
   private readonly apiKey:    string;
+  private readonly publicKey: string;
   private readonly secretKey: string;
 
   constructor() {
@@ -91,6 +93,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const v = config.vtpass;
     this.baseUrl   = v.baseUrl;
     this.apiKey    = v.apiKey;
+    this.publicKey = v.publicKey;
     this.secretKey = v.secretKey;
   }
 
@@ -100,6 +103,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const checks: [string, string][] = [
       ["VTPASS_BASE_URL",   this.baseUrl],
       ["VTPASS_API_KEY",    this.apiKey],
+      ["VTPASS_PUBLIC_KEY", this.publicKey],
       ["VTPASS_SECRET_KEY", this.secretKey],
     ];
     return checks.filter(([, v]) => !v).map(([k]) => k);
@@ -116,23 +120,26 @@ export class VTPassProvider extends HttpVTUProvider {
 
   // ── Auth headers ──────────────────────────────────────────────────────────
   //
-  // VTPass REST API authentication (sandbox and production):
-  //   GET  /balance         → api-key header only
-  //   POST /pay             → api-key + secret-key headers
-  //   POST /requery         → api-key header only
-  //   POST /merchant-verify → api-key header only
+  // VTPass REST API authentication (from official docs):
+  //   GET  /balance, /requery     → api-key + public-key
+  //   POST /pay, /merchant-verify → api-key + secret-key
   //
-  // Authorization: Basic is for the VTPass web dashboard only — NOT for API calls.
+  // Authorization: Basic is for the VTPass web dashboard only.
 
   private readHeaders(): Record<string, string> {
     return {
       "Content-Type": "application/json",
       "api-key":      this.apiKey,
+      "public-key":   this.publicKey,
     };
   }
 
   private writeHeaders(): Record<string, string> {
-    return { ...this.readHeaders(), "secret-key": this.secretKey };
+    return {
+      "Content-Type": "application/json",
+      "api-key":      this.apiKey,
+      "secret-key":   this.secretKey,
+    };
   }
 
   // ── HTTP primitives ───────────────────────────────────────────────────────
