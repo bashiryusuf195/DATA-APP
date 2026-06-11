@@ -126,6 +126,23 @@ export async function identityReportController(
       }, null, 2));
     }
 
+    // ── Serve portal PDF if available (highest priority) ────────────────────
+    // When the portal automation downloaded an official PDF slip, serve it
+    // directly rather than rendering from the template.
+    const portalPdfData = typeof rd["portal_pdf_data"] === "string"
+      ? rd["portal_pdf_data"] as string
+      : null;
+
+    if (portalPdfData) {
+      logger.info("report_served_portal_pdf", { reference });
+      const pdfBytes = Buffer.from(portalPdfData, "base64");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="verification-${reference}.pdf"`);
+      res.setHeader("Content-Length", pdfBytes.length);
+      res.end(pdfBytes);
+      return;
+    }
+
     // ── Generate PDF from template ───────────────────────────────────────────
     let pdfBuffer: Buffer;
 

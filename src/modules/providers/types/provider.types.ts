@@ -71,6 +71,9 @@ export interface ProviderPurchaseResult {
     address?:       string;
     phone?:         string;       // unmasked
     photo?:         string;       // base64 image (excluded from DB raw_response)
+    /** Base64-encoded PDF downloaded from the SecureIDVerify portal. When present,
+     *  the identity report controller serves this directly instead of rendering a template. */
+    portal_pdf_data?: string;
   };
 }
 
