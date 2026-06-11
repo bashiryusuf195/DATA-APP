@@ -442,6 +442,12 @@ export function ProvidersPage() {
                       </div>
                       {diagResult.details && (
                         <div className="mt-2 space-y-1 pl-6">
+                          {(diagResult.details as Record<string, unknown>).outbound_ip != null && (
+                            <div className="rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1.5 mb-1">
+                              <p className="text-[11px] text-amber-300 font-semibold">Railway outbound IP — whitelist this on VTPass:</p>
+                              <p className="text-[13px] text-amber-200 font-mono font-bold">{String((diagResult.details as Record<string, unknown>).outbound_ip as string)}</p>
+                            </div>
+                          )}
                           {diagResult.details.userId_length !== undefined && (
                             <p className="text-[11px] text-ink-faint">UserID length: {diagResult.details.userId_length} chars</p>
                           )}
