@@ -80,37 +80,99 @@ class SecureIDVerifyPortalService {
     logger.info('portal_login_started');
 
     const page = await this.context!.newPage();
+    let step = 'navigate_to_login';
     try {
+      // ── Step 1: navigate ──────────────────────────────────────────────────
+      logger.info('[SIDV-PORTAL] login step: navigate', { url: this.cfg.url });
       await page.goto(this.cfg.url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      await this.fillFirst(page, [
+      const afterNavUrl   = page.url();
+      const afterNavTitle = await page.title().catch(() => '(title_error)');
+      logger.info('[SIDV-PORTAL] login step: after_navigate', {
+        current_url:   afterNavUrl,
+        page_title:    afterNavTitle,
+      });
+
+      // ── Step 2: find username field ───────────────────────────────────────
+      step = 'find_username';
+      const usernameSelectors = [
         'input[name="username"]',
         'input[name="email"]',
         'input[type="email"]',
         'input[id*="user"]',
         'input[id*="email"]',
-      ], this.cfg.username);
+      ];
+      const foundUsername = await this.findFirstSelector(page, usernameSelectors);
+      logger.info('[SIDV-PORTAL] login step: username_field', {
+        found:    foundUsername !== null,
+        selector: foundUsername,
+        current_url: page.url(),
+      });
+      if (!foundUsername) {
+        throw new Error(`portal_fill_no_match: username — tried ${usernameSelectors.join(', ')}`);
+      }
+      await page.locator(foundUsername).first().fill(this.cfg.username);
 
-      await this.fillFirst(page, [
+      // ── Step 3: find password field ───────────────────────────────────────
+      step = 'find_password';
+      const passwordSelectors = [
         'input[name="password"]',
         'input[type="password"]',
-      ], this.cfg.password);
+      ];
+      const foundPassword = await this.findFirstSelector(page, passwordSelectors);
+      logger.info('[SIDV-PORTAL] login step: password_field', {
+        found:    foundPassword !== null,
+        selector: foundPassword,
+      });
+      if (!foundPassword) {
+        throw new Error(`portal_fill_no_match: password — tried ${passwordSelectors.join(', ')}`);
+      }
+      await page.locator(foundPassword).first().fill(this.cfg.password);
 
-      await this.clickFirst(page, [
+      // ── Step 4: find and click login button ───────────────────────────────
+      step = 'click_login_button';
+      const buttonSelectors = [
         'button[type="submit"]',
         'input[type="submit"]',
         'button:has-text("Login")',
         'button:has-text("Sign in")',
-      ]);
+        'button:has-text("Log in")',
+      ];
+      const foundButton = await this.findFirstSelector(page, buttonSelectors);
+      logger.info('[SIDV-PORTAL] login step: login_button', {
+        found:    foundButton !== null,
+        selector: foundButton,
+      });
+      if (!foundButton) {
+        throw new Error(`portal_click_no_match: login button — tried ${buttonSelectors.join(', ')}`);
+      }
+      await page.locator(foundButton).first().click();
 
-      // Confirm navigation away from the login page.
+      // ── Step 5: wait for redirect away from login ─────────────────────────
+      step = 'wait_for_post_login_redirect';
       await page.waitForURL(
         (url) => !url.href.toLowerCase().includes('login'),
         { timeout: 30_000 },
       );
 
+      const postLoginUrl   = page.url();
+      const postLoginTitle = await page.title().catch(() => '(title_error)');
+      logger.info('[SIDV-PORTAL] login step: post_login', {
+        current_url: postLoginUrl,
+        page_title:  postLoginTitle,
+      });
+
       this.loggedIn = true;
       logger.info('[SIDV-PORTAL] login success');
+    } catch (err) {
+      const e = err as Error;
+      logger.error('[SIDV-PORTAL-ERROR]', {
+        step,
+        message:     e.message,
+        stack:       e.stack ?? null,
+        current_url: page.url(),
+      });
+      throw err;
     } finally {
       await page.close().catch(() => {});
     }
@@ -123,74 +185,159 @@ class SecureIDVerifyPortalService {
     idType: PortalIdType,
     idNumber: string,
   ): Promise<string> {
-    logger.info('portal_slip_request_started', { id_type: idType });
-
     const lookupUrl = `${this.cfg.url.replace(/\/$/, '')}${this.getLookupPath(idType)}`;
-    await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-
-    // Detect session expiry — portal redirected us back to login.
-    if (page.url().toLowerCase().includes('login')) {
-      logger.info('portal_session_expired_relogin');
-      this.loggedIn = false;
-      await this.ensureLoggedIn();
+    let step = 'navigate_to_lookup';
+    try {
+      // ── Step 1: navigate to lookup page ────────────────────────────────────
+      logger.info('[SIDV-PORTAL] lookup step: navigate', { id_type: idType, url: lookupUrl });
       await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+      const afterNavUrl   = page.url();
+      const afterNavTitle = await page.title().catch(() => '(title_error)');
+      logger.info('[SIDV-PORTAL] lookup step: after_navigate', {
+        current_url: afterNavUrl,
+        page_title:  afterNavTitle,
+        id_type:     idType,
+      });
+
+      // Detect session expiry — portal redirected us back to login.
+      if (afterNavUrl.toLowerCase().includes('login')) {
+        logger.info('[SIDV-PORTAL] lookup step: session_expired_relogin', { current_url: afterNavUrl });
+        this.loggedIn = false;
+        step = 'relogin';
+        await this.ensureLoggedIn();
+        step = 'navigate_to_lookup_after_relogin';
+        await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        logger.info('[SIDV-PORTAL] lookup step: after_relogin_navigate', {
+          current_url: page.url(),
+          page_title:  await page.title().catch(() => '(title_error)'),
+        });
+      }
+
+      // ── Step 2: fill ID number field ────────────────────────────────────────
+      step = 'find_id_field';
+      const idSelectors = [
+        'input[name="nin"]',
+        'input[name="bvn"]',
+        'input[name="id_number"]',
+        'input[name="idNumber"]',
+        'input[placeholder*="NIN"]',
+        'input[placeholder*="BVN"]',
+        'input[placeholder*="number" i]',
+        'input[type="text"]',
+      ];
+      const foundIdField = await this.findFirstSelector(page, idSelectors);
+      logger.info('[SIDV-PORTAL] lookup step: id_field', {
+        id_type:  idType,
+        found:    foundIdField !== null,
+        selector: foundIdField,
+        current_url: page.url(),
+      });
+      if (!foundIdField) {
+        throw new Error(`portal_fill_no_match: id field — tried ${idSelectors.join(', ')}`);
+      }
+      await page.locator(foundIdField).first().fill(idNumber);
+
+      // ── Step 3: strategy 1 — intercept download event ──────────────────────
+      step = 'click_submit_watch_download';
+      const submitSelectors = [
+        'button[type="submit"]',
+        'input[type="submit"]',
+        'button:has-text("Search")',
+        'button:has-text("Verify")',
+        'button:has-text("Submit")',
+      ];
+      const foundSubmit = await this.findFirstSelector(page, submitSelectors);
+      logger.info('[SIDV-PORTAL] lookup step: submit_button', {
+        found:    foundSubmit !== null,
+        selector: foundSubmit,
+      });
+
+      const downloadRace = page
+        .waitForEvent('download', { timeout: 90_000 })
+        .then((dl) => this.readDownload(dl, idType))
+        .catch(() => null);
+
+      if (foundSubmit) {
+        await page.locator(foundSubmit).first().click();
+      } else {
+        throw new Error(`portal_click_no_match: submit button — tried ${submitSelectors.join(', ')}`);
+      }
+
+      const downloaded = await downloadRace;
+      logger.info('[SIDV-PORTAL] lookup step: strategy1_download', {
+        id_type:     idType,
+        downloaded:  downloaded !== null,
+        current_url: page.url(),
+      });
+      if (downloaded) return downloaded;
+
+      // ── Step 4: strategy 2 — find download link after result renders ────────
+      step = 'find_download_link';
+      const dlLinkSelector = 'a[href*=".pdf"], a:has-text("Download"), a:has-text("Print PDF"), button:has-text("Download PDF")';
+      const dlLinkHref = await page
+        .locator(dlLinkSelector)
+        .first()
+        .getAttribute('href', { timeout: 60_000 })
+        .catch(() => null);
+
+      logger.info('[SIDV-PORTAL] lookup step: strategy2_download_link', {
+        id_type:    idType,
+        found:      dlLinkHref !== null,
+        href:       dlLinkHref,
+        current_url: page.url(),
+        page_title:  await page.title().catch(() => '(title_error)'),
+      });
+
+      if (dlLinkHref !== null) {
+        step = 'click_download_link';
+        const dl2Race = page.waitForEvent('download', { timeout: 30_000 });
+        await page.locator(dlLinkSelector).first().click();
+        const dl2 = await dl2Race.catch(() => null);
+        logger.info('[SIDV-PORTAL] lookup step: strategy2_click_result', {
+          id_type:    idType,
+          downloaded: dl2 !== null,
+        });
+        if (dl2) return this.readDownload(dl2, idType);
+      }
+
+      // ── Step 5: strategy 3 — page.pdf() of result page ─────────────────────
+      step = 'wait_for_result_selector';
+      const resultSelector = '.result, .report, #report, [class*="result"], [class*="report"], [class*="slip"]';
+      const resultEl = await page
+        .waitForSelector(resultSelector, { timeout: 60_000 })
+        .catch(() => null);
+
+      logger.info('[SIDV-PORTAL] lookup step: strategy3_result_element', {
+        id_type:     idType,
+        found:       resultEl !== null,
+        current_url: page.url(),
+        page_title:  await page.title().catch(() => '(title_error)'),
+      });
+
+      if (!resultEl) {
+        throw new Error(`portal_result_not_found: none of "${resultSelector}" appeared within 60s`);
+      }
+
+      step = 'page_pdf_render';
+      const pdfBuf = await page.pdf({ format: 'A4', printBackground: true });
+      const b64 = Buffer.from(pdfBuf).toString('base64');
+      logger.info('[SIDV-PORTAL] lookup step: strategy3_pdf_rendered', {
+        id_type:    idType,
+        size_bytes: pdfBuf.length,
+      });
+      return b64;
+
+    } catch (err) {
+      const e = err as Error;
+      logger.error('[SIDV-PORTAL-ERROR]', {
+        step,
+        message:     e.message,
+        stack:       e.stack ?? null,
+        current_url: page.url(),
+      });
+      throw err;
     }
-
-    await this.fillFirst(page, [
-      'input[name="nin"]',
-      'input[name="bvn"]',
-      'input[name="id_number"]',
-      'input[name="idNumber"]',
-      'input[placeholder*="NIN"]',
-      'input[placeholder*="BVN"]',
-      'input[placeholder*="number" i]',
-      'input[type="text"]',
-    ], idNumber);
-
-    logger.info('portal_slip_submitted', { id_type: idType });
-
-    // Strategy 1: intercept a file download triggered by the submit button.
-    const downloadRace = page
-      .waitForEvent('download', { timeout: 90_000 })
-      .then((dl) => this.readDownload(dl, idType))
-      .catch(() => null);
-
-    await this.clickFirst(page, [
-      'button[type="submit"]',
-      'input[type="submit"]',
-      'button:has-text("Search")',
-      'button:has-text("Verify")',
-      'button:has-text("Submit")',
-    ]);
-
-    const downloaded = await downloadRace;
-    if (downloaded) return downloaded;
-
-    // Strategy 2: wait for a "Download PDF" / "Print" link after the results render.
-    const downloadLinkPdf = await page
-      .locator('a[href*=".pdf"], a:has-text("Download"), a:has-text("Print PDF"), button:has-text("Download PDF")')
-      .first()
-      .getAttribute('href', { timeout: 60_000 })
-      .catch(() => null);
-
-    if (downloadLinkPdf) {
-      const dl2Race = page.waitForEvent('download', { timeout: 30_000 });
-      await page.locator(
-        'a[href*=".pdf"], a:has-text("Download"), a:has-text("Print PDF"), button:has-text("Download PDF")',
-      ).first().click();
-      const dl2 = await dl2Race.catch(() => null);
-      if (dl2) return this.readDownload(dl2, idType);
-    }
-
-    // Strategy 3: page.pdf() fallback — render the result page to PDF via headless Chrome.
-    await page.waitForSelector(
-      '.result, .report, #report, [class*="result"], [class*="report"], [class*="slip"]',
-      { timeout: 60_000 },
-    );
-    const pdfBuf = await page.pdf({ format: 'A4', printBackground: true });
-    const b64 = Buffer.from(pdfBuf).toString('base64');
-    logger.info('portal_pdf_generated_fallback', { id_type: idType, size_bytes: pdfBuf.length });
-    return b64;
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -204,26 +351,12 @@ class SecureIDVerifyPortalService {
     }
   }
 
-  private async fillFirst(page: Page, selectors: string[], value: string): Promise<void> {
+  /** Returns the first selector from the list that matches at least one element, or null. */
+  private async findFirstSelector(page: Page, selectors: string[]): Promise<string | null> {
     for (const sel of selectors) {
-      const loc = page.locator(sel).first();
-      if (await loc.count() > 0) {
-        await loc.fill(value);
-        return;
-      }
+      if (await page.locator(sel).count() > 0) return sel;
     }
-    throw new Error(`portal_fill_no_match: tried ${selectors.join(', ')}`);
-  }
-
-  private async clickFirst(page: Page, selectors: string[]): Promise<void> {
-    for (const sel of selectors) {
-      const loc = page.locator(sel).first();
-      if (await loc.count() > 0) {
-        await loc.click();
-        return;
-      }
-    }
-    throw new Error(`portal_click_no_match: tried ${selectors.join(', ')}`);
+    return null;
   }
 
   private async readDownload(dl: Download, idType: PortalIdType): Promise<string> {
@@ -235,7 +368,7 @@ class SecureIDVerifyPortalService {
       stream.on('error', reject);
     });
     const buf = Buffer.concat(chunks);
-    logger.info('portal_pdf_downloaded', { id_type: idType, size_bytes: buf.length });
+    logger.info('[SIDV-PORTAL] download stream read', { id_type: idType, size_bytes: buf.length });
     return buf.toString('base64');
   }
 
