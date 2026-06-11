@@ -286,7 +286,7 @@ export class VTPassProvider extends HttpVTUProvider {
       variation_code:    variationCode,
       amount:            input.amount,
       phone:             input.phone,
-      subscription_type: "renew",
+      subscription_type: "change",
       quantity:          1,
     };
   }
