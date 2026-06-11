@@ -179,6 +179,27 @@ class SecureIDVerifyPortalService {
 
       // ── 4. Fill NIN / BVN ─────────────────────────────────────────────────
       step = 'fill_id_number';
+
+      // Audit all inputs on the form page before attempting to fill.
+      // Logs safe metadata only — never logs typed values or the identifier itself.
+      const allInputs = await page.locator('input').all();
+      const inputMeta = await Promise.all(
+        allInputs.map(async (el) => ({
+          type:        await el.getAttribute('type').catch(() => null),
+          name:        await el.getAttribute('name').catch(() => null),
+          id:          await el.getAttribute('id').catch(() => null),
+          placeholder: await el.getAttribute('placeholder').catch(() => null),
+          aria_label:  await el.getAttribute('aria-label').catch(() => null),
+          checked:     await el.isChecked().catch(() => null),
+          visible:     await el.isVisible().catch(() => false),
+        }))
+      );
+      logger.info('[SIDV-PORTAL] form_inputs_found', {
+        id_type:     idType,
+        total:       inputMeta.length,
+        inputs:      inputMeta,
+      });
+
       const idSelectors = [
         'input[name="nin"]',
         'input[name="bvn"]',
@@ -186,8 +207,14 @@ class SecureIDVerifyPortalService {
         'input[name="idNumber"]',
         'input[placeholder*="NIN" i]',
         'input[placeholder*="BVN" i]',
+        'input[placeholder*="11-digit" i]',
+        'input[placeholder*="Enter the 11-digit" i]',
+        'input[placeholder*="Enter" i]',
         'input[placeholder*="number" i]',
+        'input[type="number"]',
         'input[type="text"]',
+        'input.form-control',
+        'input',
       ];
       const foundIdField = await this.findFirstSelector(page, idSelectors);
       logger.info('[SIDV-PORTAL] lookup step: id_field', { found: foundIdField !== null, selector: foundIdField });
