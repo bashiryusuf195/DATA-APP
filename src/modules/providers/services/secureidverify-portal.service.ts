@@ -178,13 +178,13 @@ class SecureIDVerifyPortalService {
       const modalClosedOnForm = await this.dismissModal(page);
 
       // ── Page diagnostics ─────────────────────────────────────────────────
-      logger.info('[SIDV-PORTAL] page_url',   { url:   page.url() });
-      logger.info('[SIDV-PORTAL] page_title', { title: await page.title().catch(() => '(error)') });
+      logger.info(`[SIDV-PORTAL] page_url ${page.url()}`);
+      logger.info(`[SIDV-PORTAL] page_title ${await page.title().catch(() => '(error)')}`);
 
-      const bodyPreview = await page.evaluate(() =>
-        (document.body?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 400)
+      const bodyText = await page.evaluate(() =>
+        (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim()
       ).catch(() => '(eval_error)');
-      logger.info('[SIDV-PORTAL] body_text_preview', { text: bodyPreview });
+      logger.info(`[SIDV-PORTAL] body_text_preview ${JSON.stringify(bodyText.slice(0, 1000))}`);
 
       // Audit all inputs via a single DOM evaluation — captures every attribute
       // in one round-trip. Values are never read or logged.
@@ -203,14 +203,14 @@ class SecureIDVerifyPortalService {
           readonly:    el.readOnly,
         }))
       ).catch(() => [] as unknown[]);
-      logger.info('[SIDV-PORTAL] form_inputs_found', {
-        id_type: idType,
-        count:   (inputAudit as unknown[]).length,
-        inputs:  inputAudit,
-      });
+      logger.info(`[SIDV-PORTAL] form_inputs_found ${JSON.stringify({ count: (inputAudit as unknown[]).length, inputs: inputAudit })}`);
 
-      logger.info('[SIDV-PORTAL] form_page_loaded', { id_type: idType, current_url: page.url() });
-      logger.info('[SIDV-PORTAL] alert_modal_closed', { page: 'form', was_present: modalClosedOnForm });
+      const allInputCount     = await page.locator('input').count().catch(() => -1);
+      const visibleInputCount = await page.locator('input:visible').count().catch(() => -1);
+      logger.info(`[SIDV-PORTAL] input_counts all=${allInputCount} visible=${visibleInputCount}`);
+
+      logger.info(`[SIDV-PORTAL] form_page_loaded id_type=${idType} current_url=${page.url()}`);
+      logger.info(`[SIDV-PORTAL] alert_modal_closed page=form was_present=${modalClosedOnForm}`);
 
       // ── 4. Fill NIN / BVN ─────────────────────────────────────────────────
       step = 'fill_id_number';
@@ -454,24 +454,24 @@ class SecureIDVerifyPortalService {
         const loc   = locator();
         const count = await loc.count().catch(() => 0);
         if (!count) {
-          logger.info('[SIDV-PORTAL] fill_strategy_skip', { strategy: label, reason: 'not_found' });
+          logger.info(`[SIDV-PORTAL] fill_strategy_skip strategy=${label} reason=not_found`);
           continue;
         }
         await loc.fill(idNumber);
         const filled = await loc.inputValue().catch(() => '');
         if (filled.includes(idNumber)) {
-          logger.info('[SIDV-PORTAL] identifier_filled', { id_type: idType, strategy: label });
+          logger.info(`[SIDV-PORTAL] identifier_filled id_type=${idType} strategy=${label}`);
           return;
         }
-        logger.info('[SIDV-PORTAL] fill_strategy_skip', { strategy: label, reason: 'value_not_set_after_fill' });
+        logger.info(`[SIDV-PORTAL] fill_strategy_skip strategy=${label} reason=value_not_set_after_fill`);
       } catch (e) {
-        logger.info('[SIDV-PORTAL] fill_strategy_skip', { strategy: label, reason: (e as Error).message });
+        logger.info(`[SIDV-PORTAL] fill_strategy_skip strategy=${label} reason=${(e as Error).message}`);
       }
     }
 
     // DOM eval fallback — find the first visible, enabled text-like input and
     // set its value via native event dispatch for React controlled inputs.
-    logger.info('[SIDV-PORTAL] fill_dom_eval_fallback', { id_type: idType });
+    logger.info(`[SIDV-PORTAL] fill_dom_eval_fallback id_type=${idType}`);
     const domResult = await page.evaluate((val: string) => {
       const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
       const target = inputs.find((el) => {
@@ -491,11 +491,11 @@ class SecureIDVerifyPortalService {
       return { success: true, filled: target.value === val, type: target.type, name: target.name, id: target.id };
     }, idNumber);
 
-    logger.info('[SIDV-PORTAL] fill_dom_eval_result', { id_type: idType, result: domResult });
+    logger.info(`[SIDV-PORTAL] fill_dom_eval_result id_type=${idType} ${JSON.stringify(domResult)}`);
 
     if ((domResult as { success: boolean; filled?: boolean }).success &&
         (domResult as { success: boolean; filled?: boolean }).filled) {
-      logger.info('[SIDV-PORTAL] identifier_filled', { id_type: idType, strategy: 'dom_eval' });
+      logger.info(`[SIDV-PORTAL] identifier_filled id_type=${idType} strategy=dom_eval`);
       return;
     }
 
@@ -505,9 +505,9 @@ class SecureIDVerifyPortalService {
       if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
       await page.screenshot({ path: path.join(tmpDir, 'secureidverify-form-debug.png'), fullPage: true });
       fs.writeFileSync(path.join(tmpDir, 'secureidverify-form-debug.html'), await page.content());
-      logger.info('[SIDV-PORTAL] debug_artifacts_saved', { dir: tmpDir });
+      logger.info(`[SIDV-PORTAL] debug_artifacts_saved dir=${tmpDir}`);
     } catch (saveErr) {
-      logger.warn('[SIDV-PORTAL] debug_artifacts_save_failed', { error: (saveErr as Error).message });
+      logger.warn(`[SIDV-PORTAL] debug_artifacts_save_failed ${(saveErr as Error).message}`);
     }
 
     throw new Error(`portal_fill_no_match: id field — all fill strategies exhausted for ${idType}`);
