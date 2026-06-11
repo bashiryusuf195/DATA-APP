@@ -95,8 +95,9 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
     H: 1008,
     templateFile: "NIN Information.png",
 
-    // Photo box: right column, blank area above disclaimer text (disclaimer starts y≈0.181)
-    photo: { x: 0.689, y: 0.067, w: 0.261, h: 0.112 },
+    // Photo box: centre-left, spanning the personal-info rows (first_name…gender).
+    // Reference PDF places the photo at page-x ≈ 0.219–0.373; template x-scale ≈ 1.38.
+    photo: { x: 0.295, y: 0.067, w: 0.215, h: 0.148 },
 
     fields: {
       // ── Personal info rows (value column; labels are on the template) ───
