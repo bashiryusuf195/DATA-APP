@@ -326,7 +326,7 @@ export class VTPassProvider extends HttpVTUProvider {
       request_id:     this.vtpassRequestId(input.reference),
       serviceID:      input.network_operator,
       billersCode:    input.phone,
-      variation_code: input.variation_code,
+      variation_code: input.provider_variation_code ?? input.variation_code,
       amount:         input.amount,
       phone:          input.phone,
       quantity:       1,
