@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { chromium, type Browser, type BrowserContext, type Page, type Download } from 'playwright';
 import { config } from '../../../config';
 import { logger } from '../../../lib/logger';
@@ -174,53 +176,45 @@ class SecureIDVerifyPortalService {
       // ── 3. Close alert modal if present ───────────────────────────────────
       step = 'dismiss_modal_on_form';
       const modalClosedOnForm = await this.dismissModal(page);
+
+      // ── Page diagnostics ─────────────────────────────────────────────────
+      logger.info('[SIDV-PORTAL] page_url',   { url:   page.url() });
+      logger.info('[SIDV-PORTAL] page_title', { title: await page.title().catch(() => '(error)') });
+
+      const bodyPreview = await page.evaluate(() =>
+        (document.body?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 400)
+      ).catch(() => '(eval_error)');
+      logger.info('[SIDV-PORTAL] body_text_preview', { text: bodyPreview });
+
+      // Audit all inputs via a single DOM evaluation — captures every attribute
+      // in one round-trip. Values are never read or logged.
+      const inputAudit = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('input')).map((el) => ({
+          tag:         el.tagName.toLowerCase(),
+          type:        el.type        || null,
+          name:        el.name        || null,
+          id:          el.id          || null,
+          class:       el.className   || null,
+          placeholder: el.placeholder || null,
+          aria_label:  el.getAttribute('aria-label') || null,
+          role:        el.getAttribute('role')       || null,
+          visible:     !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length),
+          disabled:    el.disabled,
+          readonly:    el.readOnly,
+        }))
+      ).catch(() => [] as unknown[]);
+      logger.info('[SIDV-PORTAL] form_inputs_found', {
+        id_type: idType,
+        count:   (inputAudit as unknown[]).length,
+        inputs:  inputAudit,
+      });
+
       logger.info('[SIDV-PORTAL] form_page_loaded', { id_type: idType, current_url: page.url() });
       logger.info('[SIDV-PORTAL] alert_modal_closed', { page: 'form', was_present: modalClosedOnForm });
 
       // ── 4. Fill NIN / BVN ─────────────────────────────────────────────────
       step = 'fill_id_number';
-
-      // Audit all inputs on the form page before attempting to fill.
-      // Logs safe metadata only — never logs typed values or the identifier itself.
-      const allInputs = await page.locator('input').all();
-      const inputMeta = await Promise.all(
-        allInputs.map(async (el) => ({
-          type:        await el.getAttribute('type').catch(() => null),
-          name:        await el.getAttribute('name').catch(() => null),
-          id:          await el.getAttribute('id').catch(() => null),
-          placeholder: await el.getAttribute('placeholder').catch(() => null),
-          aria_label:  await el.getAttribute('aria-label').catch(() => null),
-          checked:     await el.isChecked().catch(() => null),
-          visible:     await el.isVisible().catch(() => false),
-        }))
-      );
-      logger.info('[SIDV-PORTAL] form_inputs_found', {
-        id_type:     idType,
-        total:       inputMeta.length,
-        inputs:      inputMeta,
-      });
-
-      const idSelectors = [
-        'input[name="nin"]',
-        'input[name="bvn"]',
-        'input[name="id_number"]',
-        'input[name="idNumber"]',
-        'input[placeholder*="NIN" i]',
-        'input[placeholder*="BVN" i]',
-        'input[placeholder*="11-digit" i]',
-        'input[placeholder*="Enter the 11-digit" i]',
-        'input[placeholder*="Enter" i]',
-        'input[placeholder*="number" i]',
-        'input[type="number"]',
-        'input[type="text"]',
-        'input.form-control',
-        'input',
-      ];
-      const foundIdField = await this.findFirstSelector(page, idSelectors);
-      logger.info('[SIDV-PORTAL] lookup step: id_field', { found: foundIdField !== null, selector: foundIdField });
-      if (!foundIdField) throw new Error(`portal_fill_no_match: id field — tried ${idSelectors.join(', ')}`);
-      await page.locator(foundIdField).first().fill(idNumber);
-      logger.info('[SIDV-PORTAL] identifier_filled', { id_type: idType });
+      await this.fillIdentifier(page, idNumber, idType);
 
       // ── 5. Select slip type ───────────────────────────────────────────────
       step = 'select_slip_type';
@@ -432,6 +426,91 @@ class SecureIDVerifyPortalService {
       }
     }
     throw new Error('portal_consent_checkbox_not_found');
+  }
+
+  /**
+   * Multi-strategy NIN/BVN fill.
+   * Tries Playwright locators first, falls back to DOM eval.
+   * Saves debug screenshot + HTML if nothing works.
+   */
+  private async fillIdentifier(page: Page, idNumber: string, idType: PortalIdType): Promise<void> {
+    const strategies: Array<{ label: string; locator: () => ReturnType<Page['locator']> }> = [
+      {
+        label: 'getByLabel',
+        locator: () => page.getByLabel(/National Identification Number|NIN|Bank Verification Number|BVN/i),
+      },
+      {
+        label: 'getByPlaceholder',
+        locator: () => page.getByPlaceholder(/11-digit|NIN|BVN|Enter/i),
+      },
+      {
+        label: 'input_first',
+        locator: () => page.locator('input').first(),
+      },
+    ];
+
+    for (const { label, locator } of strategies) {
+      try {
+        const loc   = locator();
+        const count = await loc.count().catch(() => 0);
+        if (!count) {
+          logger.info('[SIDV-PORTAL] fill_strategy_skip', { strategy: label, reason: 'not_found' });
+          continue;
+        }
+        await loc.fill(idNumber);
+        const filled = await loc.inputValue().catch(() => '');
+        if (filled.includes(idNumber)) {
+          logger.info('[SIDV-PORTAL] identifier_filled', { id_type: idType, strategy: label });
+          return;
+        }
+        logger.info('[SIDV-PORTAL] fill_strategy_skip', { strategy: label, reason: 'value_not_set_after_fill' });
+      } catch (e) {
+        logger.info('[SIDV-PORTAL] fill_strategy_skip', { strategy: label, reason: (e as Error).message });
+      }
+    }
+
+    // DOM eval fallback — find the first visible, enabled text-like input and
+    // set its value via native event dispatch for React controlled inputs.
+    logger.info('[SIDV-PORTAL] fill_dom_eval_fallback', { id_type: idType });
+    const domResult = await page.evaluate((val: string) => {
+      const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+      const target = inputs.find((el) => {
+        const t = (el.type || 'text').toLowerCase();
+        if (['checkbox', 'radio', 'hidden', 'password', 'submit', 'button', 'file', 'image', 'reset'].includes(t)) return false;
+        if (el.disabled || el.readOnly) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      if (!target) return { success: false, reason: 'no_eligible_input_found' };
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (nativeInputValueSetter) nativeInputValueSetter.call(target, val);
+      else target.value = val;
+      target.dispatchEvent(new Event('input',  { bubbles: true }));
+      target.dispatchEvent(new Event('change', { bubbles: true }));
+      target.dispatchEvent(new Event('blur',   { bubbles: true }));
+      return { success: true, filled: target.value === val, type: target.type, name: target.name, id: target.id };
+    }, idNumber);
+
+    logger.info('[SIDV-PORTAL] fill_dom_eval_result', { id_type: idType, result: domResult });
+
+    if ((domResult as { success: boolean; filled?: boolean }).success &&
+        (domResult as { success: boolean; filled?: boolean }).filled) {
+      logger.info('[SIDV-PORTAL] identifier_filled', { id_type: idType, strategy: 'dom_eval' });
+      return;
+    }
+
+    // All strategies failed — save debug artifacts and throw.
+    try {
+      const tmpDir = path.join(process.cwd(), 'tmp');
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      await page.screenshot({ path: path.join(tmpDir, 'secureidverify-form-debug.png'), fullPage: true });
+      fs.writeFileSync(path.join(tmpDir, 'secureidverify-form-debug.html'), await page.content());
+      logger.info('[SIDV-PORTAL] debug_artifacts_saved', { dir: tmpDir });
+    } catch (saveErr) {
+      logger.warn('[SIDV-PORTAL] debug_artifacts_save_failed', { error: (saveErr as Error).message });
+    }
+
+    throw new Error(`portal_fill_no_match: id field — all fill strategies exhausted for ${idType}`);
   }
 
   /** Returns the first selector that matches at least one element, or null. */
