@@ -279,12 +279,26 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
     // from the SecureIDVerify web portal and attach it to report_data.
     // If the portal fails, we still return the successful API result — the
     // identity-report controller will fall back to template rendering.
+    logger.info("[SIDV-PORTAL] enabled?", {
+      use_pdf:         config.secureidverifyPortal.usePdf,
+      api_status:      result.status,
+      has_report_data: !!result.report_data,
+      reference:       input.reference,
+    });
+
     if (
       result.status === "successful" &&
       result.report_data &&
       config.secureidverifyPortal.usePdf
     ) {
       const portalIdType = variationCodeToPortalIdType(variationCode);
+      logger.info("[SIDV-PORTAL] portal_id_type resolved", {
+        variation_code: variationCode,
+        portal_id_type: portalIdType,
+        has_id_number:  !!idNumber,
+        reference:      input.reference,
+      });
+
       if (portalIdType && idNumber) {
         try {
           const pdfBase64 = await secureidverifyPortalService.getPdfSlip(portalIdType, idNumber);
@@ -292,17 +306,24 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
             ...result,
             report_data: { ...result.report_data, portal_pdf_data: pdfBase64 },
           };
-          logger.info("portal_pdf_attached", {
-            reference: input.reference,
-            id_type:   portalIdType,
+          logger.info("[SIDV-PORTAL] portal_pdf_data attached", {
+            reference:  input.reference,
+            id_type:    portalIdType,
+            pdf_length: pdfBase64.length,
           });
         } catch (err) {
-          logger.warn("portal_pdf_failed_fallback_to_template", {
+          logger.warn("[SIDV-PORTAL] fallback_to_template", {
             reference: input.reference,
             id_type:   portalIdType,
-            error:     (err as Error).message,
+            reason:    (err as Error).message,
           });
         }
+      } else {
+        logger.warn("[SIDV-PORTAL] skipped — missing portal_id_type or id_number", {
+          portal_id_type: portalIdType,
+          has_id_number:  !!idNumber,
+          reference:      input.reference,
+        });
       }
     }
 

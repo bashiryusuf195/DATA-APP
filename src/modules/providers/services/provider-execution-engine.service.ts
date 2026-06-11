@@ -624,6 +624,17 @@ class ProviderExecutionEngine {
       provider:     result.provider,
     });
 
+    if (result.report_data) {
+      logger.info("[SIDV-PORTAL] report_data before db write", {
+        reference:            params.transaction_reference,
+        report_data_keys:     Object.keys(result.report_data),
+        has_portal_pdf_data:  "portal_pdf_data" in result.report_data,
+        portal_pdf_length:    typeof result.report_data.portal_pdf_data === "string"
+          ? result.report_data.portal_pdf_data.length
+          : 0,
+      });
+    }
+
     await updateTransactionStatus(params.transaction_reference, {
       status:             "successful",
       provider:           result.provider,
