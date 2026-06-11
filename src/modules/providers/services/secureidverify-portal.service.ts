@@ -211,9 +211,37 @@ class SecureIDVerifyPortalService {
         id_type:     idType,
       });
 
-      // Session expiry: redirected back to login.
-      if (afterNavUrl.toLowerCase().includes('login')) {
-        logger.info('[SIDV-PORTAL] lookup step: session_expired_relogin', { current_url: afterNavUrl });
+      // ── Session-expiry detection (content-based, not URL-based) ────────────
+      // We inspect the page for login-form elements and verification-form elements
+      // before deciding whether to re-login.  URL string matching produced false
+      // positives when the verification URL itself contained "login"-like substrings
+      // or when domcontentloaded fired before a JS redirect settled.
+      const loginFormSelectors    = ['input[type="password"]', 'input[name="password"]'];
+      const verifyFormSelectors   = ['input[name="nin"]', 'input[name="bvn"]',
+                                     'input[name="id_number"]', 'input[name="idNumber"]',
+                                     'input[placeholder*="NIN" i]', 'input[placeholder*="BVN" i]',
+                                     'input[type="text"]'];
+
+      const foundLoginField  = await this.findFirstSelector(page, loginFormSelectors);
+      const foundVerifyField = await this.findFirstSelector(page, verifyFormSelectors);
+
+      logger.info('[SIDV-PORTAL] lookup step: session_check', {
+        current_url:         afterNavUrl,
+        page_title:          afterNavTitle,
+        url_contains_login:  afterNavUrl.toLowerCase().includes('login'),
+        login_field_found:   foundLoginField,
+        verify_field_found:  foundVerifyField,
+      });
+
+      // Only treat as session-expired when a login form is present AND the
+      // verification form is absent — meaning we were redirected to the login page.
+      const isSessionExpired = foundLoginField !== null && foundVerifyField === null;
+
+      if (isSessionExpired) {
+        logger.info('[SIDV-PORTAL] lookup step: session_expired_relogin', {
+          current_url:       afterNavUrl,
+          login_field_found: foundLoginField,
+        });
         this.loggedIn = false;
         step = 'relogin';
         await this.ensureLoggedIn();
