@@ -5,7 +5,6 @@ import type { User } from '@/types'
 import {
   getStoredTokens,
   saveTokens,
-  removeTokens,
   removeAccessToken,
 } from '@/lib/secureTokens'
 
