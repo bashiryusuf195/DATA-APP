@@ -125,23 +125,37 @@ class SecureIDVerifyPortalService {
   // ── Main lookup flow ────────────────────────────────────────────────────────
 
   private async lookupAndDownloadPdf(page: Page, idType: PortalIdType, idNumber: string): Promise<string> {
-    const base      = this.cfg.url.replace(/\/$/, '');
-    const lookupUrl = `${base}${this.getLookupPath(idType)}`;
-    const slipLabel = SLIP_TYPE_LABEL[idType];
-    let step        = 'navigate_to_verification';
+    // Derive the portal origin from the login URL so lookup paths are always
+    // rooted at the domain root, not appended onto /auth/login.
+    const portalOrigin = new URL(this.cfg.url).origin;
+    const lookupUrl    = `${portalOrigin}${this.getLookupPath(idType)}`;
+    const slipLabel    = SLIP_TYPE_LABEL[idType];
+    let step           = 'navigate_to_verification';
 
     try {
       // ── 1. Navigate to the verification form ──────────────────────────────
-      logger.info('[SIDV-PORTAL] lookup step: navigate', { id_type: idType, url: lookupUrl });
+      logger.info(`[SIDV-PORTAL] lookup step: navigate id_type=${idType} url=${lookupUrl}`);
       await page.goto(lookupUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
       const afterNavUrl   = page.url();
       const afterNavTitle = await page.title().catch(() => '(title_error)');
-      logger.info('[SIDV-PORTAL] lookup step: after_navigate', {
-        current_url: afterNavUrl,
-        page_title:  afterNavTitle,
-        id_type:     idType,
-      });
+      logger.info(`[SIDV-PORTAL] lookup step: after_navigate id_type=${idType} current_url=${afterNavUrl} page_title=${afterNavTitle}`);
+
+      // Assert we landed on the expected route.
+      const expectedPath = this.getLookupPath(idType);
+      if (!afterNavUrl.includes(expectedPath)) {
+        throw new Error(`portal_route_mismatch: expected path ${expectedPath} but landed on ${afterNavUrl}`);
+      }
+      if (
+        afterNavTitle.toLowerCase().includes('not found') ||
+        afterNavTitle.includes('404')
+      ) {
+        throw new Error(`portal_route_404: current_url=${afterNavUrl}`);
+      }
+      const bodyCheck = await page.evaluate(() => document.body?.innerText ?? '').catch(() => '');
+      if (/404\s*not\s*found/i.test(bodyCheck)) {
+        throw new Error(`portal_route_404: current_url=${afterNavUrl}`);
+      }
 
       // ── 2. Session-expiry check ───────────────────────────────────────────
       // Expired ONLY when the URL is an auth/login path OR a password field is
@@ -262,7 +276,7 @@ class SecureIDVerifyPortalService {
         id_type: idType,
         reason:  'DOWNLOAD SLIP button not found or download event not captured on detail page',
       });
-      return await this.downloadFromVerificationsList(page, base, idNumber, idType, slipLabel);
+      return await this.downloadFromVerificationsList(page, portalOrigin, idNumber, idType, slipLabel);
 
     } catch (err) {
       const e = err as Error;
@@ -321,12 +335,12 @@ class SecureIDVerifyPortalService {
 
   private async downloadFromVerificationsList(
     page: Page,
-    base: string,
+    portalOrigin: string,
     idNumber: string,
     idType: PortalIdType,
     slipLabel: string,
   ): Promise<string> {
-    const listUrl = `${base}/user/verifications`;
+    const listUrl = `${portalOrigin}/user/verifications`;
     await page.goto(listUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForSelector('table, [class*="verification"], [class*="list"]', { timeout: 30_000 }).catch(() => {});
 
