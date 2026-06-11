@@ -292,6 +292,14 @@ export async function credentialDiagnosticController(
       const baseUrl   = config.vtpass.baseUrl || "https://sandbox.vtpass.com/api";
       const balanceUrl = `${baseUrl}/balance`;
 
+      // Detect outbound IP so the user knows what to whitelist on VTPass.
+      let outboundIp = "unknown";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(5_000) });
+        const ipJson = await ipRes.json() as { ip?: string };
+        outboundIp = ipJson.ip ?? "unknown";
+      } catch { /* non-fatal */ }
+
       // Helper — one attempt, returns { status, body }
       async function attempt(headers: Record<string, string>): Promise<{ status: number; body: string }> {
         const ctrl = new AbortController();
@@ -348,6 +356,7 @@ export async function credentialDiagnosticController(
             ? `Working auth method found: ${passing[0].method}`
             : "All 4 auth methods returned non-200. Account may not be activated on VTPass sandbox.",
           details: {
+            outbound_ip:    outboundIp,
             baseUrl,
             apiKey_length:  apiKey.length,
             apiKey_prefix:  apiKey.slice(0, 6),
