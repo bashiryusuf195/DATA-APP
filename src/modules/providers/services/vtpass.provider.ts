@@ -242,7 +242,10 @@ export class VTPassProvider extends HttpVTUProvider {
       throw new Error("VTPass data purchase requires variation_code (data plan code)");
     }
     // Strip any trailing -data suffix before appending, so "mtn" and "mtn-data" both → "mtn-data"
-    const network = input.network_operator.replace(/-data$/i, "").toLowerCase();
+    // VTPass uses legacy brand name "etisalat" for 9mobile.
+    const NETWORK_MAP: Record<string, string> = { "9mobile": "etisalat" };
+    const base    = input.network_operator.replace(/-data$/i, "").toLowerCase();
+    const network = NETWORK_MAP[base] ?? base;
     return {
       request_id:     input.reference,
       serviceID:      `${network}-data`,
