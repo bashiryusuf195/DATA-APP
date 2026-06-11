@@ -275,14 +275,15 @@ export class VTPassProvider extends HttpVTUProvider {
     if (!input.smartcard_number) {
       throw new Error("VTPass cable TV purchase requires smartcard_number (IUC number)");
     }
-    if (!input.variation_code) {
+    const variationCode = input.provider_variation_code ?? input.variation_code;
+    if (!variationCode) {
       throw new Error("VTPass cable TV purchase requires variation_code (subscription package)");
     }
     return {
       request_id:        this.vtpassRequestId(input.reference),
       serviceID:         input.network_operator,       // e.g. "dstv"
       billersCode:       input.smartcard_number,
-      variation_code:    input.variation_code,
+      variation_code:    variationCode,
       amount:            input.amount,
       phone:             input.phone,
       subscription_type: "renew",
