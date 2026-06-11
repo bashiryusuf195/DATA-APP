@@ -687,3 +687,35 @@ export async function getVtpassVariationsController(
     next(err);
   }
 }
+
+// ── PATCH /admin/providers/:providerCode/service-mode ─────────────────────────
+// Sets service_mode ('api' | 'automation') in provider_credentials.metadata.
+// Only merges service_mode — all other metadata keys are preserved.
+
+const ServiceModeSchema = z.object({
+  mode: z.enum(["api", "automation"]),
+});
+
+export async function updateServiceModeController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { providerCode } = req.params;
+    const { mode } = ServiceModeSchema.parse(req.body);
+
+    const existing = await getProviderCredentials(providerCode);
+    const currentMeta = (existing?.metadata as Record<string, unknown>) ?? {};
+
+    await upsertProviderCredentials({
+      provider_code: providerCode,
+      metadata: { ...currentMeta, service_mode: mode },
+    });
+
+    logger.info("provider_service_mode_updated", { provider_code: providerCode, mode });
+    res.status(200).json({ success: true, data: { provider_code: providerCode, service_mode: mode } });
+  } catch (err) {
+    next(err);
+  }
+}

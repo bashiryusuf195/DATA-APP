@@ -13,6 +13,7 @@ import {
   disableProviderController,
   fetchProviderPlansController,
   getVtpassVariationsController,
+  updateServiceModeController,
 } from "../controllers/admin-providers.controller";
 
 const router = Router();
@@ -38,5 +39,7 @@ router.post(  "/providers/:providerCode/credential-diagnostic", ...adminGuard, a
 router.get(   "/providers/:providerCode/plans",                 ...adminGuard, adminRateLimiter, fetchProviderPlansController);
 // Fetch VTPass service catalog (?serviceID=mtn-data|dstv|ikeja-electric|…)
 router.get(   "/providers/vtpass/service-variations",           ...adminGuard, adminRateLimiter, getVtpassVariationsController);
+// Set service mode for a provider (e.g. secureidverify: 'api' | 'automation')
+router.patch( "/providers/:providerCode/service-mode",          ...adminGuard, adminRateLimiter, updateServiceModeController);
 
 export { router as adminProvidersRouter };
