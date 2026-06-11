@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Fingerprint } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '@/store/auth.store'
 import { performNativeBiometric } from '@/hooks/useBiometricAuth'
+import { biometricDeviceApi } from '@/api/biometric-device.api'
+import { saveBiometricCredentials } from '@/lib/secureTokens'
 import toast from 'react-hot-toast'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -27,25 +30,88 @@ function saveDecision(decision: BioRecord['decision']): void {
   localStorage.setItem(PROMPT_KEY, JSON.stringify({ decision, ts: Date.now() }))
 }
 
+// ── Device secret generation ──────────────────────────────────────────────────
+// Generates a cryptographically random device_id (UUID) and device_secret
+// (64 hex characters = 32 bytes = 256-bit entropy).
+
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  // Fallback for environments without crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
+function generateDeviceSecret(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function getDeviceName(): string {
+  if (Capacitor.isNativePlatform()) {
+    const ua = navigator.userAgent
+    if (/android/i.test(ua)) return 'Android Device'
+    if (/iphone|ipad/i.test(ua)) return 'iPhone/iPad'
+    return 'Mobile Device'
+  }
+  return 'Web Browser'
+}
+
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
-type Phase = 'idle' | 'loading' | 'success'
+type Phase = 'idle' | 'loading' | 'success' | 'error'
 
 export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
-  const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled)
-  const [phase, setPhase]   = useState<Phase>('idle')
+  const { setBiometricEnabled, setBiometricDeviceId } = useAuthStore((s) => ({
+    setBiometricEnabled:  s.setBiometricEnabled,
+    setBiometricDeviceId: s.setBiometricDeviceId,
+  }))
+  const [phase, setPhase]       = useState<Phase>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const handleEnable = async () => {
     setPhase('loading')
-    const result = await performNativeBiometric('Enable biometric login for Hive Data')
-    if (result === 'success') {
-      setBiometricEnabled(true)
-      saveDecision('enabled')
-      setPhase('success')
-    } else {
-      // Cancelled or failed — don't record; prompt can appear again later
+    setErrorMsg('')
+
+    // 1. Native biometric prompt — proves the user is physically present.
+    const biometricResult = await performNativeBiometric('Enable biometric login for Hive Data')
+    if (biometricResult !== 'success') {
       setPhase('idle')
+      return // Cancelled — let user try again
     }
+
+    // 2. Generate device credentials.
+    const deviceId     = generateUuid()
+    const deviceSecret = generateDeviceSecret()
+    const deviceName   = getDeviceName()
+    const platform     = Capacitor.isNativePlatform()
+      ? (/iphone|ipad/i.test(navigator.userAgent) ? 'ios' : 'android')
+      : 'web'
+
+    // 3. Register with backend (requires active session via Authorization header).
+    try {
+      await biometricDeviceApi.register({
+        device_id:     deviceId,
+        device_name:   deviceName,
+        platform:      platform as 'android' | 'ios' | 'web',
+        device_secret: deviceSecret,
+      })
+    } catch {
+      setPhase('error')
+      setErrorMsg('Registration failed. Please try again.')
+      return
+    }
+
+    // 4. Persist credentials in Android Keystore.
+    saveBiometricCredentials(deviceId, deviceSecret)
+
+    // 5. Mark biometric as enabled in store and remember the device_id.
+    setBiometricDeviceId(deviceId)
+    setBiometricEnabled(true)
+    saveDecision('enabled')
+    setPhase('success')
   }
 
   const handleLater = () => {
@@ -58,7 +124,7 @@ export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  // Auto-close 1.5 s after success, then show a toast
+  // Auto-close 1.5 s after success
   useEffect(() => {
     if (phase !== 'success') return
     toast.success('Biometric login enabled')
@@ -76,7 +142,7 @@ export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
       {/* Backdrop — clicking it = Maybe Later */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={phase === 'idle' ? handleLater : undefined}
+        onClick={phase === 'idle' || phase === 'error' ? handleLater : undefined}
         aria-hidden="true"
       />
 
@@ -97,7 +163,7 @@ export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {/* ── Prompt ──────────────────────────────────────────────────────── */}
+        {/* ── Prompt / Error ───────────────────────────────────────────────── */}
         {phase !== 'success' && (
           <>
             <div className="flex justify-center mb-5">
@@ -116,6 +182,10 @@ export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
               Enable fingerprint or face login for quick, secure access — no password needed next time.
             </p>
 
+            {phase === 'error' && (
+              <p className="text-xs text-danger text-center mb-4">{errorMsg}</p>
+            )}
+
             <div className="space-y-2.5">
               <button
                 onClick={handleEnable}
@@ -130,7 +200,7 @@ export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
                 ) : (
                   <>
                     <Fingerprint className="h-4 w-4" />
-                    Enable Biometric Login
+                    {phase === 'error' ? 'Try Again' : 'Enable Biometric Login'}
                   </>
                 )}
               </button>

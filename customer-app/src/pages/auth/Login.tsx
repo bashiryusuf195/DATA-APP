@@ -6,7 +6,9 @@ import { ONBOARDING_KEY } from '@/pages/onboarding/Onboarding'
 import { Button, Input, Card } from '@/components/ui'
 import { authApi } from '@/api/auth.api'
 import { apiClient } from '@/api/client'
+import { biometricDeviceApi } from '@/api/biometric-device.api'
 import { useAuthStore } from '@/store/auth.store'
+import { getBiometricCredentials, removeBiometricCredentials } from '@/lib/secureTokens'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
 import {
@@ -36,11 +38,9 @@ export function LoginPage() {
   const [biometricLoading, setBiometricLoading]     = useState(false)
 
   const { setAuth, access_token, _hasHydrated } = useAuthStore()
-  const biometricEnabled    = useAuthStore((s) => s.biometric_enabled)
-  const setBiometricEnabled = useAuthStore((s) => s.setBiometricEnabled)
-  const refresh_token       = useAuthStore((s) => s.refresh_token)
-  const storedSessionId     = useAuthStore((s) => s.session_id)
-  const storedUser          = useAuthStore((s) => s.user)
+  const biometricEnabled   = useAuthStore((s) => s.biometric_enabled)
+  const biometricDeviceId  = useAuthStore((s) => s.biometric_device_id)
+  const disableBiometric   = useAuthStore((s) => s.disableBiometric)
   const navigate = useNavigate()
 
   const [nativeBiometricReady,   setNativeBiometricReady]   = useState(false)
@@ -135,36 +135,55 @@ export function LoginPage() {
     setNativeBiometricLoading(true)
     setError('')
     try {
-      const result = await performNativeBiometric('Sign in to Hive Data')
-      if (result !== 'success') return // cancelled — stay on login, no error shown
+      // 1. Native biometric prompt — proves physical presence before we read
+      //    the device_secret from the Keystore.
+      const biometricResult = await performNativeBiometric('Sign in to Hive Data')
+      if (biometricResult !== 'success') return // cancelled — stay on login
 
-      if (!refresh_token || !storedUser) {
-        setBiometricEnabled(false)
-        setError('Session expired. Please sign in with your password.')
+      // 2. Read device credentials from Android Keystore.
+      const creds = await getBiometricCredentials()
+      if (!creds || !biometricDeviceId) {
+        // device_secret missing — the Keystore entry was cleared (e.g. after
+        // factory reset or uninstall).  Disable biometric and ask the user
+        // to re-enable it after signing in with their password.
+        disableBiometric()
+        removeBiometricCredentials()
+        setError('Biometric data not found. Please sign in with your password to re-enable biometrics.')
         return
       }
 
-      const tokens = await authApi.refresh(refresh_token)
+      // 3. Call the backend — device_secret proves identity, backend issues
+      //    fresh tokens regardless of when the last session expired.
+      const result = await biometricDeviceApi.login({
+        device_id:     biometricDeviceId,
+        device_secret: creds.device_secret,
+      })
 
-      // Call setAuth() BEFORE any further API calls.
-      // The request interceptor reads access_token from the store — calling me()
-      // before setAuth() would send an unauthenticated request and trigger
-      // the 401 redirect guard. setAuth() is synchronous, so any request after
-      // it immediately uses the correct token. AppLayout refreshes user data
-      // via /auth/me in the background once the dashboard mounts.
       setAuth({
-        access_token:  tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        session_id:    storedSessionId ?? '',
-        user:          storedUser,
+        access_token:  result.tokens.access_token,
+        refresh_token: result.tokens.refresh_token,
+        session_id:    result.session_id,
+        user:          result.user,
       })
 
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
-    } catch {
-      // Refresh token expired or network error
-      setBiometricEnabled(false)
-      setError('Session expired. Please sign in with your password.')
+    } catch (err) {
+      const code = isAxiosError(err) ? (err.response?.data?.code as string | undefined) : undefined
+
+      // Device revoked server-side (password reset, manual revoke, etc.).
+      if (code === 'BIOMETRIC_DEVICE_NOT_FOUND' || code === 'BIOMETRIC_SECRET_INVALID') {
+        disableBiometric()
+        removeBiometricCredentials()
+        setError('Biometric login was revoked. Please sign in with your password to re-enable biometrics.')
+        return
+      }
+
+      setError(
+        isAxiosError(err)
+          ? (err.response?.data?.message ?? 'Biometric sign-in failed. Please try again.')
+          : 'Biometric sign-in failed. Please try again.',
+      )
     } finally {
       setNativeBiometricLoading(false)
     }

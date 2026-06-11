@@ -3,8 +3,10 @@ import { SecureStorage } from '@aparajita/capacitor-secure-storage'
 
 const isNative = Capacitor.isNativePlatform()
 
-const KEY_AT = 'hive_access_token'
-const KEY_RT = 'hive_refresh_token'
+const KEY_AT              = 'hive_access_token'
+const KEY_RT              = 'hive_refresh_token'
+const KEY_BIO_DEVICE_ID   = 'hive_biometric_device_id'
+const KEY_BIO_DEVICE_SECRET = 'hive_biometric_device_secret'
 
 export async function getStoredTokens(): Promise<{
   access_token:  string | null
@@ -46,4 +48,39 @@ export function removeTokens(): void {
 export function removeAccessToken(): void {
   if (!isNative) return
   try { SecureStorage.remove(KEY_AT).catch(() => {}) } catch {}
+}
+
+// ── Biometric device credentials ──────────────────────────────────────────────
+// device_id and device_secret are stored in Android Keystore on native.
+// On web these are no-ops: biometric device auth is Android-only.
+
+export async function getBiometricCredentials(): Promise<{
+  device_id:     string
+  device_secret: string
+} | null> {
+  if (!isNative) return null
+  try {
+    const [id, secret] = await Promise.all([
+      SecureStorage.get(KEY_BIO_DEVICE_ID),
+      SecureStorage.get(KEY_BIO_DEVICE_SECRET),
+    ])
+    if (typeof id === 'string' && typeof secret === 'string' && id && secret) {
+      return { device_id: id, device_secret: secret }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function saveBiometricCredentials(deviceId: string, deviceSecret: string): void {
+  if (!isNative) return
+  try { SecureStorage.set(KEY_BIO_DEVICE_ID,     deviceId).catch(() => {}) } catch {}
+  try { SecureStorage.set(KEY_BIO_DEVICE_SECRET, deviceSecret).catch(() => {}) } catch {}
+}
+
+export function removeBiometricCredentials(): void {
+  if (!isNative) return
+  try { SecureStorage.remove(KEY_BIO_DEVICE_ID).catch(() => {})     } catch {}
+  try { SecureStorage.remove(KEY_BIO_DEVICE_SECRET).catch(() => {}) } catch {}
 }
