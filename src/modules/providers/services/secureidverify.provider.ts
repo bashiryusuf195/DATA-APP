@@ -7,6 +7,12 @@ import type {
   ProviderHealthResult,
 } from "../types/provider.types";
 import { getProviderCredentials } from "./provider-credentials.service";
+import { config } from "../../../config";
+import { logger } from "../../../lib/logger";
+import {
+  secureidverifyPortalService,
+  type PortalIdType,
+} from "./secureidverify-portal.service";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -169,6 +175,16 @@ function normalizeBvnReportData(d: Record<string, unknown>) {
   };
 }
 
+function variationCodeToPortalIdType(variationCode: string): PortalIdType | null {
+  switch (variationCode) {
+    case "nin-information": return "nin_information";
+    case "nin-standard":    return "nin_standard";
+    case "nin-premium":     return "nin_premium";
+    case "bvn-basic":       return "bvn_basic";
+    default:                return null;
+  }
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export class SecureIDVerifyProvider extends HttpVTUProvider {
@@ -245,18 +261,52 @@ export class SecureIDVerifyProvider extends HttpVTUProvider {
     const idNumber = (input.metadata?.id_number as string | undefined) ?? undefined;
     const phone    = input.phone;
 
+    let result: ProviderPurchaseResult;
+
     if (isNinVariation(variationCode)) {
-      return this.verifyNIN(input, idNumber, phone, apiKey, baseUrl);
+      result = await this.verifyNIN(input, idNumber, phone, apiKey, baseUrl);
+    } else if (isBvnVariation(variationCode)) {
+      result = await this.verifyBVN(input, idNumber, apiKey, baseUrl);
+    } else {
+      throw new Error(
+        `SecureIDVerify: unknown variation_code '${variationCode}'. ` +
+        `Valid codes: nin-information, nin-standard, nin-premium, bvn-basic`
+      );
     }
 
-    if (isBvnVariation(variationCode)) {
-      return this.verifyBVN(input, idNumber, apiKey, baseUrl);
+    // ── Portal PDF enhancement ───────────────────────────────────────────────
+    // When SECUREIDVERIFY_USE_PORTAL_PDF=true, download the official PDF slip
+    // from the SecureIDVerify web portal and attach it to report_data.
+    // If the portal fails, we still return the successful API result — the
+    // identity-report controller will fall back to template rendering.
+    if (
+      result.status === "successful" &&
+      result.report_data &&
+      config.secureidverifyPortal.usePdf
+    ) {
+      const portalIdType = variationCodeToPortalIdType(variationCode);
+      if (portalIdType && idNumber) {
+        try {
+          const pdfBase64 = await secureidverifyPortalService.getPdfSlip(portalIdType, idNumber);
+          result = {
+            ...result,
+            report_data: { ...result.report_data, portal_pdf_data: pdfBase64 },
+          };
+          logger.info("portal_pdf_attached", {
+            reference: input.reference,
+            id_type:   portalIdType,
+          });
+        } catch (err) {
+          logger.warn("portal_pdf_failed_fallback_to_template", {
+            reference: input.reference,
+            id_type:   portalIdType,
+            error:     (err as Error).message,
+          });
+        }
+      }
     }
 
-    throw new Error(
-      `SecureIDVerify: unknown variation_code '${variationCode}'. ` +
-      `Valid codes: nin-information, nin-standard, nin-premium, bvn-basic`
-    );
+    return result;
   }
 
   // ── NIN verification ──────────────────────────────────────────────────────

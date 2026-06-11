@@ -16,6 +16,20 @@ FROM node:22-alpine AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
+# Chromium for Playwright portal automation (SecureIDVerify PDF slip downloads).
+# Using the Alpine system package avoids the large Playwright bundled browser download.
+# PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 prevents `npm ci` from downloading a second copy.
+# PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH tells Playwright where to find the system binary.
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 COPY package*.json ./
 # Install production deps; add ts-node + typescript for knex migrations
 RUN npm ci --omit=dev && \

@@ -155,4 +155,18 @@ export const config = {
   workers: {
     disabled: optional('DISABLE_WORKERS', 'false') === 'true',
   },
+
+  // ── SecureIDVerify portal automation (temporary PDF slip solution) ─────────
+  // When SECUREIDVERIFY_USE_PORTAL_PDF=true the worker logs into the
+  // SecureIDVerify web portal via Playwright to download the official PDF slip
+  // after a successful API verification.  Set to false to use the template-
+  // rendered PDF only (existing behaviour).
+  // Credentials are loaded from env vars only — never from code or DB.
+  secureidverifyPortal: {
+    usePdf:     optional('SECUREIDVERIFY_USE_PORTAL_PDF',    'false') === 'true',
+    url:        optional('SECUREIDVERIFY_PORTAL_URL',        ''),
+    username:   optional('SECUREIDVERIFY_PORTAL_USERNAME',   ''),
+    password:   optional('SECUREIDVERIFY_PORTAL_PASSWORD',   ''),
+    timeoutMs:  parseInt(optional('SECUREIDVERIFY_PORTAL_TIMEOUT_MS', '120000'), 10),
+  },
 } as const;
