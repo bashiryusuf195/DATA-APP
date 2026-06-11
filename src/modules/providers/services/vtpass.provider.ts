@@ -129,6 +129,12 @@ export class VTPassProvider extends HttpVTUProvider {
   //
   // Authorization: Basic is for the VTPass web dashboard only.
 
+  // VTPass requires the first 8 characters of request_id to be today's date (YYYYMMDD).
+  // Our internal references are "DAT-20260611-XXXXXX" — strip the prefix so VTPass gets "20260611-XXXXXX".
+  private vtpassRequestId(ref: string): string {
+    return ref.replace(/^[A-Za-z]+-(\d{8})-/, "$1-");
+  }
+
   private readHeaders(): Record<string, string> {
     return {
       "Content-Type": "application/json",
@@ -227,7 +233,7 @@ export class VTPassProvider extends HttpVTUProvider {
       );
     }
     return {
-      request_id: input.reference,
+      request_id: this.vtpassRequestId(input.reference),
       serviceID:  network,
       amount:     input.amount,
       phone:      input.phone,
@@ -405,7 +411,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
       headers: this.writeHeaders(),
-      body:    JSON.stringify({ request_id: reference }),
+      body:    JSON.stringify({ request_id: this.vtpassRequestId(reference) }),
     });
 
     if (response.status === 401) {
