@@ -211,14 +211,18 @@ export class VTPassProvider extends HttpVTUProvider {
   // ── Service-type payload builders ─────────────────────────────────────────
 
   private buildAirtimePayload(input: ProviderPurchaseInput): Record<string, unknown> {
-    if (!input.variation_code) {
+    // VTPass airtime serviceID is the bare network name: mtn | glo | airtel | etisalat
+    // variation_code may arrive as "mtn-airtime" (other-provider format) — strip the suffix.
+    const raw     = input.network_operator ?? input.variation_code ?? "";
+    const network = raw.split("-")[0].toLowerCase();
+    if (!network) {
       throw new Error(
-        "VTPass airtime requires variation_code (network: mtn | glo | airtel | etisalat)"
+        "VTPass airtime requires network_operator or variation_code (mtn | glo | airtel | etisalat)"
       );
     }
     return {
       request_id: input.reference,
-      serviceID:  input.variation_code,   // e.g. "mtn"
+      serviceID:  network,
       amount:     input.amount,
       phone:      input.phone,
     };
@@ -234,9 +238,11 @@ export class VTPassProvider extends HttpVTUProvider {
     if (!variationCode) {
       throw new Error("VTPass data purchase requires variation_code (data plan code)");
     }
+    // Strip any trailing -data suffix before appending, so "mtn" and "mtn-data" both → "mtn-data"
+    const network = input.network_operator.replace(/-data$/i, "").toLowerCase();
     return {
       request_id:     input.reference,
-      serviceID:      `${input.network_operator}-data`,  // e.g. "mtn-data"
+      serviceID:      `${network}-data`,
       billersCode:    input.phone,
       variation_code: variationCode,
       amount:         input.amount,
