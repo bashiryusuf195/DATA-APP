@@ -6,13 +6,16 @@ import type {
   VerifyTransactionResult,
   ProviderBalance,
   ProviderHealthResult,
+  MeterVerifyInput,
+  MeterVerifyResult,
+  CableVerifyInput,
+  CableVerifyResult,
 } from "../types/provider.types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const VTPASS_TIMEOUT_MS = 15_000;
 
-// VTPass response codes
 const CODE_SUCCESS = "000";
 const CODE_PENDING = "099";
 const AUTH_FAILURE_CODES = new Set(["invalid-login-details", "403", "user-not-found"]);
@@ -27,6 +30,8 @@ interface VTPassTransaction {
   amount?: number;
   type?: string;
   phone?: string;
+  // Exam pin delivery
+  pins?: Array<{ pin: string; serial?: string }>;
 }
 
 interface VTPassPurchaseResponse {
@@ -35,12 +40,31 @@ interface VTPassPurchaseResponse {
   response_description?: string;
   requestId?: string;
   amount?: string;
+  // Exam pin: single pin returned here
   purchased_code?: string;
 }
 
 interface VTPassBalanceResponse {
   code: string;
   balance?: string | number;
+}
+
+// Merchant verify covers both meter and cable TV — fields differ per service.
+interface VTPassMerchantVerifyResponse {
+  code: string;
+  content?: {
+    // Electricity meter fields
+    Customer_Name?: string;
+    Address?: string;
+    MeterNumber?: string;
+    Customer_Arrears?: string;
+    // Cable TV fields
+    Status?: string;
+    Due_Date?: string;
+    Current_Bouquet?: string;
+    smartcard_number?: string;
+  };
+  response_description?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,7 +96,6 @@ export class VTPassProvider extends HttpVTUProvider {
 
   // ── Credential validation ─────────────────────────────────────────────────
 
-  /** Returns names of missing env vars for the three used in REST API calls. */
   missingCredentials(): string[] {
     const checks: [string, string][] = [
       ["VTPASS_BASE_URL",   this.baseUrl],
@@ -94,12 +117,12 @@ export class VTPassProvider extends HttpVTUProvider {
   // ── Auth headers ──────────────────────────────────────────────────────────
   //
   // VTPass REST API authentication (sandbox and production):
-  //   GET  /balance  → api-key header only
-  //   POST /pay      → api-key + secret-key headers
-  //   POST /requery  → api-key header only
+  //   GET  /balance         → api-key header only
+  //   POST /pay             → api-key + secret-key headers
+  //   POST /requery         → api-key header only
+  //   POST /merchant-verify → api-key header only
   //
-  // The Authorization: Basic header is for the VTPass web dashboard login,
-  // NOT for API calls. Sending it alongside api-key causes a 401.
+  // Authorization: Basic is for the VTPass web dashboard only — NOT for API calls.
 
   private readHeaders(): Record<string, string> {
     return {
@@ -108,7 +131,6 @@ export class VTPassProvider extends HttpVTUProvider {
     };
   }
 
-  // Purchase (write) operations additionally require the secret key.
   private writeHeaders(): Record<string, string> {
     return { ...this.readHeaders(), "secret-key": this.secretKey };
   }
@@ -174,8 +196,111 @@ export class VTPassProvider extends HttpVTUProvider {
         : isPending ? "Transaction pending"
         : "Transaction failed"
       ),
-      status:      isSuccess ? "successful" : isPending ? "processing" : "failed",
+      status:       isSuccess ? "successful" : isPending ? "processing" : "failed",
       raw_response: raw,
+    };
+  }
+
+  // ── Service-type payload builders ─────────────────────────────────────────
+
+  private buildAirtimePayload(input: ProviderPurchaseInput): Record<string, unknown> {
+    if (!input.variation_code) {
+      throw new Error(
+        "VTPass airtime requires variation_code (network: mtn | glo | airtel | etisalat)"
+      );
+    }
+    return {
+      request_id: input.reference,
+      serviceID:  input.variation_code,   // e.g. "mtn"
+      amount:     input.amount,
+      phone:      input.phone,
+    };
+  }
+
+  private buildDataPayload(input: ProviderPurchaseInput): Record<string, unknown> {
+    if (!input.network_operator) {
+      throw new Error(
+        "VTPass data purchase requires network_operator (mtn | glo | airtel | etisalat)"
+      );
+    }
+    const variationCode = input.provider_variation_code ?? input.variation_code;
+    if (!variationCode) {
+      throw new Error("VTPass data purchase requires variation_code (data plan code)");
+    }
+    return {
+      request_id:     input.reference,
+      serviceID:      `${input.network_operator}-data`,  // e.g. "mtn-data"
+      billersCode:    input.phone,
+      variation_code: variationCode,
+      amount:         input.amount,
+      phone:          input.phone,
+    };
+  }
+
+  private buildCableTvPayload(input: ProviderPurchaseInput): Record<string, unknown> {
+    // network_operator = "dstv" | "gotv" | "startimes"
+    if (!input.network_operator) {
+      throw new Error(
+        "VTPass cable TV purchase requires network_operator (dstv | gotv | startimes)"
+      );
+    }
+    if (!input.smartcard_number) {
+      throw new Error("VTPass cable TV purchase requires smartcard_number (IUC number)");
+    }
+    if (!input.variation_code) {
+      throw new Error("VTPass cable TV purchase requires variation_code (subscription package)");
+    }
+    return {
+      request_id:        input.reference,
+      serviceID:         input.network_operator,       // e.g. "dstv"
+      billersCode:       input.smartcard_number,
+      variation_code:    input.variation_code,
+      amount:            input.amount,
+      phone:             input.phone,
+      subscription_type: "renew",
+      quantity:          1,
+    };
+  }
+
+  private buildElectricityPayload(input: ProviderPurchaseInput): Record<string, unknown> {
+    // network_operator = disco serviceID, e.g. "ikeja-electric"
+    if (!input.network_operator) {
+      throw new Error(
+        "VTPass electricity purchase requires network_operator (disco service ID, e.g. ikeja-electric)"
+      );
+    }
+    if (!input.meter_number) {
+      throw new Error("VTPass electricity purchase requires meter_number");
+    }
+    const meterType = input.plan_category ?? input.variation_code ?? "prepaid";
+    return {
+      request_id:     input.reference,
+      serviceID:      input.network_operator,          // e.g. "ikeja-electric"
+      billersCode:    input.meter_number,
+      variation_code: meterType,                       // "prepaid" | "postpaid"
+      amount:         input.amount,
+      phone:          input.phone,
+    };
+  }
+
+  private buildExamPinPayload(input: ProviderPurchaseInput): Record<string, unknown> {
+    // network_operator = "waec" | "waec-registration" | "jamb"
+    if (!input.network_operator) {
+      throw new Error(
+        "VTPass exam pin purchase requires network_operator (waec | waec-registration | jamb)"
+      );
+    }
+    if (!input.variation_code) {
+      throw new Error("VTPass exam pin purchase requires variation_code");
+    }
+    return {
+      request_id:     input.reference,
+      serviceID:      input.network_operator,
+      billersCode:    input.phone,
+      variation_code: input.variation_code,
+      amount:         input.amount,
+      phone:          input.phone,
+      quantity:       1,
     };
   }
 
@@ -184,26 +309,34 @@ export class VTPassProvider extends HttpVTUProvider {
   async purchase(input: ProviderPurchaseInput): Promise<ProviderPurchaseResult> {
     this.assertCredentials();
 
-    if (input.service_type !== "airtime") {
-      throw new Error(
-        `VTPass: service_type '${input.service_type}' not yet implemented. Only 'airtime' is supported.`
-      );
-    }
-    if (!input.variation_code) {
-      throw new Error(
-        "VTPass airtime purchase requires variation_code (network operator: mtn | glo | airtel | etisalat)"
-      );
-    }
+    let payload: Record<string, unknown>;
 
-    const payload = {
-      request_id: input.reference,
-      serviceID:  input.variation_code,
-      amount:     input.amount,
-      phone:      input.phone,
-    };
+    switch (input.service_type) {
+      case "airtime":
+        payload = this.buildAirtimePayload(input);
+        break;
+      case "data":
+        payload = this.buildDataPayload(input);
+        break;
+      case "cable_tv":
+        payload = this.buildCableTvPayload(input);
+        break;
+      case "electricity":
+        payload = this.buildElectricityPayload(input);
+        break;
+      case "exam_pin":
+        payload = this.buildExamPinPayload(input);
+        break;
+      default:
+        throw new Error(
+          `VTPass: service_type '${input.service_type}' is not supported. ` +
+          `Supported: airtime | data | cable_tv | electricity | exam_pin`
+        );
+    }
 
     console.log("[VTPASS] purchase →", {
-      serviceID: input.variation_code,
+      service:   input.service_type,
+      serviceID: payload["serviceID"],
       amount:    input.amount,
       phone:     maskPhone(input.phone),
       reference: input.reference,
@@ -310,7 +443,6 @@ export class VTPassProvider extends HttpVTUProvider {
   }
 
   async healthCheck(): Promise<ProviderHealthResult> {
-    // 1. Missing env vars — no HTTP call made.
     const missing = this.missingCredentials();
     if (missing.length > 0) {
       return {
@@ -319,7 +451,6 @@ export class VTPassProvider extends HttpVTUProvider {
       };
     }
 
-    // 2. Attempt balance check as a live ping.
     const start = Date.now();
     try {
       await this.getBalance();
@@ -332,39 +463,125 @@ export class VTPassProvider extends HttpVTUProvider {
       const msg        = (err as Error).message ?? String(err);
       const latency_ms = Date.now() - start;
 
-      // 3. Authentication failure (HTTP 401).
       if (msg.includes("401")) {
-        return {
-          healthy:    false,
-          latency_ms,
-          message:    "VTPass authentication failed (HTTP 401) — verify VTPASS_API_KEY in .env",
-        };
+        return { healthy: false, latency_ms, message: "VTPass authentication failed (HTTP 401) — verify VTPASS_API_KEY" };
       }
-
-      // 4. Timeout.
       if (msg.includes("timed out")) {
-        return {
-          healthy:    false,
-          latency_ms,
-          message:    `VTPass health check timed out — check VTPASS_BASE_URL or network connectivity`,
-        };
+        return { healthy: false, latency_ms, message: "VTPass health check timed out — check VTPASS_BASE_URL" };
       }
-
-      // 5. Network / DNS failure.
       if (msg.includes("network error") || msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
-        return {
-          healthy:    false,
-          latency_ms,
-          message:    `VTPass network unreachable — check VTPASS_BASE_URL and internet connectivity`,
-        };
+        return { healthy: false, latency_ms, message: "VTPass network unreachable — check VTPASS_BASE_URL" };
       }
+      return { healthy: false, latency_ms, message: `VTPass health check failed: ${msg}` };
+    }
+  }
 
-      // 6. Any other failure.
+  // ── Meter verification ────────────────────────────────────────────────────
+  //
+  // VTPass /merchant-verify for electricity:
+  //   disco_name = serviceID (e.g. "ikeja-electric")
+  //   meter_type = "prepaid" | "postpaid"
+
+  async verifyMeter(input: MeterVerifyInput): Promise<MeterVerifyResult> {
+    this.assertCredentials();
+
+    console.log("[VTPASS] verifyMeter →", {
+      serviceID:  input.disco_name,
+      meterType:  input.meter_type,
+      meter:      input.meter_number.slice(0, 4) + "***",
+    });
+
+    const url      = `${this.baseUrl}/merchant-verify`;
+    const response = await this.fetchWithTimeout(url, {
+      method:  "POST",
+      headers: this.readHeaders(),
+      body:    JSON.stringify({
+        billersCode: input.meter_number,
+        serviceID:   input.disco_name,
+        type:        input.meter_type,
+      }),
+    });
+
+    if (response.status === 401) {
+      throw new Error("VTPass: HTTP 401 on /merchant-verify — verify VTPASS_API_KEY.");
+    }
+    if (!response.ok) {
+      throw new Error(`VTPass meter verify failed with HTTP ${response.status}`);
+    }
+
+    const raw = await this.parseJson<VTPassMerchantVerifyResponse>(response, "merchant-verify");
+
+    if (raw.code !== CODE_SUCCESS) {
       return {
-        healthy:    false,
-        latency_ms,
-        message:    `VTPass health check failed: ${msg}`,
+        success:      false,
+        customer_name: "",
+        meter_number: input.meter_number,
+        message:      raw.response_description ?? `Meter verification failed (code: ${raw.code})`,
+        raw_response: raw,
       };
     }
+
+    const c = raw.content ?? {};
+    return {
+      success:       true,
+      customer_name: c.Customer_Name ?? "",
+      address:       c.Address,
+      meter_number:  c.MeterNumber ?? input.meter_number,
+      message:       "Meter verified successfully",
+      raw_response:  raw,
+    };
+  }
+
+  // ── Cable TV verification ─────────────────────────────────────────────────
+  //
+  // VTPass /merchant-verify for cable TV:
+  //   biller_code = serviceID (e.g. "dstv" | "gotv" | "startimes")
+
+  async verifyCable(input: CableVerifyInput): Promise<CableVerifyResult> {
+    this.assertCredentials();
+
+    console.log("[VTPASS] verifyCable →", {
+      serviceID:   input.biller_code,
+      smartcard:   input.smartcard_number.slice(0, 4) + "***",
+    });
+
+    const url      = `${this.baseUrl}/merchant-verify`;
+    const response = await this.fetchWithTimeout(url, {
+      method:  "POST",
+      headers: this.readHeaders(),
+      body:    JSON.stringify({
+        billersCode: input.smartcard_number,
+        serviceID:   input.biller_code,
+        type:        "SmartCard",
+      }),
+    });
+
+    if (response.status === 401) {
+      throw new Error("VTPass: HTTP 401 on /merchant-verify — verify VTPASS_API_KEY.");
+    }
+    if (!response.ok) {
+      throw new Error(`VTPass cable verify failed with HTTP ${response.status}`);
+    }
+
+    const raw = await this.parseJson<VTPassMerchantVerifyResponse>(response, "cable-verify");
+
+    if (raw.code !== CODE_SUCCESS) {
+      return {
+        success:  false,
+        message:  raw.response_description ?? `Cable verification failed (code: ${raw.code})`,
+        raw_response: raw,
+      };
+    }
+
+    const c = raw.content ?? {};
+    return {
+      success:          true,
+      customer_name:    c.Customer_Name,
+      current_package:  c.Current_Bouquet,
+      due_date:         c.Due_Date,
+      smartcard_number: c.smartcard_number ?? input.smartcard_number,
+      message:          "Smartcard verified successfully",
+      raw_response:     raw,
+    };
   }
 }
