@@ -12,11 +12,13 @@
 //   4. Resolve RBAC context — embeds roles + permissions in req.user
 
 import type { Request, Response, NextFunction } from "express";
-import { AppError } from "../../../shared/errors/AppError";
-import { verifySupabaseJwt } from "../services/supabase.service";
-import { resolveUserRbac } from "../services/rbac.service";
-import { getDbInstance } from "../../../db/knex";
-import { sha256 } from "../../../lib/crypto";
+import { decodeProtectedHeader }               from "jose";
+import { AppError }                            from "../../../shared/errors/AppError";
+import { verifySupabaseJwt }                   from "../services/supabase.service";
+import { verifyLocalJwt }                      from "../services/jwt.service";
+import { resolveUserRbac }                     from "../services/rbac.service";
+import { getDbInstance }                       from "../../../db/knex";
+import { sha256 }                              from "../../../lib/crypto";
 
 function extractBearer(req: Request): string | null {
   const header = req.headers.authorization;
@@ -39,8 +41,13 @@ export async function authenticate(
   try {
     const db = getDbInstance();
 
-    // 1. Local JWT verification — fast, no network
-    const jwtPayload = await verifySupabaseJwt(rawToken);
+    // 1. JWT verification — dispatch by alg header (decode header is cheap, no sig check).
+    //    HS256 = biometric-issued token (BACKEND_JWT_SECRET).
+    //    Anything else = Supabase RS256 token verified via JWKS.
+    const { alg } = decodeProtectedHeader(rawToken);
+    const jwtPayload = alg === "HS256"
+      ? await verifyLocalJwt(rawToken)
+      : await verifySupabaseJwt(rawToken);
 
     // 2. Load our user record by Supabase auth_id
     const user = await db("users")

@@ -14,4 +14,9 @@ export const env = {
   // HMAC key used server-side to hash biometric device secrets before storage.
   // Must be set in production; in dev a fallback is used so the server starts.
   BIOMETRIC_HMAC_SECRET: process.env.BIOMETRIC_HMAC_SECRET ?? "dev-biometric-hmac-secret-change-in-prod",
+
+  // HS256 signing secret for biometric-issued JWTs.
+  // Separate from SUPABASE_JWT_SECRET (which is RS256 JWKS-verified).
+  // Must be set in production (min 32 chars); dev fallback keeps server startable.
+  BACKEND_JWT_SECRET: process.env.BACKEND_JWT_SECRET ?? "dev-backend-jwt-secret-change-in-prod-min-32-chars",
 };
