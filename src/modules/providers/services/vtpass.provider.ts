@@ -121,8 +121,8 @@ export class VTPassProvider extends HttpVTUProvider {
   // ── Auth headers ──────────────────────────────────────────────────────────
   //
   // VTPass REST API authentication (from official docs):
-  //   GET  /balance, /requery     → api-key + public-key
-  //   POST /pay, /merchant-verify → api-key + secret-key
+  //   GET  /balance                        → api-key + public-key  (readHeaders)
+  //   POST /pay, /requery, /merchant-verify → api-key + secret-key (writeHeaders)
   //
   // Authorization: Basic is for the VTPass web dashboard only.
 
@@ -394,7 +394,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const url      = `${this.baseUrl}/requery`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.readHeaders(),
+      headers: this.writeHeaders(),
       body:    JSON.stringify({ request_id: reference }),
     });
 
@@ -509,7 +509,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const url      = `${this.baseUrl}/merchant-verify`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.readHeaders(),
+      headers: this.writeHeaders(),
       body:    JSON.stringify({
         billersCode: input.meter_number,
         serviceID:   input.disco_name,
@@ -563,7 +563,7 @@ export class VTPassProvider extends HttpVTUProvider {
     const url      = `${this.baseUrl}/merchant-verify`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.readHeaders(),
+      headers: this.writeHeaders(),
       body:    JSON.stringify({
         billersCode: input.smartcard_number,
         serviceID:   input.biller_code,
