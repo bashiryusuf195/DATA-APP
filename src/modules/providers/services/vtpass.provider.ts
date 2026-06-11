@@ -14,7 +14,7 @@ import type {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const VTPASS_TIMEOUT_MS = 15_000;
+const VTPASS_TIMEOUT_MS = 30_000;
 
 const CODE_SUCCESS = "000";
 const CODE_PENDING = "099";
