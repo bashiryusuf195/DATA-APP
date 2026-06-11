@@ -90,41 +90,43 @@ export const FIELD_MAP: Record<string, TemplateMap> = {
 
   // ── NIN Information Slip ─────────────────────────────────────────────────
   // Page: 612 × 1008 pt  (US Legal landscape)
+  // Coordinates sourced from docs/identity-reference/nin_information_exact_coordinates_v2.json
   nin_information: {
     W: 612,
     H: 1008,
     templateFile: "NIN Information.png",
 
-    // Photo box: centre-left, spanning the personal-info rows (first_name…gender).
-    // Reference PDF places the photo at page-x ≈ 0.219–0.373; template x-scale ≈ 1.38.
-    photo: { x: 0.295, y: 0.067, w: 0.215, h: 0.148 },
+    // Photo box: centre column, aligned with personal-info row block.
+    // y shifted +0.0268 from JSON origin to align with PNG template label rows.
+    photo: { x: 0.3366, y: 0.1627, w: 0.1781, h: 0.1438 },
 
     fields: {
       // ── Personal info rows (value column; labels are on the template) ───
-      first_name:      { x: 0.291, y: 0.082, w: 0.375, h: 0.025, size: 10 },
-      middle_name:     { x: 0.291, y: 0.112, w: 0.375, h: 0.025, size: 10 },
-      last_name:       { x: 0.291, y: 0.142, w: 0.375, h: 0.025, size: 10 },
-      date_of_birth:   { x: 0.291, y: 0.172, w: 0.375, h: 0.025, size: 10 },
-      gender:          { x: 0.291, y: 0.202, w: 0.375, h: 0.025, size: 10 },
+      // All y values = JSON y_norm + 0.0268 (one-row offset between JSON origin and PNG template)
+      first_name:      { x: 0.1634, y: 0.1667, w: 0.1471, h: 0.0149, size: 8 },
+      middle_name:     { x: 0.1634, y: 0.1935, w: 0.1471, h: 0.0149, size: 8 },
+      last_name:       { x: 0.1634, y: 0.2232, w: 0.1471, h: 0.0149, size: 8 },
+      date_of_birth:   { x: 0.1912, y: 0.2490, w: 0.1716, h: 0.0149, size: 8 },
+      gender:          { x: 0.1912, y: 0.2828, w: 0.1471, h: 0.0149, size: 8 },
 
-      // ── NIN number — white background, black text ──────────────────────
-      id_number:       { x: 0.069, y: 0.267, w: 0.863, h: 0.048, size: 20, bold: true },
+      // ── NIN number ──────────────────────────────────────────────────────
+      id_number:       { x: 0.2124, y: 0.3016, w: 0.3105, h: 0.0278, size: 20, bold: true },
 
       // ── Details grid — left column values ──────────────────────────────
-      tracking_id:     { x: 0.270, y: 0.352, w: 0.258, h: 0.022, size: 9 },
-      residence_state: { x: 0.270, y: 0.375, w: 0.258, h: 0.022, size: 9 },
-      birth_state:     { x: 0.270, y: 0.398, w: 0.258, h: 0.022, size: 9 },
+      tracking_id:     { x: 0.1895, y: 0.3373, w: 0.1634, h: 0.0159, size: 8 },
+      residence_state: { x: 0.1912, y: 0.3641, w: 0.1471, h: 0.0278, size: 8, wrap: true },
+      birth_state:     { x: 0.1912, y: 0.3929, w: 0.1471, h: 0.0159, size: 8 },
 
       // ── Details grid — right column values ─────────────────────────────
-      phone:           { x: 0.678, y: 0.352, w: 0.253, h: 0.022, size: 9 },
-      residence_lga:   { x: 0.678, y: 0.375, w: 0.253, h: 0.022, size: 9 },
-      birth_lga:       { x: 0.678, y: 0.398, w: 0.253, h: 0.022, size: 9 },
+      phone:           { x: 0.4248, y: 0.3373, w: 0.1634, h: 0.0159, size: 8 },
+      residence_lga:   { x: 0.4248, y: 0.3641, w: 0.1634, h: 0.0278, size: 8, wrap: true },
+      birth_lga:       { x: 0.4248, y: 0.3929, w: 0.1634, h: 0.0159, size: 8 },
 
       // ── Address (wraps to 2 lines) ──────────────────────────────────────
-      address:         { x: 0.196, y: 0.421, w: 0.720, h: 0.040, size: 9, wrap: true },
+      address:         { x: 0.1912, y: 0.4157, w: 0.3595, h: 0.0278, size: 8, wrap: true },
 
-      // ── Footer reference line ───────────────────────────────────────────
-      _reference:      { x: 0.065, y: 0.976, w: 0.870, h: 0.018, size: 7 },
+      // ── Footer reference line (already correct — no offset applied) ─────
+      _reference:      { x: 0.0572, y: 0.9623, w: 0.5392, h: 0.0159, size: 6 },
     },
   },
 
