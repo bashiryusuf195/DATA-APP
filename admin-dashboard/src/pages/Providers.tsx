@@ -457,9 +457,9 @@ export function ProvidersPage() {
                           {diagResult.details.raw_status && (
                             <p className="text-[11px] text-ink-faint font-mono">{diagResult.details.raw_status}</p>
                           )}
-                          {(diagResult.details as Record<string, unknown>).raw_response && (
+                          {(diagResult.details as Record<string, unknown>).raw_response != null && (
                             <p className="text-[11px] text-amber-300 font-mono break-all">
-                              {String((diagResult.details as Record<string, unknown>).raw_response)}
+                              {String((diagResult.details as Record<string, unknown>).raw_response as string)}
                             </p>
                           )}
                         </div>
