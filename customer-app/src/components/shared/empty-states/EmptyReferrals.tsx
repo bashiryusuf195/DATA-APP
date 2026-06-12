@@ -44,7 +44,11 @@ function GiftIllustration() {
   )
 }
 
-export function EmptyReferrals() {
+interface EmptyReferralsProps {
+  rewardLabel?: string
+}
+
+export function EmptyReferrals({ rewardLabel = '₦200' }: EmptyReferralsProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center select-none">
       {/* Ambient glow */}
@@ -60,7 +64,7 @@ export function EmptyReferrals() {
 
       <h3 className="text-xl font-black text-ink mb-2">No Rewards Yet</h3>
       <p className="text-sm text-ink-muted leading-relaxed max-w-[260px]">
-        Share your referral code with friends. You'll earn ₦200 for every friend who signs up and makes a purchase.
+        Share your referral code with friends. You'll earn {rewardLabel} for every friend who signs up and makes a purchase.
       </p>
     </div>
   )

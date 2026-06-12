@@ -11,6 +11,7 @@ import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
 import { NotificationPromptModal, shouldShowNotificationPrompt, isPushPromptSuppressed } from '@/components/shared/NotificationPromptModal'
 import { BiometricPromptModal, isBiometricPromptSuppressed } from '@/components/shared/BiometricPromptModal'
 import { SupportWidget }          from '@/components/shared/SupportWidget'
+import { OfflineBanner }          from '@/components/shared/OfflineBanner'
 import { PwaInstallSheet }        from '@/components/shared/PwaInstallSheet'
 import { PageTransition }         from '@/components/shared/PageTransition'
 import { PullToRefreshIndicator } from '@/components/shared/PullToRefresh'
@@ -219,6 +220,9 @@ export function AppLayout() {
 
       {/* Floating support widget */}
       <SupportWidget />
+
+      {/* Offline detection banner — fixed at top above header */}
+      <OfflineBanner />
 
       {/* Scroll to top on every route change, restore on back/forward */}
       <ScrollRestoration />

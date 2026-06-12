@@ -484,6 +484,17 @@ export function SettingsPage() {
           <div className="flex items-center gap-2 mb-4">
             <Fingerprint className="h-4 w-4 text-ink-muted" />
             <p className="text-sm font-semibold text-ink">Biometric Login</p>
+            {/* Native: show enabled/disabled badge */}
+            {Capacitor.isNativePlatform() && nativeBiometricAvailable && (
+              <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full border ${
+                biometricEnabled
+                  ? 'bg-success/10 text-success border-success/20'
+                  : 'bg-surface-2 text-ink-faint border-border'
+              }`}>
+                {biometricEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            )}
+            {/* Web: show device count */}
             {!Capacitor.isNativePlatform() && passkeys && passkeys.length > 0 && (
               <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">
                 {passkeys.length} device{passkeys.length !== 1 ? 's' : ''}
@@ -730,6 +741,11 @@ export function SettingsPage() {
               <ChevronRight className="h-4 w-4 text-ink-faint shrink-0" />
             </Link>
           ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-border text-center">
+          <p className="text-xs text-ink-faint">
+            Hive Data&nbsp;&nbsp;v{import.meta.env.VITE_APP_VERSION ?? '1.0.0'}
+          </p>
         </div>
       </Card>
 
