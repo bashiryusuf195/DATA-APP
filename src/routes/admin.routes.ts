@@ -38,6 +38,7 @@ import { adminIntegrityRouter }        from "../modules/backup/routes/admin-inte
 import { adminReferralRouter }         from "../modules/referral/routes/admin-referral.routes";
 import { adminAnnouncementRouter }    from "../modules/announcements/routes/admin-announcement.routes";
 import { adminTransactionsRouter }     from "../modules/transactions/routes/admin-transactions.routes";
+import { adminPlanMappingsRouter }     from "../modules/providers/routes/admin-plan-mappings.routes";
 import { adminCmsRouter }              from "../modules/cms/routes/admin-cms.routes";
 import { adminServiceStatusRouter }   from "../modules/service-status/routes/admin-service-status.routes";
 import { squadUatRouter }              from "../modules/wallet/routes/squad-uat.routes";
@@ -78,6 +79,7 @@ router.use("/", adminIntegrityRouter);
 router.use("/", adminReferralRouter);
 router.use("/", adminAnnouncementRouter);
 router.use("/", adminTransactionsRouter);
+router.use("/", adminPlanMappingsRouter);
 router.use("/", adminCmsRouter);
 router.use("/", adminServiceStatusRouter);
 router.use("/squad-uat", squadUatRouter);

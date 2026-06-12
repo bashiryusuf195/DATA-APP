@@ -6,6 +6,9 @@ import type {
   BulkTogglePlansInput,
   CategoryProviderRow,
   BulkAssignProviderInput,
+  ProviderPlanMapping,
+  CreatePlanMappingInput,
+  UpdatePlanMappingInput,
 } from '@/types'
 
 export interface ServicePlansMeta {
@@ -118,4 +121,22 @@ export const catalogApi = {
     apiClient
       .post<{ success: boolean; data: { created: number; skipped: number } }>('/admin/service-plans/bulk-import', body)
       .then((r) => r.data.data),
+
+  listPlanMappings: (planId: string): Promise<ProviderPlanMapping[]> =>
+    apiClient
+      .get<{ success: boolean; data: ProviderPlanMapping[] }>('/admin/plan-mappings', { params: { plan_id: planId } })
+      .then((r) => (Array.isArray(r.data.data) ? r.data.data : [])),
+
+  createPlanMapping: (body: CreatePlanMappingInput): Promise<ProviderPlanMapping> =>
+    apiClient
+      .post<{ success: boolean; data: ProviderPlanMapping }>('/admin/plan-mappings', body)
+      .then((r) => r.data.data),
+
+  updatePlanMapping: (id: string, body: UpdatePlanMappingInput): Promise<ProviderPlanMapping> =>
+    apiClient
+      .patch<{ success: boolean; data: ProviderPlanMapping }>(`/admin/plan-mappings/${id}`, body)
+      .then((r) => r.data.data),
+
+  deletePlanMapping: (id: string): Promise<void> =>
+    apiClient.delete(`/admin/plan-mappings/${id}`).then(() => undefined),
 }
