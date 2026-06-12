@@ -34,6 +34,7 @@ const ResetPasswordPage  = lazy(() => import('@/pages/auth/ResetPassword').then(
 const DashboardPage         = lazy(() => import('@/pages/dashboard/Dashboard').then(m => ({ default: m.DashboardPage })))
 const WalletPage            = lazy(() => import('@/pages/wallet/Wallet').then(m => ({ default: m.WalletPage })))
 const FundWalletPage        = lazy(() => import('@/pages/wallet/FundWallet').then(m => ({ default: m.FundWalletPage })))
+const WithdrawRequestPage   = lazy(() => import('@/pages/wallet/WithdrawRequest').then(m => ({ default: m.WithdrawRequestPage })))
 const TransactionsPage      = lazy(() => import('@/pages/transactions/Transactions').then(m => ({ default: m.TransactionsPage })))
 const TransactionDetailPage = lazy(() => import('@/pages/transactions/TransactionDetail').then(m => ({ default: m.TransactionDetailPage })))
 const ServicesPage          = lazy(() => import('@/pages/services/Services').then(m => ({ default: m.ServicesPage })))
@@ -93,8 +94,9 @@ export const router = createBrowserRouter([
     children: [
       { path: '/dashboard',     element: <DashboardPage /> },
 
-      { path: '/wallet',        element: <WalletPage /> },
-      { path: '/wallet/fund',   element: <FundWalletPage /> },
+      { path: '/wallet',          element: <WalletPage /> },
+      { path: '/wallet/fund',    element: <FundWalletPage /> },
+      { path: '/wallet/withdraw', element: <WithdrawRequestPage /> },
 
       { path: '/transactions',            element: <TransactionsPage /> },
       { path: '/transactions/:reference', element: <TransactionDetailPage /> },

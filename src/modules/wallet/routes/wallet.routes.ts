@@ -15,6 +15,7 @@ import {
   fundTestController,
   transferController,
 } from "../controllers/wallet.controller";
+import { refundRequestController } from "../controllers/refund-request.controller";
 import {
   initializeFundingController,
   verifyFundingController,
@@ -32,6 +33,7 @@ router.get("/squad-account",  authenticate, balanceRateLimiter, getSquadAccountC
 router.post("/fund/initialize",       authenticate, fundingRateLimiter, idempotency, initializeFundingController);
 router.post("/fund/verify/:reference", authenticate, fundingRateLimiter, verifyFundingController);
 
+router.post("/refund-request", authenticate, purchaseRateLimiter, refundRequestController);
 router.post("/fund-test", authenticate, fundTestController);
 router.post("/transfer",  authenticate, purchaseRateLimiter, requirePin, transferController);
 

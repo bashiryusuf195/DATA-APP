@@ -1,6 +1,26 @@
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { walletApi } from '@/api/wallet.api'
 import { apiClient } from '@/api/client'
+import type { DedicatedAccount } from '@/types'
+import type { SquadAccountResult } from '@/api/wallet.api'
+
+// ── localStorage helpers for DVA cache ────────────────────────────────────────
+// Dedicated account numbers don't change once assigned. We cache them in
+// localStorage so the card renders instantly on every page load/refresh without
+// a network round-trip. React Query's initialDataUpdatedAt tells it exactly when
+// data was last fetched, so the 24 h staleTime is honoured correctly.
+
+function readLocalCache<T>(key: string): { d: T; t: number } | null {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as { d: T; t: number }) : null
+  } catch { return null }
+}
+
+function writeLocalCache<T>(key: string, data: T): void {
+  try { localStorage.setItem(key, JSON.stringify({ d: data, t: Date.now() })) } catch {}
+}
 
 export type FundingCardType = 'quick_transfer' | 'dedicated_account'
 export interface FundingCardConfig { type: FundingCardType; enabled: boolean }
@@ -68,19 +88,31 @@ export function useVerifyFunding() {
 }
 
 export function useDedicatedAccount() {
+  const cached = useMemo(() => readLocalCache<DedicatedAccount | null>('wallet:dva'), [])
   return useQuery({
     queryKey: ['wallet-dedicated-account'],
-    queryFn:  walletApi.getDedicatedAccount,
-    staleTime: 24 * 60 * 60 * 1000, // accounts don't change — refetch once per day
-    retry: false, // don't retry 503 when Paystack isn't configured
+    queryFn:  async () => {
+      const data = await walletApi.getDedicatedAccount()
+      writeLocalCache('wallet:dva', data)
+      return data
+    },
+    staleTime: 24 * 60 * 60 * 1000,
+    ...(cached != null ? { initialData: cached.d, initialDataUpdatedAt: cached.t } : {}),
+    retry: false,
   })
 }
 
 export function useSquadAccount() {
+  const cached = useMemo(() => readLocalCache<SquadAccountResult>('wallet:squad'), [])
   return useQuery({
     queryKey: ['wallet-squad-account'],
-    queryFn:  walletApi.getSquadAccount,
+    queryFn:  async () => {
+      const data = await walletApi.getSquadAccount()
+      writeLocalCache('wallet:squad', data)
+      return data
+    },
     staleTime: 24 * 60 * 60 * 1000,
+    ...(cached != null ? { initialData: cached.d, initialDataUpdatedAt: cached.t } : {}),
     retry: false,
   })
 }

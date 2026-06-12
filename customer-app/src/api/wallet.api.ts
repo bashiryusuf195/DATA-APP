@@ -104,6 +104,16 @@ export const walletApi = {
       .get<ApiResponse<DedicatedAccount | null>>('/wallet/account')
       .then((r) => r.data.data ?? null),
 
+  submitRefundRequest: (body: {
+    account_number: string
+    bank_name:      string
+    amount:         number
+    description?:   string
+  }): Promise<{ reference: string }> =>
+    apiClient
+      .post<ApiResponse<{ reference: string }>>('/wallet/refund-request', body)
+      .then((r) => r.data.data),
+
   getSquadAccount: async (): Promise<SquadAccountResult> => {
     const EMPTY: SquadAccountResult = {
       account: null, profileIncomplete: false, incompleteMessage: null,
