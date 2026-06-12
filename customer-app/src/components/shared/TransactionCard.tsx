@@ -4,7 +4,7 @@ import {
   ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
-import { fmtCurrency, fmtRelativeTime } from '@/utils/format'
+import { fmtCurrency, fmtRelativeTime, normalizeTransactionStatus } from '@/utils/format'
 import { StatusBadge } from './StatusBadge'
 import type { Transaction } from '@/types'
 
@@ -58,10 +58,11 @@ interface TransactionCardProps {
 }
 
 export function TransactionCard({ tx, compact = false }: TransactionCardProps) {
-  const Icon     = TYPE_ICON[tx.type]  ?? ArrowUpRight
-  const iconBg   = TYPE_BG[tx.type]   ?? 'bg-surface-2'
-  const iconClr  = TYPE_COLOR[tx.type] ?? 'text-ink-muted'
-  const isCredit = tx.type === 'wallet_funding'
+  const Icon       = TYPE_ICON[tx.type]  ?? ArrowUpRight
+  const iconBg     = TYPE_BG[tx.type]   ?? 'bg-surface-2'
+  const iconClr    = TYPE_COLOR[tx.type] ?? 'text-ink-muted'
+  const isCredit   = tx.type === 'wallet_funding'
+  const uiStatus   = normalizeTransactionStatus(tx.status)
 
   return (
     <Link
@@ -87,9 +88,9 @@ export function TransactionCard({ tx, compact = false }: TransactionCardProps) {
       <div className="text-right shrink-0">
         <p className={cn(
           'text-sm font-bold',
-          tx.status === 'failed'                               ? 'text-danger'  :
-          tx.status === 'success'                              ? 'text-success' :
-          tx.status === 'pending' || tx.status === 'processing'? 'text-warning'  :
+          uiStatus === 'failed'  ? 'text-danger'  :
+          uiStatus === 'success' ? 'text-success' :
+          uiStatus === 'pending' ? 'text-warning'  :
           'text-ink-muted'
         )}>
           {isCredit ? '+' : '-'}{fmtCurrency(tx.amount)}

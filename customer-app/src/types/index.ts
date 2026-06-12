@@ -122,7 +122,7 @@ export interface LedgerEntry {
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 
-export type TransactionStatus = 'pending' | 'processing' | 'success' | 'failed' | 'refunded' | 'reversed' | 'requires_review'
+export type TransactionStatus = 'pending' | 'processing' | 'successful' | 'success' | 'failed' | 'cancelled' | 'reversed' | 'requires_review'
 
 export type TransactionType =
   | 'airtime'
