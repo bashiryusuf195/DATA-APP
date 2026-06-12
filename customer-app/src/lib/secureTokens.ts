@@ -73,10 +73,12 @@ export async function getBiometricCredentials(): Promise<{
   }
 }
 
-export function saveBiometricCredentials(deviceId: string, deviceSecret: string): void {
+export async function saveBiometricCredentials(deviceId: string, deviceSecret: string): Promise<void> {
   if (!isNative) return
-  try { SecureStorage.set(KEY_BIO_DEVICE_ID,     deviceId).catch(() => {}) } catch {}
-  try { SecureStorage.set(KEY_BIO_DEVICE_SECRET, deviceSecret).catch(() => {}) } catch {}
+  await Promise.all([
+    SecureStorage.set(KEY_BIO_DEVICE_ID,     deviceId),
+    SecureStorage.set(KEY_BIO_DEVICE_SECRET, deviceSecret),
+  ])
 }
 
 export function removeBiometricCredentials(): void {

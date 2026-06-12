@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '@/store/auth.store'
 import { performNativeBiometric } from '@/hooks/useBiometricAuth'
 import { biometricDeviceApi } from '@/api/biometric-device.api'
-import { saveBiometricCredentials } from '@/lib/secureTokens'
+import { saveBiometricCredentials, getBiometricCredentials } from '@/lib/secureTokens'
 import toast from 'react-hot-toast'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -20,10 +20,19 @@ export function isBiometricPromptSuppressed(biometricEnabled: boolean): boolean 
     const raw = localStorage.getItem(PROMPT_KEY)
     if (!raw) return false
     const { decision, ts } = JSON.parse(raw) as BioRecord
-    if (decision === 'enabled' || decision === 'never') return true
+    if (decision === 'never') return true
+    // 'enabled' entry means a prior enrollment existed. If biometricEnabled is now false
+    // (credentials lost/revoked), do NOT suppress — let the user re-enroll immediately.
+    if (decision === 'enabled') return false
     if (decision === 'dismissed') return Date.now() - ts < COOLDOWN
   } catch { /* ignore */ }
   return false
+}
+
+/** Call when biometric is forcibly disabled (revoked, credentials lost) so the
+ *  re-enrollment prompt appears on the next dashboard visit. */
+export function clearBiometricPromptDecision(): void {
+  try { localStorage.removeItem(PROMPT_KEY) } catch {}
 }
 
 function saveDecision(decision: BioRecord['decision']): void {
@@ -104,10 +113,24 @@ export function BiometricPromptModal({ onClose }: { onClose: () => void }) {
       return
     }
 
-    // 4. Persist credentials in Android Keystore.
-    saveBiometricCredentials(deviceId, deviceSecret)
+    // 4. Persist credentials in Android Keystore — await so we can verify the write.
+    try {
+      await saveBiometricCredentials(deviceId, deviceSecret)
+    } catch {
+      setPhase('error')
+      setErrorMsg('Could not save credentials to secure storage. Please try again.')
+      return
+    }
 
-    // 5. Mark biometric as enabled in store and remember the device_id.
+    // 5. Verify the save actually worked before marking as enabled.
+    const saved = await getBiometricCredentials()
+    if (!saved) {
+      setPhase('error')
+      setErrorMsg('Credential verification failed. Please try again.')
+      return
+    }
+
+    // 6. Mark biometric as enabled in store and remember the device_id.
     setBiometricDeviceId(deviceId)
     setBiometricEnabled(true)
     saveDecision('enabled')
