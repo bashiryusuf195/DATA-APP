@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, ScrollRestoration } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Capacitor } from '@capacitor/core'
 import { Sidebar }                from './Sidebar'
 import { BottomNav }              from './BottomNav'
@@ -37,21 +37,22 @@ export function AppLayout() {
     if (meta) meta.content = dark ? '#0D1117' : '#ECEEF6'
   }, [dark])
 
-  // Refresh user profile from /auth/me on every app load so the store is never
-  // stale. Also syncs balance_hidden preference from the server so the setting
-  // persists across devices and after logout/login.
+  // Refresh user profile at most once per 5 min — React Query caches the result
+  // so repeated AppLayout mounts (navigation back, StrictMode) skip the request.
+  const { data: freshUser } = useQuery({
+    queryKey: ['auth-me'],
+    queryFn:  authApi.me,
+    staleTime: 5 * 60 * 1000,
+    enabled:  !!user,
+  })
+
   useEffect(() => {
-    if (!user) return
-    authApi.me()
-      .then((fresh) => {
-        setUser(fresh)
-        if (fresh.preferences?.balance_hidden !== undefined) {
-          setBalanceHidden(fresh.preferences.balance_hidden as boolean)
-        }
-      })
-      .catch(() => { /* keep existing store data on network error */ })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!freshUser) return
+    setUser(freshUser)
+    if (freshUser.preferences?.balance_hidden !== undefined) {
+      setBalanceHidden(freshUser.preferences.balance_hidden as boolean)
+    }
+  }, [freshUser, setUser, setBalanceHidden])
 
   // Show setup modal once per session if no PIN is configured.
   // "Set up later" hides it for this session; the API will still reject
@@ -95,10 +96,20 @@ export function AppLayout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!user, pushPromptAllowed])
 
-  // Pull-to-refresh — invalidates all active queries; disabled until user is loaded
+  // Pull-to-refresh — invalidates only dashboard-relevant queries so static
+  // data (accounts, referral config) and auth-me are not unnecessarily refetched.
   const queryClient  = useQueryClient()
   const handleRefresh = useCallback(
-    () => queryClient.invalidateQueries(),
+    () => queryClient.invalidateQueries({
+      predicate: (q) => {
+        const key = q.queryKey[0] as string
+        return [
+          'wallet-balance', 'wallet-dedicated-account', 'wallet-squad-account',
+          'transactions', 'notifications', 'notifications-count',
+          'kyc-status', 'service-status', 'announcements-active',
+        ].includes(key)
+      },
+    }),
     [queryClient],
   )
   const { ptrState, distance } = usePullToRefresh(handleRefresh, !!user)

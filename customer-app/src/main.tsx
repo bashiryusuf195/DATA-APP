@@ -18,6 +18,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      // Keep cache alive for 10 min so navigating away and back reuses data
+      // without a refetch (default is 5 min).
+      gcTime: 10 * 60 * 1000,
     },
   },
 })
