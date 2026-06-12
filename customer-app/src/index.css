@@ -216,19 +216,6 @@ html.dark .dashboard-shine-card::before {
   border-radius: inherit;
 }
 
-/* ── Funding carousel card — light mode polish ────────────────────────────────
-   In dark mode the surface-1 card (#161B22) already looks rich. In light mode
-   surface-1 is plain white — this class upgrades it with a brand-tinted gradient,
-   richer shadow, and a soft indigo border. Dark mode is unaffected.
-────────────────────────────────────────────────────────────────────────────── */
-html:not(.dark) .funding-card-shell {
-  background: linear-gradient(145deg, #ffffff 0%, #f2f5ff 58%, #ebeeff 100%);
-  border-color: rgba(79, 70, 229, 0.18);
-  box-shadow:
-    0 4px 24px rgba(30, 78, 126, 0.10),
-    0 1px 4px rgba(0, 0, 0, 0.05);
-}
-
 /* ── Skeleton shimmer ────────────────────────────────────────────────────────
    A left-to-right highlight sweep that works in both light and dark mode.
    --skeleton-highlight is a thin bright band; base colour is --surface-2.
