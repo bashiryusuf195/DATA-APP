@@ -14,7 +14,7 @@ import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtCurrency } from '@/utils/format'
 import { ENDPOINTS } from '@/config/endpoints'
-import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule } from '@/types'
+import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule, ProviderPlanMapping, CreatePlanMappingInput, UpdatePlanMappingInput } from '@/types'
 import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2, Trash2 } from 'lucide-react'
 
 const PAGE_SIZE = 50
@@ -337,6 +337,150 @@ function buildFormState(initial?: ServicePlan | null): PlanFormState {
     provider_metadata_raw: '{}',
   }
 }
+
+// ── Provider Mapping sub-components ──────────────────────────────────────────
+
+interface MappingFormProps {
+  planId: string
+  initial?: ProviderPlanMapping
+  onSave: (body: CreatePlanMappingInput) => void
+  onCancel: () => void
+  pending: boolean
+}
+
+function MappingForm({ planId, initial, onSave, onCancel, pending }: MappingFormProps) {
+  const [f, setF] = useState({
+    provider_code:       initial?.provider_code       ?? '',
+    provider_plan_code:  initial?.provider_plan_code  ?? '',
+    provider_cost_price: initial?.provider_cost_price != null ? String(initial.provider_cost_price) : '',
+    provider_operator:   initial?.provider_operator   ?? '',
+    provider_category:   initial?.provider_category   ?? '',
+    priority:            String(initial?.priority ?? 100),
+    enabled:             initial?.enabled             ?? true,
+    allow_loss_fallback: initial?.allow_loss_fallback ?? false,
+  })
+
+  function handleSave() {
+    onSave({
+      plan_id:             planId,
+      provider_code:       f.provider_code.trim(),
+      provider_plan_code:  f.provider_plan_code.trim(),
+      provider_cost_price: f.provider_cost_price ? parseFloat(f.provider_cost_price) : null,
+      provider_operator:   f.provider_operator.trim() || null,
+      provider_category:   f.provider_category.trim() || null,
+      priority:            parseInt(f.priority) || 100,
+      enabled:             f.enabled,
+      allow_loss_fallback: f.allow_loss_fallback,
+    })
+  }
+
+  return (
+    <div className="rounded-lg border border-accent/50 bg-surface-2 p-3 space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <Input label="Provider Code" value={f.provider_code} onChange={(e) => setF((x) => ({ ...x, provider_code: e.target.value }))} placeholder="e.g. vtpass" disabled={!!initial} />
+        <Input label="Provider Plan Code" value={f.provider_plan_code} onChange={(e) => setF((x) => ({ ...x, provider_plan_code: e.target.value }))} placeholder="e.g. mtn-1gb" />
+        <Input label="Cost Price (₦)" type="number" min={0} step="0.01" value={f.provider_cost_price} onChange={(e) => setF((x) => ({ ...x, provider_cost_price: e.target.value }))} placeholder="Optional" />
+        <Input label="Priority" type="number" min={0} max={9999} value={f.priority} onChange={(e) => setF((x) => ({ ...x, priority: e.target.value }))} />
+        <Input label="Operator Override" value={f.provider_operator} onChange={(e) => setF((x) => ({ ...x, provider_operator: e.target.value }))} placeholder="Optional" />
+        <Input label="Category Override" value={f.provider_category} onChange={(e) => setF((x) => ({ ...x, provider_category: e.target.value }))} placeholder="Optional" />
+      </div>
+      <div className="flex gap-4 text-sm">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={f.enabled} onChange={(e) => setF((x) => ({ ...x, enabled: e.target.checked }))} className="rounded" />
+          Enabled
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={f.allow_loss_fallback} onChange={(e) => setF((x) => ({ ...x, allow_loss_fallback: e.target.checked }))} className="rounded" />
+          Allow loss fallback
+        </label>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={pending}>Cancel</Button>
+        <Button variant="primary" size="sm" onClick={handleSave} disabled={pending}>{pending ? 'Saving…' : (initial ? 'Update' : 'Add Mapping')}</Button>
+      </div>
+    </div>
+  )
+}
+
+function MappingRow({ mapping, onEdit, onDelete, deleting }: { mapping: ProviderPlanMapping; onEdit: () => void; onDelete: () => void; deleting: boolean }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs font-medium text-ink">{mapping.provider_code}</span>
+          <span className="text-ink-faint text-xs">→</span>
+          <span className="font-mono text-xs text-ink">{mapping.provider_plan_code}</span>
+          {!mapping.enabled && <Badge variant="danger">disabled</Badge>}
+          {mapping.allow_loss_fallback && <Badge variant="neutral">loss ok</Badge>}
+        </div>
+        <div className="flex gap-3 mt-0.5 flex-wrap">
+          {mapping.provider_cost_price != null && <span className="text-[11px] text-ink-faint">cost: ₦{mapping.provider_cost_price}</span>}
+          {mapping.provider_operator && <span className="text-[11px] text-ink-faint">op: {mapping.provider_operator}</span>}
+          {mapping.provider_category && <span className="text-[11px] text-ink-faint">cat: {mapping.provider_category}</span>}
+          <span className="text-[11px] text-ink-faint">priority: {mapping.priority}</span>
+        </div>
+      </div>
+      <div className="flex gap-1 shrink-0">
+        <Button variant="ghost" size="sm" onClick={onEdit}><Edit className="w-3.5 h-3.5" /></Button>
+        <Button variant="ghost" size="sm" onClick={onDelete} disabled={deleting}><Trash2 className="w-3.5 h-3.5 text-rose-400" /></Button>
+      </div>
+    </div>
+  )
+}
+
+function PlanMappingsSection({ planId }: { planId: string }) {
+  const qc = useQueryClient()
+  const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const { data: mappings = [], isLoading } = useQuery({
+    queryKey: ['plan-mappings', planId],
+    queryFn: () => catalogApi.listPlanMappings(planId),
+  })
+
+  const createMut = useMutation({
+    mutationFn: (body: CreatePlanMappingInput) => catalogApi.createPlanMapping(body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['plan-mappings', planId] }); setAdding(false); toast.success('Mapping added') },
+    onError: (err) => toast.error(errMsg(err, 'Failed to add mapping')),
+  })
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: CreatePlanMappingInput }) => catalogApi.updatePlanMapping(id, body),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['plan-mappings', planId] }); setEditingId(null); toast.success('Mapping updated') },
+    onError: (err) => toast.error(errMsg(err, 'Failed to update mapping')),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => catalogApi.deletePlanMapping(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['plan-mappings', planId] }); toast.success('Mapping deleted') },
+    onError: (err) => toast.error(errMsg(err, 'Failed to delete mapping')),
+  })
+
+  return (
+    <div className="border-t border-border pt-4 space-y-3 px-1">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-widest">Provider Mappings</p>
+        {!adding && <Button variant="secondary" size="sm" onClick={() => setAdding(true)}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>}
+      </div>
+      {adding && (
+        <MappingForm planId={planId} onSave={(body) => createMut.mutate(body)} onCancel={() => setAdding(false)} pending={createMut.isPending} />
+      )}
+      {isLoading && <p className="text-xs text-ink-faint py-2">Loading…</p>}
+      {!isLoading && mappings.length === 0 && !adding && (
+        <p className="text-xs text-ink-faint py-2 text-center">No mappings configured. Add one to override per-provider plan codes.</p>
+      )}
+      {mappings.map((m) =>
+        editingId === m.id ? (
+          <MappingForm key={m.id} planId={planId} initial={m} onSave={(body) => updateMut.mutate({ id: m.id, body })} onCancel={() => setEditingId(null)} pending={updateMut.isPending} />
+        ) : (
+          <MappingRow key={m.id} mapping={m} onEdit={() => setEditingId(m.id)} onDelete={() => deleteMut.mutate(m.id)} deleting={deleteMut.isPending} />
+        )
+      )}
+    </div>
+  )
+}
+
+// ── Plan form modal ───────────────────────────────────────────────────────────
 
 function PlanFormModal({ open, onClose, services, providers, initial, onSaved }: PlanFormProps) {
   const isEdit = !!initial
@@ -690,6 +834,7 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
           </div>
         </div>
       </div>
+      {isEdit && initial?.id && <PlanMappingsSection planId={initial.id} />}
     </Modal>
   )
 }

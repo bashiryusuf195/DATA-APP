@@ -65,12 +65,14 @@ export const vtuPurchaseWorker = createWorker(
     // Also read provider_variation_code (needed by providers like SMShika data
     // that use a numeric plan ID instead of our internal variation_code).
     let planOverrides: PlanProviderOverrides | undefined;
+    let planId:                   string | null = null;
     let planProviderVariationCode: string | null = null;
     let planCategory: string | null = null;
     let planNetworkOperator: string | null = null;
 
     if (data.variation_code) {
       const plan = await getPlanByVariationCode(data.service_type, data.variation_code).catch(() => null);
+      planId = (plan?.id as string | null) ?? null;
       if (plan?.primary_provider_code) {
         planOverrides = {
           primary_provider_code:  plan.primary_provider_code as string,
@@ -103,6 +105,7 @@ export const vtuPurchaseWorker = createWorker(
 
     const result = await providerExecutionEngine.executeWithFailover({
       service_type:   data.service_type,
+      plan_id:        planId,
       plan_overrides: planOverrides,
       purchase_input: {
         service_type:            data.service_type,

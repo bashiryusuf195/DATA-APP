@@ -228,6 +228,48 @@ export interface BalanceCheckResult {
   checked_at: string
 }
 
+// ── Provider Plan Mappings ────────────────────────────────────────────────────
+
+export interface ProviderPlanMapping {
+  id: string
+  plan_id: string
+  provider_code: string
+  provider_plan_code: string
+  provider_cost_price: number | null
+  provider_operator: string | null
+  provider_category: string | null
+  priority: number
+  enabled: boolean
+  allow_loss_fallback: boolean
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface CreatePlanMappingInput {
+  plan_id: string
+  provider_code: string
+  provider_plan_code: string
+  provider_cost_price?: number | null
+  provider_operator?: string | null
+  provider_category?: string | null
+  priority?: number
+  enabled?: boolean
+  allow_loss_fallback?: boolean
+  metadata?: Record<string, unknown>
+}
+
+export interface UpdatePlanMappingInput {
+  provider_plan_code?: string
+  provider_cost_price?: number | null
+  provider_operator?: string | null
+  provider_category?: string | null
+  priority?: number
+  enabled?: boolean
+  allow_loss_fallback?: boolean
+  metadata?: Record<string, unknown>
+}
+
 // ── Routing Rules ─────────────────────────────────────────────────────────────
 
 export interface RoutingRule {

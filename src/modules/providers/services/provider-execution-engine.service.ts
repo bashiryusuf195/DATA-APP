@@ -8,6 +8,7 @@ import {
   getFailedAttemptProviderCodes,
   getPendingAttemptForReference,
 } from "./provider-attempts.service";
+import { getPlanMappingForProvider } from "./provider-plan-mappings.service";
 import { vtuVerifyPendingQueue } from "../../queue/queues/vtu-verify-pending.queue";
 import {
   updateTransactionStatus,
@@ -51,6 +52,7 @@ export interface ExecuteWithFailoverParams {
   transaction_reference: string;
   transaction:           TransactionForExecution;
   plan_overrides?:       PlanProviderOverrides;
+  plan_id?:              string | null;
 }
 
 export interface RejectedProvider {
@@ -220,6 +222,20 @@ class ProviderExecutionEngine {
     for (const candidate of candidates) {
       const { providerCode, provider, isFailover } = candidate;
 
+      // Resolve per-provider purchase input. Returns null if this provider is
+      // blocked by a disabled or loss-protecting mapping — skip without recording
+      // a provider attempt so it does not count as an exhausted provider.
+      const resolvedInput = await this.resolveInputForProvider(
+        purchase_input,
+        providerCode,
+        params.plan_id,
+        Number(transaction.amount),
+      );
+      if (resolvedInput === null) {
+        rejectedProviders.push({ provider_code: providerCode, reason: "MAPPING_BLOCKED" });
+        continue;
+      }
+
       if (attemptedProviders.length > 0 || isFailover) failoverTriggered = true;
       attemptedProviders.push(providerCode);
 
@@ -236,7 +252,7 @@ class ProviderExecutionEngine {
       let errorMsg: string | null = null;
 
       try {
-        result = await provider.purchase(purchase_input);
+        result = await provider.purchase(resolvedInput);
       } catch (err) {
         errorMsg = (err as Error).message;
         logger.error("engine_provider_threw", {
@@ -274,10 +290,10 @@ class ProviderExecutionEngine {
             : null;
 
       const safeRequest: Record<string, unknown> = {
-        service_type:   purchase_input.service_type,
-        amount:         purchase_input.amount,
-        variation_code: purchase_input.variation_code ?? null,
-        reference:      purchase_input.reference,
+        service_type:   resolvedInput.service_type,
+        amount:         resolvedInput.amount,
+        variation_code: resolvedInput.variation_code ?? null,
+        reference:      resolvedInput.reference,
       };
 
       // recordProviderAttempt is non-critical: a DB error here must NOT kill
@@ -575,6 +591,55 @@ class ProviderExecutionEngine {
 
     candidates.push({ providerCode, provider, isFailover, resolutionSource });
     seen.add(providerCode);
+  }
+
+  // ── Per-provider input resolution ─────────────────────────────────────────
+  //
+  // Returns a copy of baseInput with plan-mapping overrides applied for the
+  // given provider.  Returns null when the mapping explicitly blocks use of
+  // this provider (disabled or loss-protection threshold exceeded), which
+  // causes the engine to skip the provider without recording an attempt.
+
+  private async resolveInputForProvider(
+    baseInput:    ProviderPurchaseInput,
+    providerCode: string,
+    planId:       string | null | undefined,
+    amount:       number,
+  ): Promise<ProviderPurchaseInput | null> {
+    if (!planId) return baseInput;
+
+    const mapping = await getPlanMappingForProvider(planId, providerCode).catch(() => null);
+
+    if (!mapping) {
+      logger.warn("provider_plan_mapping_missing", { plan_id: planId, provider_code: providerCode });
+      return baseInput;
+    }
+
+    if (!mapping.enabled) {
+      logger.info("engine_mapping_disabled_skip_provider", { plan_id: planId, provider_code: providerCode });
+      return null;
+    }
+
+    if (
+      mapping.provider_cost_price !== null &&
+      mapping.provider_cost_price > amount &&
+      !mapping.allow_loss_fallback
+    ) {
+      logger.warn("engine_mapping_loss_protection_skip", {
+        plan_id:        planId,
+        provider_code:  providerCode,
+        provider_cost:  mapping.provider_cost_price,
+        customer_price: amount,
+      });
+      return null;
+    }
+
+    return {
+      ...baseInput,
+      provider_variation_code: mapping.provider_plan_code,
+      ...(mapping.provider_operator ? { network_operator: mapping.provider_operator } : {}),
+      ...(mapping.provider_category ? { plan_category:    mapping.provider_category } : {}),
+    };
   }
 
   // ── Eligibility check ──────────────────────────────────────────────────────
