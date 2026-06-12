@@ -216,6 +216,63 @@ html.dark .dashboard-shine-card::before {
   border-radius: inherit;
 }
 
+/* ── Light-mode card polish ───────────────────────────────────────────────────
+   Scoped entirely to html:not(.dark) — zero impact on dark mode.
+   !important is used only where Tailwind's bg-surface-1 / shadow-card would
+   win without it. Each class is additive to existing Tailwind base classes.
+────────────────────────────────────────────────────────────────────────────── */
+
+/* Funding carousel card: lavender-tinted gradient + branded shadow ring */
+html:not(.dark) .lm-funding-card {
+  background: linear-gradient(172deg, #ECEBFF 0%, #FFFFFF 46%) !important;
+  box-shadow:
+    0 0 0 1px rgba(79, 70, 229, 0.11),
+    0 4px 20px rgba(79, 70, 229, 0.09),
+    0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  border-color: transparent !important;
+}
+
+/* Service quick-action tiles: richer lift at rest + brand glow on hover */
+html:not(.dark) .lm-service-card {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.07),
+    0 2px 10px rgba(0, 0, 0, 0.04);
+}
+html:not(.dark) .lm-service-card.dashboard-shine-card:hover {
+  box-shadow:
+    0 6px 24px rgba(79, 70, 229, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Transaction list container: deeper elevation */
+html:not(.dark) .lm-tx-container {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    0 6px 20px rgba(0, 0, 0, 0.04);
+  border-color: transparent !important;
+}
+
+/* Transaction rows: inset left accent stripe by normalised status */
+html:not(.dark) .lm-tx-success { box-shadow: inset 3px 0 0 0 #059669; }
+html:not(.dark) .lm-tx-failed  { box-shadow: inset 3px 0 0 0 #DC2626; }
+html:not(.dark) .lm-tx-pending { box-shadow: inset 3px 0 0 0 #D97706; }
+
+/* Section headings: indigo left-bar accent */
+html:not(.dark) .lm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+html:not(.dark) .lm-section-title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 0.8em;
+  background: linear-gradient(to bottom, #5C5CE8, #3535D9);
+  border-radius: 2px;
+}
+
 /* ── Skeleton shimmer ────────────────────────────────────────────────────────
    A left-to-right highlight sweep that works in both light and dark mode.
    --skeleton-highlight is a thin bright band; base colour is --surface-2.

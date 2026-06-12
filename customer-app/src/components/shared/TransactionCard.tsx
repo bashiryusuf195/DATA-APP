@@ -67,7 +67,12 @@ export function TransactionCard({ tx, compact = false }: TransactionCardProps) {
   return (
     <Link
       to={`/transactions/${tx.reference}`}
-      className="flex items-center gap-3.5 py-3.5 px-4 hover:bg-surface-2/70 transition-colors"
+      className={cn(
+        'flex items-center gap-3.5 py-3.5 px-4 hover:bg-surface-2/70 transition-colors',
+        uiStatus === 'success' && 'lm-tx-success',
+        uiStatus === 'failed'  && 'lm-tx-failed',
+        uiStatus === 'pending' && 'lm-tx-pending',
+      )}
     >
       {/* Circular icon */}
       <div className={cn('h-10 w-10 rounded-full flex items-center justify-center shrink-0', iconBg)}>
