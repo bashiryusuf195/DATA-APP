@@ -87,8 +87,9 @@ export function TransactionCard({ tx, compact = false }: TransactionCardProps) {
       <div className="text-right shrink-0">
         <p className={cn(
           'text-sm font-bold',
-          tx.status === 'failed'  ? 'text-danger'  :
-          tx.status === 'success' ? 'text-success' :
+          tx.status === 'failed'                               ? 'text-danger'  :
+          tx.status === 'success'                              ? 'text-success' :
+          tx.status === 'pending' || tx.status === 'processing'? 'text-warning'  :
           'text-ink-muted'
         )}>
           {isCredit ? '+' : '-'}{fmtCurrency(tx.amount)}
