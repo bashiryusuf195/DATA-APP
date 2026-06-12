@@ -91,8 +91,10 @@ export function DashboardPage() {
   const { data: txData,  isLoading: txLoading }      = useTransactions({ limit: 5 })
   const { data: notifData }                          = useNotifications({ limit: 1 })
 
-  // First load: all data is fetching and nothing is cached yet
-  if (balanceLoading && txLoading && !txData) {
+  // Show full-page skeleton only on the very first load when balance is absent.
+  // Transactions render with an inline skeleton so they never block the page.
+  // On return visits React Query serves cached data instantly — no skeleton at all.
+  if (balanceLoading && !balance) {
     return <DashboardSkeleton />
   }
 
