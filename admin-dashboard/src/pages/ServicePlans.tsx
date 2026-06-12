@@ -14,7 +14,7 @@ import { Button, Badge, Modal, Input, Select, Card } from '@/components/ui'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtCurrency } from '@/utils/format'
 import { ENDPOINTS } from '@/config/endpoints'
-import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule, ProviderPlanMapping, CreatePlanMappingInput, UpdatePlanMappingInput } from '@/types'
+import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule, ProviderPlanMapping, CreatePlanMappingInput } from '@/types'
 import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2, Trash2 } from 'lucide-react'
 
 const PAGE_SIZE = 50
