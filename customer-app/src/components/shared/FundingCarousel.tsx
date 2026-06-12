@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Copy, CheckCheck, RefreshCw, Building2, ArrowRight,
@@ -15,7 +15,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AmountInput } from '@/components/shared/AmountInput'
 import { Skeleton } from '@/components/ui'
 import { cn } from '@/utils/cn'
-import { useThemeStore } from '@/store/theme.store'
 import type { TransferAccount } from '@/types'
 
 // ── Dedicated Account Card ────────────────────────────────────────────────────
@@ -335,13 +334,6 @@ function cardLabel(type: FundingCardConfig['type']): string {
 
 export function FundingCarousel() {
   const { data: config } = useFundingConfig()
-  const dark = useThemeStore((s) => s.dark)
-
-  const lightCardStyle = useMemo(() => dark ? undefined : {
-    background:  'linear-gradient(145deg, #f8f9ff 0%, #eef0ff 60%, #e5e8ff 100%)',
-    borderColor: 'rgba(79, 70, 229, 0.22)',
-    boxShadow:   '0 4px 24px rgba(30,78,126,0.12), 0 1px 4px rgba(0,0,0,0.06)',
-  }, [dark])
 
   const trackRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -401,10 +393,7 @@ export function FundingCarousel() {
             className="shrink-0 w-full snap-start"
             aria-label={cardLabel(cfg.type)}
           >
-            <div
-              className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px] dashboard-shine-card"
-              style={lightCardStyle}
-            >
+            <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px] dashboard-shine-card">
               {renderCard(cfg)}
             </div>
           </div>
