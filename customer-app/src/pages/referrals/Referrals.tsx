@@ -10,6 +10,7 @@ import { Card } from '@/components/ui'
 import { ReferralsSkeleton } from '@/components/skeletons'
 import { EmptyReferrals } from '@/components/shared/empty-states'
 import { referralsApi } from '@/api/referrals.api'
+import { useReferralSettings } from '@/hooks/useReferrals'
 import type { ReferralReward } from '@/types'
 import { fmtCurrency, fmtDate } from '@/utils/format'
 import { cn } from '@/utils/cn'
@@ -214,6 +215,13 @@ export function ReferralsPage() {
     queryFn:  referralsApi.getMyReferrals,
     staleTime: 60_000,
   })
+
+  const { data: settings } = useReferralSettings()
+  const rewardLabel = settings
+    ? settings.reward_type === 'percentage'
+      ? `${settings.reward_value}%`
+      : `₦${settings.reward_value.toLocaleString()}`
+    : '₦200'
 
   const referralLink = data?.referral_code
     ? `https://hivedata.ng/register?ref=${data.referral_code}`
@@ -463,7 +471,7 @@ export function ReferralsPage() {
         </p>
 
         {!data?.rewards?.length ? (
-          <EmptyReferrals />
+          <EmptyReferrals rewardLabel={rewardLabel} />
         ) : (
           <div className="space-y-0">
             {visibleRewards.map((r, i) => {

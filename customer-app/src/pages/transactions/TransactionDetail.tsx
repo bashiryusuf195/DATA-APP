@@ -3,13 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Copy, Check, Zap, Download, Loader2, ShieldCheck,
   Share2, CheckCircle2, XCircle, Clock, Search, RefreshCw,
-  ArrowDownLeft,
+  ArrowDownLeft, Flag, RotateCcw,
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { cn } from '@/utils/cn'
 import { useTransaction } from '@/hooks/useTransactions'
+import { useSupportConfig } from '@/hooks/useSupportConfig'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { fmtCurrency, fmtDateTime, normalizeTransactionStatus } from '@/utils/format'
 import { transactionsApi } from '@/api/transactions.api'
@@ -473,6 +474,9 @@ function ServiceCard({
 // ─── Action bar ───────────────────────────────────────────────────────────────
 
 function ActionBar({ tx }: { tx: Transaction }) {
+  const navigate = useNavigate()
+  const { data: supportConfig } = useSupportConfig()
+
   const [copiedRef,    setCopiedRef]    = useState(false)
   const [downloading,  setDownloading]  = useState(false)
 
@@ -560,10 +564,27 @@ function ActionBar({ tx }: { tx: Transaction }) {
     }
   }, [tx.reference])
 
+  const handleReportIssue = useCallback(() => {
+    const uiStatus = getUIStatus(tx.status)
+    const cfg = STATUS_CFG[uiStatus]
+    const msg = encodeURIComponent(
+      `Hi, I need help with a transaction.\n\nReference: ${tx.reference}\nService: ${TYPE_LABEL[tx.type] ?? tx.type}\nStatus: ${cfg.label}\nAmount: ${fmtCurrency(tx.amount, tx.currency)}\n\nPlease assist.`
+    )
+    if (supportConfig?.whatsapp_url) {
+      // Build a wa.me link with the transaction details pre-filled
+      const phone = supportConfig.whatsapp_url
+        .replace(/^https?:\/\/wa\.me\//, '')
+        .split('?')[0]
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank', 'noopener,noreferrer')
+      return
+    }
+    navigate('/support')
+  }, [tx, supportConfig, navigate])
+
   const btn = 'flex-1 flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-2xl bg-surface-2 hover:bg-border transition-colors text-ink-muted hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
-    <div className="rounded-3xl bg-surface-1 border border-border p-4">
+    <div className="rounded-3xl bg-surface-1 border border-border p-4 space-y-3">
       <div className="flex gap-3">
         <button onClick={handleCopyRef} className={btn} title="Copy reference">
           {copiedRef
@@ -591,6 +612,15 @@ function ActionBar({ tx }: { tx: Transaction }) {
           </span>
         </button>
       </div>
+
+      {/* Report Issue — full-width, subtle danger styling to signal escalation */}
+      <button
+        onClick={handleReportIssue}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl border border-border text-sm font-semibold text-ink-muted hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-colors"
+      >
+        <Flag className="h-4 w-4" />
+        Report Issue
+      </button>
     </div>
   )
 }
@@ -646,6 +676,7 @@ export function TransactionDetailPage() {
           tx={tx}
           isDownloading={isDownloading}
           onDownload={handleReportDownload}
+          onRefresh={refetch}
         />
       ) : null}
     </div>
@@ -658,10 +689,12 @@ function ReceiptContent({
   tx,
   isDownloading,
   onDownload,
+  onRefresh,
 }: {
   tx: Transaction
   isDownloading: boolean
   onDownload: (ref: string) => void
+  onRefresh: () => void
 }) {
   const uiStatus = getUIStatus(tx.status)
   const cfg      = STATUS_CFG[uiStatus]
@@ -777,6 +810,41 @@ function ReceiptContent({
         isDownloading={isDownloading}
         onDownload={onDownload}
       />
+
+      {/* ── Status context cards ─────────────────────────────────────── */}
+
+      {/* Pending/Processing: progress note + manual check button */}
+      {uiStatus === 'pending' && (
+        <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 px-4 py-3.5 flex items-start gap-3">
+          <Clock className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Processing your order</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+              This usually takes 1–5 minutes. Your wallet will not be charged until the order is confirmed.
+            </p>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 rounded-lg px-2.5 py-1.5 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Check
+          </button>
+        </div>
+      )}
+
+      {/* Failed: wallet-refund assurance (not shown for funding failures) */}
+      {uiStatus === 'failed' && tx.type !== 'wallet_funding' && (
+        <div className="rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 px-4 py-3.5 flex items-start gap-3">
+          <ShieldCheck className="h-4 w-4 text-danger shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-danger">Wallet automatically refunded</p>
+            <p className="text-xs text-red-700 dark:text-red-400 mt-0.5 leading-relaxed">
+              Any amount deducted for this transaction has been reversed to your wallet. Refunds typically reflect within a few seconds. Tap "Report Issue" below if you have questions.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Action bar ───────────────────────────────────────────────── */}
       <ActionBar tx={tx} />
