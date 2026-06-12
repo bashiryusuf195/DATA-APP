@@ -20,6 +20,7 @@ import {
   startConditionalAuthentication,
 } from '@/hooks/usePasskey'
 import { checkNativeBiometricAvailable, performNativeBiometric } from '@/hooks/useBiometricAuth'
+import { clearBiometricPromptDecision } from '@/components/shared/BiometricPromptModal'
 
 type Step = 'credentials' | '2fa'
 
@@ -144,9 +145,10 @@ export function LoginPage() {
       const creds = await getBiometricCredentials()
       if (!creds || !biometricDeviceId) {
         // device_secret missing — the Keystore entry was cleared (e.g. after
-        // factory reset or uninstall).  Disable biometric and ask the user
-        // to re-enable it after signing in with their password.
+        // factory reset or uninstall).  Disable biometric so the dashboard
+        // re-enrollment prompt appears on the next login.
         disableBiometric()
+        clearBiometricPromptDecision()
         removeBiometricCredentials()
         setError('Biometric data not found. Please sign in with your password to re-enable biometrics.')
         return
@@ -174,6 +176,7 @@ export function LoginPage() {
       // Device revoked server-side (password reset, manual revoke, etc.).
       if (code === 'BIOMETRIC_DEVICE_NOT_FOUND' || code === 'BIOMETRIC_SECRET_INVALID') {
         disableBiometric()
+        clearBiometricPromptDecision()
         removeBiometricCredentials()
         setError('Biometric login was revoked. Please sign in with your password to re-enable biometrics.')
         return
