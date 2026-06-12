@@ -16,7 +16,7 @@ export function useTransactions(params?: TransactionFilters) {
   return useQuery({
     queryKey: ['transactions', params],
     queryFn:  () => transactionsApi.list(params),
-    staleTime: 15_000,
+    staleTime: 60_000,
     placeholderData: (prev) => prev,
   })
 }

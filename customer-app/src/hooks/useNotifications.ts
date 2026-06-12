@@ -5,7 +5,7 @@ export function useNotifications(params?: { page?: number; limit?: number }) {
   return useQuery({
     queryKey: ['notifications', params],
     queryFn:  () => notificationsApi.list(params),
-    staleTime: 30_000,
+    staleTime: 60_000,
   })
 }
 

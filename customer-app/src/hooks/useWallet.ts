@@ -32,10 +32,13 @@ export const WALLET_BALANCE_KEY = ['wallet-balance'] as const
 
 export function useWalletBalance() {
   return useQuery({
-    queryKey: WALLET_BALANCE_KEY,
-    queryFn:  walletApi.getBalance,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    queryKey:        WALLET_BALANCE_KEY,
+    queryFn:         walletApi.getBalance,
+    staleTime:       30_000,
+    // Show the last cached balance instantly while a background refresh runs.
+    // Balance is invalidated explicitly after transactions and on pull-to-refresh,
+    // so continuous polling adds server load with no user benefit.
+    placeholderData: (prev) => prev,
   })
 }
 
