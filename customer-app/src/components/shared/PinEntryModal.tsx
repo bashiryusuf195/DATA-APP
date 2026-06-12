@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Lock, AlertCircle } from 'lucide-react'
-import { Modal, Button, Input } from '@/components/ui'
+import { Modal, Button } from '@/components/ui'
+import { PinPad } from '@/components/shared/PinPad'
 
 interface PinEntryModalProps {
-  open: boolean
+  open:     boolean
   loading?: boolean
-  error?: string | null
+  error?:   string | null
   onSubmit: (pin: string) => void
   onCancel: () => void
 }
@@ -23,24 +24,22 @@ function pinErrorLabel(error: string): string {
 export function PinEntryModal({ open, loading = false, error, onSubmit, onCancel }: PinEntryModalProps) {
   const [pin, setPin] = useState('')
 
-  // Reset PIN when modal opens
   useEffect(() => {
     if (open) setPin('')
   }, [open])
 
   const isValid = /^\d{4}$|^\d{6}$/.test(pin)
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = () => {
     if (!isValid || loading) return
     onSubmit(pin)
   }
 
   return (
     <Modal open={open} title="Transaction PIN" onClose={!loading ? onCancel : undefined} locked={loading} size="sm">
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="flex flex-col items-center gap-2 py-2">
-          <div className="h-12 w-12 rounded-2xl bg-brand-50 flex items-center justify-center mb-1">
+      <div className="space-y-5">
+        <div className="flex flex-col items-center gap-2 py-1">
+          <div className="h-12 w-12 rounded-2xl bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center mb-1">
             <Lock className="h-6 w-6 text-brand-600" />
           </div>
           <p className="text-sm text-ink-muted text-center">
@@ -48,18 +47,7 @@ export function PinEntryModal({ open, loading = false, error, onSubmit, onCancel
           </p>
         </div>
 
-        <Input
-          label="Transaction PIN"
-          type="password"
-          inputMode="numeric"
-          maxLength={6}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="••••"
-          autoFocus
-          disabled={loading}
-          className="text-center text-xl tracking-widest"
-        />
+        <PinPad value={pin} onChange={setPin} maxLength={6} disabled={loading} />
 
         {error && (
           <div className="flex items-start gap-2 rounded-xl bg-danger/10 border border-danger/20 px-3 py-2.5">
@@ -79,16 +67,17 @@ export function PinEntryModal({ open, loading = false, error, onSubmit, onCancel
             Cancel
           </Button>
           <Button
-            type="submit"
+            type="button"
             variant="primary"
             fullWidth
             loading={loading}
             disabled={!isValid}
+            onClick={handleSubmit}
           >
             Confirm
           </Button>
         </div>
-      </form>
+      </div>
     </Modal>
   )
 }

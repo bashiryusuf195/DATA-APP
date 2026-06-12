@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Zap, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
-import { Button, Input, Skeleton } from '@/components/ui'
+import { Button, Skeleton } from '@/components/ui'
 import { AmountInput } from '@/components/shared/AmountInput'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
@@ -96,7 +97,7 @@ export function ElectricityPage() {
 
       {/* Page header */}
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-amber-100 border-2 border-amber-300/50 flex items-center justify-center shrink-0">
+        <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-300/50 dark:border-amber-700/50 flex items-center justify-center shrink-0">
           <Zap className="h-6 w-6 text-amber-600" />
         </div>
         <div>
@@ -145,13 +146,11 @@ export function ElectricityPage() {
 
             <div className="flex gap-2 items-start">
               <div className="flex-1">
-                <Input
+                <NumPadInput
                   label="Meter Number"
-                  type="text"
-                  inputMode="numeric"
                   value={meter}
-                  onChange={(e) => {
-                    setMeter(e.target.value)
+                  onChange={(v) => {
+                    setMeter(v)
                     setVerifyResult(null)
                     setErrors((err) => ({ ...err, meter: '' }))
                   }}
@@ -200,21 +199,20 @@ export function ElectricityPage() {
               quickAmounts={[1000, 2000, 5000, 10000, 20000, 50000]}
             />
 
-            <Input
+            <NumPadInput
               label="Phone Number (optional)"
-              type="tel"
-              inputMode="numeric"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={setPhone}
               placeholder="e.g. 08012345678"
+              maxLength={11}
             />
 
             <div className="pt-1">
               <p className="text-xs text-ink-faint mb-3">Payment Source</p>
               <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-surface-0 border border-border">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center">
-                    <Zap className="h-4 w-4 text-brand-600" />
+                  <div className="h-8 w-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-ink">Wallet Balance</p>

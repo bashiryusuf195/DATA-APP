@@ -10,6 +10,7 @@ import { PopupAnnouncement }      from '@/components/shared/PopupAnnouncement'
 import { AnnouncementTicker }     from '@/components/shared/AnnouncementTicker'
 import { NotificationPromptModal, shouldShowNotificationPrompt, isPushPromptSuppressed } from '@/components/shared/NotificationPromptModal'
 import { BiometricPromptModal, isBiometricPromptSuppressed } from '@/components/shared/BiometricPromptModal'
+import { NumPad }                 from '@/components/shared/NumPad'
 import { SupportWidget }          from '@/components/shared/SupportWidget'
 import { OfflineBanner }          from '@/components/shared/OfflineBanner'
 import { PwaInstallSheet }        from '@/components/shared/PwaInstallSheet'
@@ -217,6 +218,9 @@ export function AppLayout() {
           onClose={() => setShowPwaSheet(false)}
         />
       )}
+
+      {/* Global numeric keypad — fixed at bottom, above nav (z-45) */}
+      <NumPad />
 
       {/* Floating support widget */}
       <SupportWidget />

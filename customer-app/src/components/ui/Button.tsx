@@ -25,10 +25,10 @@ export function Button({
 
   const variants = {
     primary:   'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 shadow-sm',
-    secondary: 'bg-surface-2 text-ink hover:bg-slate-200 active:bg-slate-300',
-    ghost:     'text-ink-muted hover:text-ink hover:bg-surface-2',
+    secondary: 'bg-surface-2 text-ink hover:bg-slate-200 active:bg-slate-300 dark:hover:bg-slate-700/50 dark:active:bg-slate-600/50',
+    ghost:     'text-ink-muted hover:text-ink hover:bg-surface-2 dark:hover:bg-surface-1',
     danger:    'bg-danger text-white hover:bg-red-700 active:bg-red-800 shadow-sm',
-    outline:   'border border-border text-ink hover:bg-surface-2',
+    outline:   'border border-border text-ink hover:bg-surface-2 dark:hover:bg-surface-1',
   }
 
   const sizes = {

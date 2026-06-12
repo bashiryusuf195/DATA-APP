@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Phone, ArrowLeft } from 'lucide-react'
-import { Button, Input, Card } from '@/components/ui'
+import { Button, Card } from '@/components/ui'
 import { AmountInput } from '@/components/shared/AmountInput'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { ConfirmModal }    from '@/components/shared/ConfirmModal'
 import { PinEntryModal }   from '@/components/shared/PinEntryModal'
 import { ResultModal }     from '@/components/shared/ResultModal'
@@ -13,10 +14,10 @@ import { fmtCurrency } from '@/utils/format'
 import type { AirtimePurchaseInput } from '@/types'
 
 const OPERATORS = [
-  { code: 'mtn',     label: 'MTN',    color: 'bg-yellow-50 border-yellow-200 text-yellow-800' },
-  { code: 'airtel',  label: 'Airtel', color: 'bg-red-50 border-red-200 text-red-800' },
-  { code: 'glo',     label: 'Glo',    color: 'bg-green-50 border-green-200 text-green-800' },
-  { code: '9mobile', label: '9mobile',color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+  { code: 'mtn',     label: 'MTN',     color: 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-700 dark:text-yellow-300' },
+  { code: 'airtel',  label: 'Airtel',  color: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-700 dark:text-red-300' },
+  { code: 'glo',     label: 'Glo',     color: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950/30 dark:border-green-700 dark:text-green-300' },
+  { code: '9mobile', label: '9mobile', color: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300' },
 ]
 
 export function AirtimePage() {
@@ -91,12 +92,10 @@ export function AirtimePage() {
             {errors.operator && <p className="mt-1.5 text-xs text-danger">{errors.operator}</p>}
           </div>
 
-          <Input
+          <NumPadInput
             label="Phone Number"
-            type="tel"
-            inputMode="numeric"
             value={phone}
-            onChange={(e) => { setPhone(e.target.value); setErrors((err) => ({ ...err, phone: '' })) }}
+            onChange={(v) => { setPhone(v); setErrors((err) => ({ ...err, phone: '' })) }}
             placeholder="08012345678"
             maxLength={11}
             error={errors.phone}

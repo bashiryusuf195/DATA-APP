@@ -6,6 +6,7 @@ import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 import { walletApi } from '@/api/wallet.api'
 import { AmountInput } from '@/components/shared/AmountInput'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { cn } from '@/utils/cn'
 
 const NIGERIAN_BANKS = [
@@ -158,21 +159,13 @@ export function WithdrawRequestPage() {
         </div>
 
         <Field label="Account Number">
-          <input
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
+          <NumPadInput
             value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            onChange={(v) => setAccountNumber(v.replace(/\D/g, '').slice(0, 10))}
             placeholder="0000000000"
-            className={cn(
-              'w-full px-4 py-3 rounded-2xl border bg-surface-2 text-ink font-mono text-sm placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all',
-              errors.accountNumber ? 'border-danger ring-2 ring-danger/20' : 'border-border'
-            )}
+            maxLength={10}
+            error={errors.accountNumber}
           />
-          {errors.accountNumber && (
-            <p className="text-xs text-danger mt-1">{errors.accountNumber}</p>
-          )}
         </Field>
 
         <Field label="Bank Name">

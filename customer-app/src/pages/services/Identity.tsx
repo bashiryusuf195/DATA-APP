@@ -4,7 +4,8 @@ import {
   ShieldCheck, ArrowLeft, ChevronRight, ChevronLeft,
   CreditCard, Phone, FileText, Check,
 } from 'lucide-react'
-import { Button, Input, Card } from '@/components/ui'
+import { Button, Card } from '@/components/ui'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
@@ -313,18 +314,16 @@ export function IdentityPage() {
                   ? 'Enter your registered phone number'
                   : 'Enter your NIN number'}
             </p>
-            <Input
+            <NumPadInput
               label={isBvn ? 'BVN Number' : method === 'phone' ? 'Phone Number' : 'NIN Number'}
-              type="text"
-              inputMode="numeric"
               value={identifier}
-              onChange={(e) => { setIdentifier(e.target.value); setErrors({}) }}
+              onChange={(v) => { setIdentifier(v); setErrors({}) }}
               placeholder={method === 'phone' ? '08012345678' : '12345678901'}
-              maxLength={method === 'phone' ? 14 : 11}
+              maxLength={11}
               hint={
-                isBvn         ? '11-digit Bank Verification Number' :
+                isBvn             ? '11-digit Bank Verification Number' :
                 method === 'phone' ? 'Nigerian phone number (e.g. 08012345678)' :
-                '11-digit National Identification Number'
+                                    '11-digit National Identification Number'
               }
               error={errors.identifier}
             />

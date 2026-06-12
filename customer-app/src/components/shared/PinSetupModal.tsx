@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ShieldCheck, AlertCircle } from 'lucide-react'
+import { ShieldCheck, AlertCircle, ArrowLeft } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
-import { Modal, Button, Input } from '@/components/ui'
+import { Modal, Button } from '@/components/ui'
+import { PinPad } from '@/components/shared/PinPad'
 import { pinApi } from '@/api/pin.api'
 
 interface PinSetupModalProps {
@@ -16,10 +17,13 @@ const WEAK = new Set([
   '888888','999999','123456','234567','345678','456789','987654','876543',
 ])
 
+const isValidLength = (p: string) => /^\d{4}$|^\d{6}$/.test(p)
+
 export function PinSetupModal({ onSuccess, onDismiss }: PinSetupModalProps) {
-  const [pin, setPin]         = useState('')
+  const [step,    setStep]    = useState<'set' | 'confirm'>('set')
+  const [pin,     setPin]     = useState('')
   const [confirm, setConfirm] = useState('')
-  const [err, setErr]         = useState<string | null>(null)
+  const [err,     setErr]     = useState<string | null>(null)
 
   const mutation = useMutation({
     mutationFn: () => pinApi.setup(pin),
@@ -27,63 +31,80 @@ export function PinSetupModal({ onSuccess, onDismiss }: PinSetupModalProps) {
     onError: (e: Error) => setErr(e.message),
   })
 
-  const validate = (): string | null => {
-    if (!/^\d{4}$|^\d{6}$/.test(pin))    return 'PIN must be exactly 4 or 6 digits.'
-    if (WEAK.has(pin))                    return 'This PIN is too easy to guess. Choose a less predictable combination.'
-    if (pin !== confirm)                  return 'PINs do not match.'
-    return null
+  // ── Step 1: enter new PIN ────────────────────────────────────────────────────
+
+  const goToConfirm = () => {
+    if (!isValidLength(pin))  { setErr('PIN must be exactly 4 or 6 digits.'); return }
+    if (WEAK.has(pin))        { setErr('This PIN is too easy to guess. Choose a less predictable combination.'); return }
+    setErr(null)
+    setConfirm('')
+    setStep('confirm')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const msg = validate()
-    if (msg) { setErr(msg); return }
+  // ── Step 2: confirm PIN ──────────────────────────────────────────────────────
+
+  const handleSubmit = () => {
+    if (!isValidLength(confirm))  { setErr('PIN must be exactly 4 or 6 digits.'); return }
+    if (confirm !== pin)          { setErr('PINs do not match. Please try again.'); return }
     setErr(null)
     mutation.mutate()
   }
+
+  // ── Reset to step 1 ──────────────────────────────────────────────────────────
+
+  const backToSet = () => {
+    setStep('set')
+    setConfirm('')
+    setErr(null)
+  }
+
+  // ── Common ────────────────────────────────────────────────────────────────────
+
+  const isLoading = mutation.isPending
 
   return (
     <Modal
       open
       title="Secure Your Account"
       size="sm"
-      locked={mutation.isPending}
+      locked={isLoading}
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-5">
+        {/* Icon + description */}
         <div className="flex flex-col items-center gap-2 pb-1">
-          <div className="h-14 w-14 rounded-2xl bg-brand-50 flex items-center justify-center">
+          <div className="h-14 w-14 rounded-2xl bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center">
             <ShieldCheck className="h-7 w-7 text-brand-600" />
           </div>
           <p className="text-sm text-ink-muted text-center leading-relaxed">
-            Set a 4 or 6 digit transaction PIN. You'll need it every time you make a purchase.
+            {step === 'set'
+              ? 'Create a 4 or 6 digit PIN. You\'ll need it every time you make a purchase.'
+              : 'Re-enter your PIN to confirm.'}
           </p>
         </div>
 
-        <Input
-          label="New PIN"
-          type="password"
-          inputMode="numeric"
-          maxLength={6}
-          value={pin}
-          onChange={(e) => { setPin(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr(null) }}
-          placeholder="••••"
-          disabled={mutation.isPending}
-          className="text-center text-xl tracking-widest"
-          autoFocus
-        />
+        {/* Step label */}
+        <p className="text-xs font-semibold text-center text-ink-faint">
+          {step === 'set' ? 'NEW PIN' : 'CONFIRM PIN'}
+        </p>
 
-        <Input
-          label="Confirm PIN"
-          type="password"
-          inputMode="numeric"
-          maxLength={6}
-          value={confirm}
-          onChange={(e) => { setConfirm(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr(null) }}
-          placeholder="••••"
-          disabled={mutation.isPending}
-          className="text-center text-xl tracking-widest"
-        />
+        {/* PinPad */}
+        {step === 'set' ? (
+          <PinPad
+            value={pin}
+            onChange={(v) => { setPin(v); setErr(null) }}
+            maxLength={6}
+            disabled={isLoading}
+          />
+        ) : (
+          <PinPad
+            value={confirm}
+            onChange={(v) => { setConfirm(v); setErr(null) }}
+            maxLength={pin.length as 4 | 6}
+            disabled={isLoading}
+          />
+        )}
 
+        {/* Error */}
         {err && (
           <div className="flex items-start gap-2 rounded-xl bg-danger/10 border border-danger/20 px-3 py-2.5">
             <AlertCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
@@ -91,28 +112,53 @@ export function PinSetupModal({ onSuccess, onDismiss }: PinSetupModalProps) {
           </div>
         )}
 
-        <Button
-          type="submit"
-          fullWidth
-          size="lg"
-          loading={mutation.isPending}
-          disabled={pin.length < 4 || confirm.length < 4}
-        >
-          Set Transaction PIN
-        </Button>
-
-        <p className="text-center text-xs text-ink-faint">
-          You won't be able to make purchases without a PIN.{' '}
-          <button
-            type="button"
-            className="underline hover:text-ink-muted transition-colors"
-            onClick={onDismiss}
-            disabled={mutation.isPending}
-          >
-            Set up later
-          </button>
-        </p>
-      </form>
+        {/* CTA buttons */}
+        {step === 'set' ? (
+          <>
+            <Button
+              type="button"
+              fullWidth
+              size="lg"
+              disabled={pin.length < 4}
+              onClick={goToConfirm}
+            >
+              Continue
+            </Button>
+            <p className="text-center text-xs text-ink-faint">
+              You won't be able to make purchases without a PIN.{' '}
+              <button
+                type="button"
+                className="underline hover:text-ink-muted transition-colors"
+                onClick={onDismiss}
+              >
+                Set up later
+              </button>
+            </p>
+          </>
+        ) : (
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={backToSet}
+              disabled={isLoading}
+              icon={<ArrowLeft className="h-4 w-4" />}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              fullWidth
+              size="lg"
+              loading={isLoading}
+              disabled={confirm.length < 4}
+              onClick={handleSubmit}
+            >
+              Set Transaction PIN
+            </Button>
+          </div>
+        )}
+      </div>
     </Modal>
   )
 }

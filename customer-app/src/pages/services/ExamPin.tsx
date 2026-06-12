@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, ArrowLeft } from 'lucide-react'
-import { Button, Input, Card, Skeleton } from '@/components/ui'
+import { Button, Card, Skeleton } from '@/components/ui'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
@@ -78,9 +79,13 @@ export function ExamPinPage() {
             {errors.plan && <p className="mt-1.5 text-xs text-danger">{errors.plan}</p>}
           </div>
 
-          <Input label="Phone Number" type="tel" inputMode="numeric" value={phone}
-            onChange={(e) => { setPhone(e.target.value); setErrors((err) => ({ ...err, phone: '' })) }}
-            placeholder="08012345678" maxLength={11} error={errors.phone}
+          <NumPadInput
+            label="Phone Number"
+            value={phone}
+            onChange={(v) => { setPhone(v); setErrors((err) => ({ ...err, phone: '' })) }}
+            placeholder="08012345678"
+            maxLength={11}
+            error={errors.phone}
           />
 
           <Button type="submit" fullWidth size="lg">Continue</Button>
