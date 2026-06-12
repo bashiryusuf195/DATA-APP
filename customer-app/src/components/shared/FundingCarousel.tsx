@@ -19,7 +19,7 @@ import type { TransferAccount } from '@/types'
 
 // ── Dedicated Account Card ────────────────────────────────────────────────────
 
-function DedicatedAccountCard() {
+export function DedicatedAccountCard() {
   const qc                   = useQueryClient()
   const { data: dva,       isLoading: dvaLoading    } = useDedicatedAccount()
   const { data: squadData, isLoading: squadLoading  } = useSquadAccount()
@@ -166,7 +166,7 @@ function DedicatedAccountCard() {
 
 type QtPhase = 'idle' | 'result'
 
-function QuickTransferCard() {
+export function QuickTransferCard() {
   const [amount, setAmount]             = useState('')
   const [amountError, setAmountError]   = useState('')
   const [phase, setPhase]               = useState<QtPhase>('idle')
