@@ -81,7 +81,7 @@ function ReferralBanner() {
 }
 
 function SectionTitle({ children }: { children: string }) {
-  return <p className="text-sm font-bold text-ink mb-3">{children}</p>
+  return <p className="text-sm font-bold text-ink mb-3 lm-section-title">{children}</p>
 }
 
 export function DashboardPage() {
@@ -237,7 +237,7 @@ export function DashboardPage() {
                 <Link
                   key={`${s.to}-${s.label}`}
                   to={s.to}
-                  className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-surface-1 shadow-card border border-border hover:border-brand-200 active:opacity-80 dashboard-shine-card"
+                  className="group flex flex-col items-center gap-2 p-3 rounded-2xl bg-surface-1 shadow-card border border-border hover:border-brand-200 active:opacity-80 dashboard-shine-card lm-service-card"
                 >
                   <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:shadow-md', s.bg, s.glow)}>
                     <s.icon className={cn('h-5 w-5', s.color)} />
@@ -262,7 +262,7 @@ export function DashboardPage() {
               </Link>
             </div>
 
-            <div className="bg-surface-1 rounded-3xl overflow-hidden shadow-card border border-border dashboard-shine-card">
+            <div className="bg-surface-1 rounded-3xl overflow-hidden shadow-card border border-border dashboard-shine-card lm-tx-container">
               {txLoading ? (
                 <div className="p-4 space-y-0 divide-y divide-border">
                   {[...Array(3)].map((_, i) => (

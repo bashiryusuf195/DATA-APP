@@ -15,8 +15,10 @@ export function WalletBalanceCard({ balance, currency = 'NGN', isLoading }: Wall
   const { hidden, toggle: toggleBalanceHidden } = useBalanceVisibility()
 
   return (
-    <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet wallet-card-shimmer ring-1 ring-inset ring-white/10"
-      style={{ background: 'linear-gradient(135deg, #1E4E7E 0%, #163A5E 100%)' }}>
+    <div
+      className="relative overflow-hidden rounded-3xl p-5 text-white shadow-wallet wallet-card-shimmer ring-1 ring-inset ring-white/10"
+      style={{ background: 'linear-gradient(140deg, #22568A 0%, #1A4470 45%, #122F52 100%)' }}
+    >
       {/* Decorative circles */}
       <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/5" />
       <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />

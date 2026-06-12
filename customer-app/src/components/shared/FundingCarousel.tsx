@@ -393,7 +393,7 @@ export function FundingCarousel() {
             className="shrink-0 w-full snap-start"
             aria-label={cardLabel(cfg.type)}
           >
-            <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px] dashboard-shine-card">
+            <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px] dashboard-shine-card lm-funding-card">
               {renderCard(cfg)}
             </div>
           </div>
