@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { Tv, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
-import { Button, Input, Skeleton } from '@/components/ui'
+import { Button, Skeleton } from '@/components/ui'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
@@ -114,8 +115,8 @@ export function CableTvPage() {
 
       {/* Page header */}
       <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-purple-100 border-2 border-purple-300/50 flex items-center justify-center shrink-0">
-          <Tv className="h-6 w-6 text-purple-600" />
+        <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-300/50 dark:border-purple-700/50 flex items-center justify-center shrink-0">
+          <Tv className="h-6 w-6 text-purple-600 dark:text-purple-400" />
         </div>
         <div>
           <h1 className="text-lg font-bold text-ink">Cable TV</h1>
@@ -163,18 +164,17 @@ export function CableTvPage() {
 
             <div className="flex gap-2 items-start">
               <div className="flex-1">
-                <Input
+                <NumPadInput
                   label="Smartcard / IUC Number"
-                  type="text"
-                  inputMode="numeric"
                   value={smartcard}
-                  onChange={(e) => {
-                    setSmartcard(e.target.value)
+                  onChange={(v) => {
+                    setSmartcard(v)
                     setVerifyResult(null)
                     setSelectedPlanId('')
                     setErrors((err) => ({ ...err, smartcard: '' }))
                   }}
                   placeholder="Enter smartcard number"
+                  maxLength={12}
                   error={errors.smartcard}
                 />
               </div>
@@ -255,21 +255,20 @@ export function CableTvPage() {
         {/* Step 4 — Phone + Payment source + submit */}
         {verifyResult?.success && selectedPlanId && (
           <div className="bg-surface-1 rounded-3xl p-5 shadow-card space-y-4">
-            <Input
+            <NumPadInput
               label="Phone Number (optional)"
-              type="tel"
-              inputMode="numeric"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={setPhone}
               placeholder="e.g. 08012345678"
+              maxLength={11}
             />
 
             <div>
               <p className="text-xs text-ink-faint mb-3">Payment Source</p>
               <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-surface-0 border border-border">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                    <Tv className="h-4 w-4 text-purple-600" />
+                  <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <Tv className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-ink">Wallet Balance</p>

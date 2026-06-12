@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wifi, Phone, ArrowLeft } from 'lucide-react'
-import { Button, Input, Card, Skeleton } from '@/components/ui'
+import { Button, Card, Skeleton } from '@/components/ui'
+import { NumPadInput } from '@/components/shared/NumPadInput'
 import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
@@ -15,10 +16,10 @@ import { cn } from '@/utils/cn'
 
 // Known operator display config — unknown operators fall back to a neutral style
 const NETWORK_META: Record<string, { label: string; activeClass: string }> = {
-  mtn:      { label: 'MTN',     activeClass: 'border-yellow-400 bg-yellow-50 text-yellow-800' },
-  airtel:   { label: 'Airtel',  activeClass: 'border-red-400   bg-red-50   text-red-800' },
-  glo:      { label: 'Glo',     activeClass: 'border-green-400 bg-green-50  text-green-800' },
-  '9mobile':{ label: '9mobile', activeClass: 'border-emerald-400 bg-emerald-50 text-emerald-800' },
+  mtn:      { label: 'MTN',     activeClass: 'border-yellow-400 bg-yellow-50 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300' },
+  airtel:   { label: 'Airtel',  activeClass: 'border-red-400 bg-red-50 text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-300' },
+  glo:      { label: 'Glo',     activeClass: 'border-green-400 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300' },
+  '9mobile':{ label: '9mobile', activeClass: 'border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' },
 }
 
 function networkLabel(op: string) {
@@ -236,12 +237,10 @@ export function DataPage() {
           )}
 
           {/* ── Phone number ── */}
-          <Input
+          <NumPadInput
             label="Phone Number"
-            type="tel"
-            inputMode="numeric"
             value={phone}
-            onChange={e => { setPhone(e.target.value); setErrors(err => ({ ...err, phone: '' })) }}
+            onChange={(v) => { setPhone(v); setErrors(err => ({ ...err, phone: '' })) }}
             placeholder="08012345678"
             maxLength={11}
             error={errors.phone}

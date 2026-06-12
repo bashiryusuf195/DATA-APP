@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { Home, Clock, Wallet, User, Headphones, type LucideIcon } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { useHaptic } from '@/hooks/useHaptic'
+import { useNumPadStore } from '@/store/numpad.store'
 
 const NAV = [
   { to: '/dashboard',    label: 'Home',    icon: Home       },
@@ -86,11 +87,14 @@ function NavItem({ to, label, icon: Icon }: NavEntry) {
 }
 
 export function BottomNav() {
+  const numpadOpen = useNumPadStore((s) => s.isOpen)
+
   return (
     // bottom: calc(1rem + env(safe-area-inset-bottom)) lifts the nav above the
     // Android gesture navigation bar / iPhone home indicator. On web/PWA it's 0px.
+    // Hidden when the NumPad is open to avoid overlap and free vertical space.
     <nav
-      className="fixed inset-x-4 z-40 md:hidden"
+      className={cn('fixed inset-x-4 z-40 md:hidden transition-all duration-200', numpadOpen && 'pointer-events-none opacity-0 translate-y-4')}
       style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="bg-white/85 dark:bg-[#161B22]/90 backdrop-blur-xl border border-border rounded-[2rem] shadow-modal">
