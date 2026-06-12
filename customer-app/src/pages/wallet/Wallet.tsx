@@ -1,15 +1,13 @@
 import { Link } from 'react-router-dom'
-import { Plus, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
-import { useWalletBalance, useWalletLedger } from '@/hooks/useWallet'
+import { Plus } from 'lucide-react'
+import { useWalletBalance } from '@/hooks/useWallet'
 import { WalletBalanceCard } from '@/components/shared/WalletBalanceCard'
-import { Skeleton, Button } from '@/components/ui'
-import { EmptyState } from '@/components/shared/EmptyState'
-import { fmtCurrency, fmtDateTime } from '@/utils/format'
-import { cn } from '@/utils/cn'
+import { DedicatedAccountCard, QuickTransferCard } from '@/components/shared/FundingCarousel'
+import { Button } from '@/components/ui'
+import { fmtCurrency } from '@/utils/format'
 
 export function WalletPage() {
   const { data: balance, isLoading: balanceLoading } = useWalletBalance()
-  const { data: ledger,  isLoading: ledgerLoading  } = useWalletLedger({ limit: 20 })
 
   return (
     <div className="space-y-5 pt-1">
@@ -22,7 +20,7 @@ export function WalletPage() {
         </Link>
       </div>
 
-      {/* Desktop: balance card left, ledger right; Mobile: stacked */}
+      {/* Desktop: balance left, funding cards right — Mobile: stacked */}
       <div className="lg:grid lg:grid-cols-[2fr_3fr] lg:gap-6 lg:items-start space-y-5 lg:space-y-0">
 
         {/* Balance card */}
@@ -33,7 +31,7 @@ export function WalletPage() {
             isLoading={balanceLoading}
           />
 
-          {/* Quick stats (desktop only) */}
+          {/* Quick stats strip — desktop only */}
           {!balanceLoading && balance && (
             <div className="hidden lg:grid grid-cols-2 gap-3 mt-4">
               <div className="bg-surface-1 rounded-2xl p-4 shadow-card border border-border text-center">
@@ -48,59 +46,13 @@ export function WalletPage() {
           )}
         </div>
 
-        {/* Ledger */}
-        <div>
-          <p className="text-sm font-bold text-ink mb-3">Wallet History</p>
-          <div className="bg-surface-1 rounded-3xl overflow-hidden shadow-card border border-border">
-            {ledgerLoading ? (
-              <div className="p-4 space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-3.5 w-40" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                    <Skeleton className="h-4 w-20" />
-                  </div>
-                ))}
-              </div>
-            ) : ledger?.data.length ? (
-              <div className="divide-y divide-border">
-                {ledger.data.map((entry) => {
-                  const Icon = entry.type === 'credit' ? ArrowDownLeft : ArrowUpRight
-                  return (
-                    <div key={entry.id} className="flex items-center gap-3.5 py-3.5 px-4">
-                      <div className={cn(
-                        'h-10 w-10 rounded-full flex items-center justify-center shrink-0',
-                        entry.type === 'credit' ? 'bg-teal-100' : 'bg-surface-2'
-                      )}>
-                        <Icon className={cn('h-4.5 w-4.5', entry.type === 'credit' ? 'text-teal-600' : 'text-ink-muted')} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-ink truncate">{entry.description}</p>
-                        <p className="text-xs text-ink-faint mt-0.5">{fmtDateTime(entry.created_at)}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className={cn(
-                          'text-sm font-bold',
-                          entry.type === 'credit' ? 'text-success' : 'text-danger'
-                        )}>
-                          {entry.type === 'credit' ? '+' : '-'}{fmtCurrency(entry.amount)}
-                        </p>
-                        <p className="text-[10px] text-ink-faint">{fmtCurrency(entry.balance_after)}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                icon={ArrowDownLeft}
-                title="No wallet activity"
-                description="Transactions will appear here after you fund your wallet."
-              />
-            )}
+        {/* Funding cards — shown directly (no carousel) */}
+        <div className="space-y-4">
+          <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px] lm-funding-card">
+            <DedicatedAccountCard />
+          </div>
+          <div className="bg-surface-1 rounded-3xl p-4 shadow-card border border-border min-h-[180px] lm-funding-card">
+            <QuickTransferCard />
           </div>
         </div>
 
