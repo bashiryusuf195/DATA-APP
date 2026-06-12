@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, ArrowDownToLine } from 'lucide-react'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { WalletBalanceCard } from '@/components/shared/WalletBalanceCard'
 import { DedicatedAccountCard, QuickTransferCard } from '@/components/shared/FundingCarousel'
@@ -13,11 +13,23 @@ export function WalletPage() {
     <div className="space-y-5 pt-1">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-ink">Wallet</h1>
-        <Link to="/wallet/fund">
-          <Button size="sm" icon={<Plus className="h-4 w-4" />} className="rounded-2xl shadow-brand">
-            Add Money
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/wallet/withdraw">
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<ArrowDownToLine className="h-4 w-4" />}
+              className="rounded-2xl"
+            >
+              Withdraw
+            </Button>
+          </Link>
+          <Link to="/wallet/fund">
+            <Button size="sm" icon={<Plus className="h-4 w-4" />} className="rounded-2xl shadow-brand">
+              Add Money
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Desktop: balance left, funding cards right — Mobile: stacked */}
