@@ -1148,10 +1148,22 @@ export class ClubkonnectProvider extends HttpVTUProvider {
 
     this.logRequestCredentialCheck("verify_transaction", "/APIQueryV1.asp", userId, apiKey);
 
+    // CRITICAL: ClubKonnect's query API must receive the same RequestID that was
+    // used during purchase.  Purchases call toRequestId() which strips hyphens and
+    // truncates to 20 chars.  Passing the raw UUID here produces a different string
+    // → ClubKonnect returns "not found" → every processing order ends up in
+    // requires_review instead of being confirmed and closed out automatically.
+    const requestId = toRequestId(reference);
+
+    logger.info("clubkonnect_verify_request_id", {
+      reference,
+      requestId,
+    });
+
     const url = this.buildUrl(baseUrl, "/APIQueryV1.asp", {
       UserID:    userId,
       APIKey:    apiKey,
-      RequestID: reference,
+      RequestID: requestId,
     });
 
     let response: Response;
