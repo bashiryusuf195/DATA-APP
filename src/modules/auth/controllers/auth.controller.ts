@@ -103,15 +103,15 @@ export async function loginController(
   req: Request, res: Response, next: NextFunction
 ): Promise<void> {
   try {
-    const input = validateOrThrow(LoginSchema, req.body);
-    const ip    = getClientIp(req);
-    const email = input.email;
+    const input      = validateOrThrow(LoginSchema, req.body);
+    const ip         = getClientIp(req);
+    const identifier = input.identifier;
 
     // ── Failed-login gate ──────────────────────────────────────
     // Checked BEFORE the DB round-trip. Only wrong-password attempts
     // increment this counter (see below), so a successful login never
     // burns a brute-force slot and resets the counter entirely.
-    const { blocked, retryAfterSec } = await failedLoginLimiter.check(email, ip);
+    const { blocked, retryAfterSec } = await failedLoginLimiter.check(identifier, ip);
     if (blocked) {
       res.setHeader("Retry-After", String(retryAfterSec));
       res.status(429).json({
@@ -133,13 +133,13 @@ export async function loginController(
       });
     } catch (loginErr) {
       if (isCredentialError(loginErr)) {
-        await failedLoginLimiter.increment(email, ip);
+        await failedLoginLimiter.increment(identifier, ip);
       }
       throw loginErr;
     }
 
     // Successful password verification — clear failed-login counter.
-    await failedLoginLimiter.reset(email, ip);
+    await failedLoginLimiter.reset(identifier, ip);
 
     // 2FA required for admin users with TOTP enabled.
     if (loginResult.requires_2fa) {

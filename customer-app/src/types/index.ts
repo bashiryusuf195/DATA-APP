@@ -28,7 +28,7 @@ export interface AuthTokens {
 }
 
 export interface LoginInput {
-  email: string
+  identifier: string
   password: string
 }
 
