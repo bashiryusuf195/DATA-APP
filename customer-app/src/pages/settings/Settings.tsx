@@ -9,6 +9,7 @@ import { authApi } from '@/api/auth.api'
 import { pinApi } from '@/api/pin.api'
 import { notificationsApi } from '@/api/notifications.api'
 import { passkeyApi } from '@/api/passkey.api'
+import { useSecuritySettings } from '@/hooks/useSecuritySettings'
 import { PinSetupModal } from '@/components/shared/PinSetupModal'
 import { useAuthStore } from '@/store/auth.store'
 import { isWebAuthnSupported, isPlatformAuthenticatorAvailable, registerPasskey } from '@/hooks/usePasskey'
@@ -246,6 +247,13 @@ export function SettingsPage() {
   // ── Native biometric (Android only) ────────────────────────────────────────
   const [nativeBiometricAvailable, setNativeBiometricAvailable] = useState(false)
   const [nativeBiometricLoading, setNativeBiometricLoading]     = useState(false)
+
+  // ── Biometric purchase confirmation ────────────────────────────────────────
+  const {
+    biometricPurchaseEnabled,
+    isUpdating: biometricPurchaseUpdating,
+    update:     updateSecuritySettings,
+  } = useSecuritySettings()
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -503,15 +511,28 @@ export function SettingsPage() {
           </div>
 
           {Capacitor.isNativePlatform() ? (
-            // Android native biometric toggle
+            // Android native biometric toggles
             nativeBiometricAvailable ? (
-              <ToggleRow
-                label="Enable Biometric Login"
-                hint="Use fingerprint or face to sign in"
-                checked={biometricEnabled}
-                onChange={handleNativeBiometricToggle}
-                disabled={nativeBiometricLoading}
-              />
+              <>
+                <ToggleRow
+                  label="Enable Biometric Login"
+                  hint="Use fingerprint or face to sign in"
+                  checked={biometricEnabled}
+                  onChange={handleNativeBiometricToggle}
+                  disabled={nativeBiometricLoading}
+                />
+                {biometricEnabled && (
+                  <ToggleRow
+                    label="Biometric Purchase Confirmation"
+                    hint="Confirm purchases with fingerprint or face instead of PIN"
+                    checked={biometricPurchaseEnabled}
+                    onChange={(v) =>
+                      updateSecuritySettings({ biometric_purchase_enabled: v })
+                    }
+                    disabled={biometricPurchaseUpdating}
+                  />
+                )}
+              </>
             ) : (
               <div className="flex items-start gap-2.5 rounded-xl bg-surface-0 border border-border px-4 py-3">
                 <Fingerprint className="h-4 w-4 text-ink-faint shrink-0 mt-0.5" />

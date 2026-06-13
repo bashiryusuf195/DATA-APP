@@ -15,7 +15,10 @@ export type AuditAction =
   | "2fa_enabled" | "2fa_disabled"
   | "2fa_challenge" | "2fa_login_success" | "2fa_login_failure"
   | "transaction_pin_set" | "transaction_pin_changed"
-  | "transaction_pin_removed" | "transaction_pin_reset";
+  | "transaction_pin_removed" | "transaction_pin_reset"
+  | "biometric_purchase_success"
+  | "biometric_purchase_failed"
+  | "biometric_purchase_fallback_to_pin";
 
 export interface WriteAuditOpts {
   actorId?:      string | null;

@@ -7,6 +7,7 @@ import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
+import { useSecuritySettings } from '@/hooks/useSecuritySettings'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
 import { transactionsApi } from '@/api/transactions.api'
@@ -47,7 +48,8 @@ export function DataPage() {
 
   const { data: balance } = useWalletBalance()
   const { data: allPlans, isLoading: plansLoading } = useServicePlans('data', true)
-  const purchase = useServicePurchase<DataPurchaseInput>(transactionsApi.buyData)
+  const { biometricPurchaseEnabled } = useSecuritySettings()
+  const purchase = useServicePurchase<DataPurchaseInput>(transactionsApi.buyData, { biometricPurchaseEnabled })
 
   // Step 1: distinct network operators present in active plans, in DB order
   const networks = useMemo(() => {
@@ -267,15 +269,16 @@ export function DataPage() {
           { label: 'Phone',     value: phone },
           { label: 'Amount',    value: fmtCurrency(selectedPlan?.selling_price ?? 0) },
         ]}
-        onConfirm={purchase.goToPin}
+        onConfirm={() => { void purchase.goToAuthorize() }}
         onCancel={purchase.cancel}
-        confirmLabel="Enter PIN"
+        confirmLabel={biometricPurchaseEnabled ? 'Confirm Purchase' : 'Enter PIN'}
       />
 
       <PinEntryModal
         open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
         loading={purchase.phase === 'submitting'}
         error={purchase.pinError}
+        biometricFallback={purchase.biometricFailed}
         onSubmit={purchase.confirmWithPin}
         onCancel={purchase.backToConfirm}
       />

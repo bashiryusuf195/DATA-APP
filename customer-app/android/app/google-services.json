@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "827195083353",
+    "project_id": "hive-data-82049",
+    "storage_bucket": "hive-data-82049.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:827195083353:android:55e524e585ae4785b03f48",
+        "android_client_info": {
+          "package_name": "ng.hivedata.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgH68MbjOmculMs_3fG5j3bn1nAAWlBnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

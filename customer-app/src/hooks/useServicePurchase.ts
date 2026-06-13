@@ -5,8 +5,10 @@ import type { Transaction } from '@/types'
 import { WALLET_BALANCE_KEY } from './useWallet'
 import { normalizeTransactionStatus } from '@/utils/format'
 import { transactionsApi } from '@/api/transactions.api'
+import { performNativeBiometric } from '@/hooks/useBiometricAuth'
 
-type Phase = 'idle' | 'confirm' | 'pin' | 'submitting' | 'done'
+// 'authorizing' = native biometric prompt is showing (OS-level, no app UI)
+type Phase = 'idle' | 'confirm' | 'authorizing' | 'pin' | 'submitting' | 'done'
 
 // Axios error enriched with machine-readable code from the backend
 type ApiError = Error & { code?: string }
@@ -36,15 +38,25 @@ function pinErrMessage(code: string, fallback: string): string {
   }
 }
 
+export interface ServicePurchaseOptions {
+  /** When true, the confirm button triggers a native biometric prompt instead of the PIN modal. */
+  biometricPurchaseEnabled?: boolean
+}
+
 export function useServicePurchase<T>(
-  mutationFn: (data: T) => Promise<Transaction>
+  mutationFn: (data: T) => Promise<Transaction>,
+  options?: ServicePurchaseOptions,
 ) {
+  const biometricEnabled = options?.biometricPurchaseEnabled ?? false
   const qc = useQueryClient()
-  const [phase, setPhase]         = useState<Phase>('idle')
-  const [pending, setPending]     = useState<T | null>(null)
-  const [result, setResult]       = useState<Transaction | null>(null)
-  const [isPolling, setIsPolling] = useState(false)
-  const [pinError, setPinError]   = useState<string | null>(null)
+
+  const [phase, setPhase]                 = useState<Phase>('idle')
+  const [pending, setPending]             = useState<T | null>(null)
+  const [result, setResult]               = useState<Transaction | null>(null)
+  const [isPolling, setIsPolling]         = useState(false)
+  const [pinError, setPinError]           = useState<string | null>(null)
+  // Tracks whether a biometric attempt failed so the PIN modal shows a fallback note
+  const [biometricFailed, setBiometricFailed] = useState(false)
 
   const pollTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef  = useRef(0)
@@ -123,7 +135,6 @@ export function useServicePurchase<T>(
     },
     onError: (err: ApiError) => {
       if (err.code && PIN_CODES.has(err.code)) {
-        // PIN error — keep the pin modal open and surface the specific message
         setPinError(pinErrMessage(err.code, err.message ?? 'PIN error. Please try again.'))
         setPhase('pin')
       } else {
@@ -139,34 +150,69 @@ export function useServicePurchase<T>(
   const requestConfirm = (data: T) => {
     setPending(data)
     setPinError(null)
+    setBiometricFailed(false)
     setPhase('confirm')
   }
 
-  /** Step 2: user clicks "Pay Now" in the review modal — show PIN modal */
+  /**
+   * Step 2: user clicks "Confirm Purchase" / "Enter PIN".
+   * When biometric purchase is enabled, triggers the native biometric prompt first.
+   * On biometric success the purchase is submitted immediately (no PIN needed).
+   * On failure or cancellation the PIN modal is shown as the fallback.
+   */
+  const goToAuthorize = useCallback(async () => {
+    if (!pending) return
+    setPinError(null)
+    setBiometricFailed(false)
+
+    if (biometricEnabled) {
+      setPhase('authorizing')
+      const result = await performNativeBiometric('Confirm this purchase')
+      if (result === 'success') {
+        toastFiredRef.current = false
+        setPhase('submitting')
+        mutation.mutate({ ...pending, biometric_purchase: true } as T)
+      } else {
+        // 'cancelled' or 'failed' — fall back to PIN
+        setBiometricFailed(result === 'failed')
+        setPhase('pin')
+      }
+    } else {
+      setPhase('pin')
+    }
+  }, [biometricEnabled, pending, mutation])
+
+  /** Step 3 (PIN path): user submits PIN — append it and fire the request */
+  const confirmWithPin = useCallback((pin: string) => {
+    if (!pending) return
+    toastFiredRef.current = false
+    setPhase('submitting')
+    mutation.mutate({
+      ...pending,
+      transaction_pin: pin,
+      ...(biometricFailed && { biometric_fallback: true }),
+    } as T)
+  }, [pending, biometricFailed, mutation])
+
+  /** Back from PIN modal to review modal */
+  const backToConfirm = () => {
+    setPinError(null)
+    setBiometricFailed(false)
+    setPhase('confirm')
+  }
+
+  /** Legacy alias kept so existing call-sites that use goToPin still compile. */
   const goToPin = () => {
     if (!pending) return
     setPinError(null)
     setPhase('pin')
   }
 
-  /** Step 3: user submits PIN — append it to pending data and fire the request */
-  const confirmWithPin = (pin: string) => {
-    if (!pending) return
-    toastFiredRef.current = false
-    setPhase('submitting')
-    mutation.mutate({ ...pending, transaction_pin: pin } as T)
-  }
-
-  /** Back from PIN modal to review modal */
-  const backToConfirm = () => {
-    setPinError(null)
-    setPhase('confirm')
-  }
-
   const cancel = () => {
     setPhase('idle')
     setPending(null)
     setPinError(null)
+    setBiometricFailed(false)
   }
 
   const reset = () => {
@@ -176,6 +222,7 @@ export function useServicePurchase<T>(
     setPending(null)
     setResult(null)
     setPinError(null)
+    setBiometricFailed(false)
   }
 
   return {
@@ -184,7 +231,9 @@ export function useServicePurchase<T>(
     pending,
     isPolling,
     pinError,
+    biometricFailed,
     requestConfirm,
+    goToAuthorize,
     goToPin,
     confirmWithPin,
     backToConfirm,

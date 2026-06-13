@@ -8,6 +8,7 @@ import { ConfirmModal }    from '@/components/shared/ConfirmModal'
 import { PinEntryModal }   from '@/components/shared/PinEntryModal'
 import { ResultModal }     from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
+import { useSecuritySettings } from '@/hooks/useSecuritySettings'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { transactionsApi } from '@/api/transactions.api'
 import { fmtCurrency } from '@/utils/format'
@@ -28,7 +29,8 @@ export function AirtimePage() {
   const [errors, setErrors]     = useState<Record<string, string>>({})
 
   const { data: balance } = useWalletBalance()
-  const purchase = useServicePurchase<AirtimePurchaseInput>(transactionsApi.buyAirtime)
+  const { biometricPurchaseEnabled } = useSecuritySettings()
+  const purchase = useServicePurchase<AirtimePurchaseInput>(transactionsApi.buyAirtime, { biometricPurchaseEnabled })
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -127,15 +129,16 @@ export function AirtimePage() {
           { label: 'Phone',    value: phone },
           { label: 'Amount',   value: fmtCurrency(parseFloat(amount) || 0) },
         ]}
-        onConfirm={purchase.goToPin}
+        onConfirm={() => { void purchase.goToAuthorize() }}
         onCancel={purchase.cancel}
-        confirmLabel="Enter PIN"
+        confirmLabel={biometricPurchaseEnabled ? 'Confirm Purchase' : 'Enter PIN'}
       />
 
       <PinEntryModal
         open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
         loading={purchase.phase === 'submitting'}
         error={purchase.pinError}
+        biometricFallback={purchase.biometricFailed}
         onSubmit={purchase.confirmWithPin}
         onCancel={purchase.backToConfirm}
       />
