@@ -72,17 +72,19 @@ const TYPE_LABEL: Record<string, string> = {
 // ─── Public interface ─────────────────────────────────────────────────────────
 
 export interface ReceiptData {
-  reference:     string;
-  type:          string;
-  status:        string;
-  amount:        number;
-  currency:      string;
-  description:   string;
-  customerName:  string;
-  customerEmail: string;
-  customerPhone?: string | null;
-  createdAt:     string | Date;
-  metadata?:     Record<string, unknown>;
+  reference:        string;
+  type:             string;
+  status:           string;
+  amount:           number;
+  currency:         string;
+  description:      string;
+  customerName:     string;
+  customerEmail:    string;
+  customerPhone?:   string | null;
+  /** The recharged/billed identifier: phone for airtime/data, meter for electricity, IUC for cable_tv. */
+  recipientPhone?:  string | null;
+  createdAt:        string | Date;
+  metadata?:        Record<string, unknown>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -250,9 +252,31 @@ function renderReceipt(doc: PDFKit.PDFDocument, data: ReceiptData): void {
   // ── Transaction details section ──────────────────────────────────────────────
   y = renderSectionHeader(doc, y, "TRANSACTION DETAILS");
   y = renderRow(doc, y, "Service",   data.description || TYPE_LABEL[data.type] || "—", false);
-  y = renderRow(doc, y, "Reference", data.reference, true, true /* monospace */);
-  y = renderRow(doc, y, "Date",      fmtDate(data.createdAt), false);
-  y = renderRow(doc, y, "Time",      fmtTime(data.createdAt), true);
+
+  // Recipient identifier — label adapts to service type
+  const recipientLabel =
+    data.type === "electricity"        ? "Meter No." :
+    data.type === "cable_tv"           ? "IUC No."   :
+    (data.type === "airtime" || data.type === "data" || data.type === "transfer") ? "Phone No." :
+    null;
+
+  const recipientValue = (() => {
+    if (data.recipientPhone) return data.recipientPhone;
+    if (!recipientLabel) return null;
+    // Derive from provider_response if recipientPhone not supplied
+    const metaPr = ((data.metadata ?? {}).provider_response ?? {}) as Record<string, unknown>;
+    if (data.type === "electricity") return str(metaPr.meter_number);
+    if (data.type === "cable_tv")    return str(metaPr.smartcard_number ?? metaPr.iucNumber ?? metaPr.iuc_number);
+    return null;
+  })();
+
+  if (recipientLabel && recipientValue) {
+    y = renderRow(doc, y, recipientLabel, recipientValue, true);
+  }
+
+  y = renderRow(doc, y, "Reference", data.reference, !!(recipientLabel && recipientValue), true /* monospace */);
+  y = renderRow(doc, y, "Date",      fmtDate(data.createdAt), !(recipientLabel && recipientValue));
+  y = renderRow(doc, y, "Time",      fmtTime(data.createdAt), !!(recipientLabel && recipientValue));
 
   // Balance fields from metadata
   const bBefore = meta.balance_before ?? meta.previous_balance;
@@ -397,15 +421,17 @@ function renderElectricity(doc: PDFKit.PDFDocument, y: number, pr: Record<string
 // ── Cable TV ──────────────────────────────────────────────────────────────────
 
 function renderCableTv(doc: PDFKit.PDFDocument, y: number, pr: Record<string, unknown>): number {
+  const iuc      = str(pr.smartcard_number ?? pr.iucNumber ?? pr.iuc_number ?? pr.customerNumber ?? "");
   const pkg      = str(pr.package ?? pr.Package ?? pr.Bouquet ?? pr.bouquet ?? "");
   const customer = str(pr.Customer_Name ?? pr.customer_name ?? "");
   const due      = str(pr.Due_Date ?? pr.due_date ?? "");
 
-  if (!pkg && !customer) return y;
+  if (!pkg && !customer && !iuc) return y;
 
   y = renderSectionHeader(doc, y, "SUBSCRIPTION DETAILS");
 
   const rows: Array<[string, string]> = [];
+  if (iuc)      rows.push(["IUC No.",  iuc]);
   if (customer) rows.push(["Customer", customer]);
   if (pkg)      rows.push(["Package",  pkg]);
   if (due)      rows.push(["Due Date", due]);

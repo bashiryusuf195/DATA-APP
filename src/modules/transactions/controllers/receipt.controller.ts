@@ -62,18 +62,26 @@ export async function downloadReceiptController(
     const meta = (rawMeta ?? {}) as Record<string, unknown>;
 
     // ── Build receipt data ───────────────────────────────────────────────────
+    // recipientPhone = the number/meter/IUC that was actually serviced,
+    // distinct from the customer's own phone number.
+    const recipientPhone: string | null =
+      (tx.type === "airtime" || tx.type === "data" || tx.type === "transfer")
+        ? (tx.phone ?? null)
+        : null; // electricity/cable_tv: derived from provider_response in the PDF renderer
+
     const receiptData: ReceiptData = {
-      reference:     tx.reference,
-      type:          tx.type,
-      status:        tx.status,
-      amount:        typeof tx.amount === "number" ? tx.amount : parseFloat(String(tx.amount ?? 0)),
-      currency:      tx.currency ?? "NGN",
-      description:   tx.description ?? "",
-      customerName:  fullName,
-      customerEmail: user?.email ?? req.user!.email,
-      customerPhone: user?.phone ?? tx.phone ?? null,
-      createdAt:     tx.created_at,
-      metadata:      meta,
+      reference:      tx.reference,
+      type:           tx.type,
+      status:         tx.status,
+      amount:         typeof tx.amount === "number" ? tx.amount : parseFloat(String(tx.amount ?? 0)),
+      currency:       tx.currency ?? "NGN",
+      description:    tx.description ?? "",
+      customerName:   fullName,
+      customerEmail:  user?.email ?? req.user!.email,
+      customerPhone:  user?.phone ?? null,
+      recipientPhone,
+      createdAt:      tx.created_at,
+      metadata:       meta,
     };
 
     // ── Generate PDF ─────────────────────────────────────────────────────────

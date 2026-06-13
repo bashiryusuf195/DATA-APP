@@ -149,6 +149,21 @@ function getRecipient(tx: Transaction): string | null {
   }
 }
 
+function getRecipientLabel(type: string): string {
+  switch (type) {
+    case 'airtime':
+    case 'data':
+    case 'transfer':
+      return 'Phone No.'
+    case 'electricity':
+      return 'Meter No.'
+    case 'cable_tv':
+      return 'IUC No.'
+    default:
+      return 'Recipient'
+  }
+}
+
 function getProvider(tx: Transaction): string | null {
   const meta = (tx.metadata ?? {}) as Record<string, unknown>
   const pr   = meta.provider_response as Record<string, unknown> | undefined
@@ -488,12 +503,15 @@ function ActionBar({ tx }: { tx: Transaction }) {
   }, [tx.reference])
 
   const handleShare = useCallback(async () => {
-    const uiStatus = getUIStatus(tx.status)
-    const cfg = STATUS_CFG[uiStatus]
-    const text = [
+    const uiStatus  = getUIStatus(tx.status)
+    const cfg       = STATUS_CFG[uiStatus]
+    const recipient = getRecipient(tx)
+    const recLabel  = getRecipientLabel(tx.type)
+    const lines = [
       'Hive Data Transaction Receipt',
       '',
       `Service: ${TYPE_LABEL[tx.type] ?? tx.type}`,
+      ...(recipient ? [`${recLabel}: ${recipient}`] : []),
       `Amount: ${fmtCurrency(tx.amount)}`,
       `Status: ${cfg.label}`,
       `Reference: ${tx.reference}`,
@@ -501,7 +519,8 @@ function ActionBar({ tx }: { tx: Transaction }) {
       '',
       'Support: support@hivedata.ng',
       'App: app.hivedata.ng',
-    ].join('\n')
+    ]
+    const text = lines.join('\n')
 
     if (Capacitor.isNativePlatform()) {
       try {
@@ -773,7 +792,7 @@ function ReceiptContent({
           <DetailRow label="Service" value={tx.description || (TYPE_LABEL[tx.type] ?? '—')} />
 
           {recipient && (
-            <DetailRow label="Recipient" value={recipient} />
+            <DetailRow label={getRecipientLabel(tx.type)} value={recipient} />
           )}
 
           <DetailRow
