@@ -1,5 +1,6 @@
 import { getDbInstance } from "../../../db/knex";
 import { sendAdminPushNotification, checkAndUpdateCooldown } from "../../notifications/services/admin-push.service";
+import { alertProviderDown } from "../../alerts/services/admin-alert.service";
 
 const db = getDbInstance();
 
@@ -74,25 +75,7 @@ export async function recordFailure(providerCode: string): Promise<void> {
     .first<{ circuit_open: boolean; consecutive_failures: number } | undefined>();
 
   if (state?.circuit_open) {
-    const shouldSend = await checkAndUpdateCooldown(
-      "provider_circuit_open",
-      providerCode,
-      10,
-    ).catch(() => false);
-
-    if (shouldSend) {
-      sendAdminPushNotification({
-        title:             "Provider Alert",
-        body:              `${providerCode} has ${state.consecutive_failures} consecutive failures — circuit open.`,
-        deep_link:         `/health-metrics`,
-        notification_type: "admin_provider_alert",
-        preference_key:    "admin_provider_alerts",
-        metadata: {
-          provider_code:        providerCode,
-          consecutive_failures: String(state.consecutive_failures),
-        },
-      }).catch(() => {});
-    }
+    alertProviderDown(providerCode, state.consecutive_failures).catch(() => {});
   }
 }
 
