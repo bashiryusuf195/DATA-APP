@@ -1,6 +1,7 @@
 import { getDbInstance } from "../../../db/knex";
 import { NotFoundError } from "../../../lib/errors";
 import { checkRedisHealth } from "../../../config/redis";
+import { invalidateMaintenanceCache } from "../../../middleware/maintenance.middleware";
 import {
   fetchAllSettings,
   fetchSettingByKey,
@@ -86,6 +87,8 @@ export async function updateSettingByKey(
   const validated = validateValue(existing, rawValue);
   const updated = await updateSetting(db, key, validated, updatedBy);
   if (!updated) throw new NotFoundError(`Setting "${key}"`);
+
+  if (key === 'maintenance_mode') invalidateMaintenanceCache();
 
   return maskSecret(updated);
 }

@@ -1,14 +1,18 @@
 import { useEffect, Suspense } from 'react'
 import { RouterProvider } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { router } from '@/router'
 import { useThemeStore } from '@/store/theme.store'
+import { useSystemStore } from '@/store/system.store'
 import { getFirebaseApp } from '@/lib/firebase'
+import { apiClient } from '@/api/client'
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { App as CapApp } from '@capacitor/app'
 import { PushNotifications } from '@capacitor/push-notifications'
 import toast from 'react-hot-toast'
 import { notificationsApi } from '@/api/notifications.api'
+import { MaintenancePage } from '@/pages/maintenance/Maintenance'
 
 // ── Service worker helpers ─────────────────────────────────────────────────────
 
@@ -109,11 +113,28 @@ function listenForSwNavigation(): () => void {
 // ── App ────────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const dark = useThemeStore((s) => s.dark)
+  const dark        = useThemeStore((s) => s.dark)
+  const maintenance = useSystemStore((s) => s.maintenance)
+  const setMaintenance = useSystemStore((s) => s.setMaintenance)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
+
+  // Poll /public/status every 60 s to detect maintenance transitions.
+  // The axios interceptor handles the reactive case (any 503 immediately
+  // shows the screen); this query handles restoration (maintenance → off).
+  useQuery({
+    queryKey: ['system-status'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ maintenance: boolean }>('/public/status')
+      setMaintenance(res.data.maintenance)
+      return res.data
+    },
+    refetchInterval:          60_000,
+    refetchIntervalInBackground: true,
+    retry:                    false,
+  })
 
   useEffect(() => {
     // Hide the native splash screen now that React has rendered its first frame.
@@ -184,6 +205,8 @@ export default function App() {
       Promise.all([reg, regErr, received, action]).then((hs) => hs.forEach((h) => h.remove()))
     }
   }, [])
+
+  if (maintenance) return <MaintenancePage />
 
   // Dark fallback matches the app background so lazy-chunk loads are invisible
   return (
