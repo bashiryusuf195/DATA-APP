@@ -22,23 +22,24 @@ export async function up(knex: Knex): Promise<void> {
     });
   }
 
-  // CREATE INDEX IF NOT EXISTS is safe to re-run even if the index already exists.
+  // Composite index for the analytics hot-path: filters successful purchases
+  // by type and sorts/ranges by processed_at.
+  // Uses only plain columns so it is always valid regardless of column type.
   await knex.schema.raw(`
     CREATE INDEX IF NOT EXISTS transactions_analytics_idx
       ON transactions (status, type, processed_at)
       WHERE status = 'successful'
   `);
 
-  await knex.schema.raw(`
-    CREATE INDEX IF NOT EXISTS transactions_processed_month_idx
-      ON transactions (DATE_TRUNC('month', processed_at))
-      WHERE status = 'successful'
-  `);
+  // NOTE: a DATE_TRUNC('month', processed_at) expression index was intentionally
+  // omitted. PostgreSQL requires index expressions to be IMMUTABLE, and DATE_TRUNC
+  // on a timestamptz column (timezone-sensitive) does not satisfy that requirement.
+  // The analytics queries use TO_CHAR / DATE_TRUNC in the WHERE clause instead,
+  // which is correctly covered by the transactions_analytics_idx above.
 }
 
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.raw("DROP INDEX IF EXISTS transactions_analytics_idx");
-  await knex.schema.raw("DROP INDEX IF EXISTS transactions_processed_month_idx");
   await knex.schema.alterTable("transactions", (t) => {
     t.dropColumn("selling_price_snapshot");
     t.dropColumn("cost_price_snapshot");
