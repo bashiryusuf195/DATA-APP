@@ -3,10 +3,12 @@ import { z } from "zod";
 // ── Shared field validators ────────────────────────────────────────────────────
 
 // Transaction PIN: exactly 4 or 6 numeric digits.
-// Format is validated here; correctness is enforced by the requirePin middleware.
+// Format is validated here; presence and correctness are enforced by requirePin middleware.
+// Optional because biometric_purchase: true is a valid alternative authorisation method.
 const transactionPin = z
   .string()
-  .regex(/^\d{4}$|^\d{6}$/, "transaction_pin must be exactly 4 or 6 digits");
+  .regex(/^\d{4}$|^\d{6}$/, "transaction_pin must be exactly 4 or 6 digits")
+  .optional();
 
 // Nigerian phone numbers: 080/081/070/090/091/etc. local format or +234/234 prefix.
 // Accepts: 08012345678, +2348012345678, 2348012345678

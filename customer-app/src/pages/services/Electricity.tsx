@@ -9,6 +9,7 @@ import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
+import { useSecuritySettings } from '@/hooks/useSecuritySettings'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
 import { transactionsApi } from '@/api/transactions.api'
@@ -28,7 +29,8 @@ export function ElectricityPage() {
 
   const { data: balance } = useWalletBalance()
   const { data: allPlans, isLoading: plansLoading } = useServicePlans('electricity', true)
-  const purchase = useServicePurchase<ElectricityPurchaseInput>(transactionsApi.buyElectricity)
+  const { biometricPurchaseEnabled } = useSecuritySettings()
+  const purchase = useServicePurchase<ElectricityPurchaseInput>(transactionsApi.buyElectricity, { biometricPurchaseEnabled })
 
   const selectedPlan = useMemo(
     () => allPlans?.find((p) => p.variation_code === selectedVariationCode) ?? null,
@@ -241,15 +243,16 @@ export function ElectricityPage() {
           ...(phone.trim() ? [{ label: 'Phone', value: phone.trim() }] : []),
           { label: 'Amount',   value: fmtCurrency(parseFloat(amount) || 0) },
         ]}
-        onConfirm={purchase.goToPin}
+        onConfirm={() => { void purchase.goToAuthorize() }}
         onCancel={purchase.cancel}
-        confirmLabel="Enter PIN"
+        confirmLabel={biometricPurchaseEnabled ? 'Confirm Purchase' : 'Enter PIN'}
       />
 
       <PinEntryModal
         open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
         loading={purchase.phase === 'submitting'}
         error={purchase.pinError}
+        biometricFallback={purchase.biometricFailed}
         onSubmit={purchase.confirmWithPin}
         onCancel={purchase.backToConfirm}
       />

@@ -1,0 +1,203 @@
+{
+  "template": "nin_information",
+  "page_size_pt": {
+    "width": 612,
+    "height": 1008
+  },
+  "coordinate_origin": "top-left",
+  "fields": {
+    "first_name": {
+      "x": 100,
+      "y": 141,
+      "w": 90,
+      "h": 15,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1634,
+      "y_norm": 0.1399,
+      "w_norm": 0.1471,
+      "h_norm": 0.0149
+    },
+    "middle_name": {
+      "x": 100,
+      "y": 168,
+      "w": 90,
+      "h": 15,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1634,
+      "y_norm": 0.1667,
+      "w_norm": 0.1471,
+      "h_norm": 0.0149
+    },
+    "last_name": {
+      "x": 100,
+      "y": 198,
+      "w": 90,
+      "h": 15,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1634,
+      "y_norm": 0.1964,
+      "w_norm": 0.1471,
+      "h_norm": 0.0149
+    },
+    "date_of_birth": {
+      "x": 117,
+      "y": 224,
+      "w": 105,
+      "h": 15,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1912,
+      "y_norm": 0.2222,
+      "w_norm": 0.1716,
+      "h_norm": 0.0149
+    },
+    "gender": {
+      "x": 117,
+      "y": 258,
+      "w": 90,
+      "h": 15,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1912,
+      "y_norm": 0.256,
+      "w_norm": 0.1471,
+      "h_norm": 0.0149
+    },
+    "photo": {
+      "x": 206,
+      "y": 137,
+      "w": 109,
+      "h": 145,
+      "type": "image",
+      "x_norm": 0.3366,
+      "y_norm": 0.1359,
+      "w_norm": 0.1781,
+      "h_norm": 0.1438
+    },
+    "signature": {
+      "x": 206,
+      "y": 283,
+      "w": 109,
+      "h": 24,
+      "type": "image_or_text",
+      "x_norm": 0.3366,
+      "y_norm": 0.2808,
+      "w_norm": 0.1781,
+      "h_norm": 0.0238
+    },
+    "id_number": {
+      "x": 130,
+      "y": 277,
+      "w": 190,
+      "h": 28,
+      "font_size": 20,
+      "align": "left",
+      "x_norm": 0.2124,
+      "y_norm": 0.2748,
+      "w_norm": 0.3105,
+      "h_norm": 0.0278
+    },
+    "tracking_id": {
+      "x": 116,
+      "y": 313,
+      "w": 100,
+      "h": 16,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1895,
+      "y_norm": 0.3105,
+      "w_norm": 0.1634,
+      "h_norm": 0.0159
+    },
+    "phone": {
+      "x": 260,
+      "y": 313,
+      "w": 100,
+      "h": 16,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.4248,
+      "y_norm": 0.3105,
+      "w_norm": 0.1634,
+      "h_norm": 0.0159
+    },
+    "residence_state": {
+      "x": 117,
+      "y": 340,
+      "w": 90,
+      "h": 28,
+      "font_size": 8,
+      "align": "left",
+      "wrap": true,
+      "x_norm": 0.1912,
+      "y_norm": 0.3373,
+      "w_norm": 0.1471,
+      "h_norm": 0.0278
+    },
+    "residence_lga": {
+      "x": 260,
+      "y": 340,
+      "w": 100,
+      "h": 28,
+      "font_size": 8,
+      "align": "left",
+      "wrap": true,
+      "x_norm": 0.4248,
+      "y_norm": 0.3373,
+      "w_norm": 0.1634,
+      "h_norm": 0.0278
+    },
+    "birth_state": {
+      "x": 117,
+      "y": 369,
+      "w": 90,
+      "h": 16,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.1912,
+      "y_norm": 0.3661,
+      "w_norm": 0.1471,
+      "h_norm": 0.0159
+    },
+    "birth_lga": {
+      "x": 260,
+      "y": 369,
+      "w": 100,
+      "h": 16,
+      "font_size": 8,
+      "align": "left",
+      "x_norm": 0.4248,
+      "y_norm": 0.3661,
+      "w_norm": 0.1634,
+      "h_norm": 0.0159
+    },
+    "address": {
+      "x": 117,
+      "y": 392,
+      "w": 220,
+      "h": 28,
+      "font_size": 8,
+      "align": "left",
+      "wrap": true,
+      "x_norm": 0.1912,
+      "y_norm": 0.3889,
+      "w_norm": 0.3595,
+      "h_norm": 0.0278
+    },
+    "reference_footer": {
+      "x": 35,
+      "y": 970,
+      "w": 330,
+      "h": 16,
+      "font_size": 6,
+      "align": "left",
+      "x_norm": 0.0572,
+      "y_norm": 0.9623,
+      "w_norm": 0.5392,
+      "h_norm": 0.0159
+    }
+  }
+}

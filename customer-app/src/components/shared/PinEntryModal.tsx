@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Lock, AlertCircle } from 'lucide-react'
+import { Lock, AlertCircle, Fingerprint } from 'lucide-react'
 import { Modal, Button } from '@/components/ui'
 import { PinPad } from '@/components/shared/PinPad'
 
@@ -7,6 +7,8 @@ interface PinEntryModalProps {
   open:     boolean
   loading?: boolean
   error?:   string | null
+  /** True when the user arrived here after a biometric attempt failed/was cancelled. */
+  biometricFallback?: boolean
   onSubmit: (pin: string) => void
   onCancel: () => void
 }
@@ -21,7 +23,14 @@ function pinErrorLabel(error: string): string {
   return error
 }
 
-export function PinEntryModal({ open, loading = false, error, onSubmit, onCancel }: PinEntryModalProps) {
+export function PinEntryModal({
+  open,
+  loading = false,
+  error,
+  biometricFallback = false,
+  onSubmit,
+  onCancel,
+}: PinEntryModalProps) {
   const [pin, setPin] = useState('')
 
   useEffect(() => {
@@ -46,6 +55,15 @@ export function PinEntryModal({ open, loading = false, error, onSubmit, onCancel
             Enter your 4 or 6 digit PIN to authorise this transaction.
           </p>
         </div>
+
+        {biometricFallback && !error && (
+          <div className="flex items-start gap-2 rounded-xl bg-surface-2 border border-border px-3 py-2.5">
+            <Fingerprint className="h-4 w-4 text-ink-faint shrink-0 mt-0.5" />
+            <p className="text-xs text-ink-muted">
+              Biometric verification was not completed. Enter your PIN to continue.
+            </p>
+          </div>
+        )}
 
         <PinPad value={pin} onChange={setPin} maxLength={6} disabled={loading} />
 

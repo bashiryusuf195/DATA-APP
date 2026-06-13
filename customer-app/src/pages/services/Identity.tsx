@@ -10,6 +10,7 @@ import { ConfirmModal }  from '@/components/shared/ConfirmModal'
 import { PinEntryModal } from '@/components/shared/PinEntryModal'
 import { ResultModal }   from '@/components/shared/ResultModal'
 import { useServicePurchase } from '@/hooks/useServicePurchase'
+import { useSecuritySettings } from '@/hooks/useSecuritySettings'
 import { useWalletBalance } from '@/hooks/useWallet'
 import { useServicePlans } from '@/hooks/useServices'
 import { transactionsApi } from '@/api/transactions.api'
@@ -135,7 +136,8 @@ export function IdentityPage() {
 
   const { data: balance }                        = useWalletBalance()
   const { data: plans, isLoading: plansLoading } = useServicePlans('identity_verification', true)
-  const purchase = useServicePurchase<IdentityVerificationInput>(transactionsApi.verifyIdentity)
+  const { biometricPurchaseEnabled }             = useSecuritySettings()
+  const purchase = useServicePurchase<IdentityVerificationInput>(transactionsApi.verifyIdentity, { biometricPurchaseEnabled })
 
   const ninPlans = (plans ?? []).filter((p) => p.network_operator === 'nin' && p.selling_price > 0)
   const bvnPlans = (plans ?? []).filter((p) => p.network_operator === 'bvn' && p.selling_price > 0)
@@ -428,14 +430,15 @@ export function IdentityPage() {
       <ConfirmModal
         open={purchase.phase === 'confirm'}
         rows={confirmRows}
-        onConfirm={purchase.goToPin}
+        onConfirm={() => { void purchase.goToAuthorize() }}
         onCancel={purchase.cancel}
-        confirmLabel="Enter PIN"
+        confirmLabel={biometricPurchaseEnabled ? 'Confirm Purchase' : 'Enter PIN'}
       />
       <PinEntryModal
         open={purchase.phase === 'pin' || purchase.phase === 'submitting'}
         loading={purchase.phase === 'submitting'}
         error={purchase.pinError}
+        biometricFallback={purchase.biometricFailed}
         onSubmit={purchase.confirmWithPin}
         onCancel={purchase.backToConfirm}
       />
