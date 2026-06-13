@@ -130,7 +130,7 @@ export async function sendAdminPushNotification(
     if (recipients.length === 0) return;
 
     const { preference_key: _dropped, ...pushPayload } = options;
-    const result = await sendPushToUsers(recipients, pushPayload);
+    const result = await sendPushToUsers(recipients, pushPayload, { platforms: ["web"] });
 
     logger.info("admin_push_sent", {
       notification_type: pushPayload.notification_type,
