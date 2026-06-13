@@ -3,6 +3,7 @@ import type {
   ReconciliationReport, ReconciliationIssue, ReconciliationStats,
   ProviderBalance, Refund, Reversal,
   PaginatedResponse,
+  ProfitAnalyticsData,
 } from '@/types'
 
 interface DateRange { from?: string; to?: string }
@@ -42,6 +43,13 @@ export const financeApi = {
 
   getProfitAnalysis: (params?: DateRange) =>
     apiClient.get<{ success: boolean; data: unknown }>('/admin/finance/profit-analysis', { params }).then((r) => r.data.data),
+
+  getProfitAnalytics: (month?: string): Promise<ProfitAnalyticsData> =>
+    apiClient
+      .get<{ success: boolean; data: ProfitAnalyticsData }>('/admin/analytics/profit', {
+        params: month ? { month } : undefined,
+      })
+      .then((r) => r.data.data),
 
   // ── Lists ───────────────────────────────────────────────────────────────────
   listRefunds: (params?: ListParams) =>
