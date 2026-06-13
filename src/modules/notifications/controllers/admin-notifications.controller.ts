@@ -16,6 +16,18 @@ import {
 } from "../services/template.service";
 import { AppError } from "../../../shared/errors/AppError";
 import { softDeleteNotification } from "../services/notification.service";
+import {
+  sendAdminPushNotification,
+  getAdminUserIds,
+} from "../services/admin-push.service";
+import {
+  getOrCreateNotificationPreferences,
+  updateNotificationPreferences,
+} from "../services/notification-preferences.service";
+import { getDbInstance } from "../../../db/knex";
+import { isFcmConfigured } from "../services/fcm.service";
+
+const db = getDbInstance();
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -207,5 +219,115 @@ export async function deleteNotificationController(
     const deleted = await softDeleteNotification(id);
     if (!deleted) throw new AppError(404, "NOT_FOUND", "Notification not found or already deleted");
     res.status(204).end();
+  } catch (err) { next(err); }
+}
+
+// ── Admin push preferences ────────────────────────────────────────────────────
+
+const AdminPushPrefSchema = z.object({
+  push_enabled:                z.boolean().optional(),
+  admin_transaction_failures:  z.boolean().optional(),
+  admin_provider_alerts:       z.boolean().optional(),
+  admin_support_messages:      z.boolean().optional(),
+  admin_payment_alerts:        z.boolean().optional(),
+  admin_security_events:       z.boolean().optional(),
+  admin_system_alerts:         z.boolean().optional(),
+}).refine((d) => Object.keys(d).length > 0, { message: "At least one field required" });
+
+export async function getAdminPushPreferencesController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    // base row (creates if absent)
+    const base = await getOrCreateNotificationPreferences(userId);
+    // fetch extra admin columns
+    const row = await db("notification_preferences").where({ user_id: userId }).first<Record<string, unknown>>();
+    res.json({
+      success: true,
+      data: {
+        ...base,
+        admin_transaction_failures: row?.admin_transaction_failures ?? true,
+        admin_provider_alerts:      row?.admin_provider_alerts      ?? true,
+        admin_support_messages:     row?.admin_support_messages      ?? true,
+        admin_payment_alerts:       row?.admin_payment_alerts        ?? true,
+        admin_security_events:      row?.admin_security_events       ?? true,
+        admin_system_alerts:        row?.admin_system_alerts         ?? true,
+        fcm_configured:             isFcmConfigured(),
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+export async function updateAdminPushPreferencesController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const body   = AdminPushPrefSchema.parse(req.body);
+
+    // Separate base prefs from admin-specific ones
+    const { push_enabled, ...adminCols } = body;
+    const baseUpdate: Record<string, unknown> = {};
+    if (push_enabled !== undefined) baseUpdate["push_enabled"] = push_enabled;
+
+    if (Object.keys(baseUpdate).length > 0) {
+      await updateNotificationPreferences(userId, baseUpdate as Parameters<typeof updateNotificationPreferences>[1]);
+    }
+    if (Object.keys(adminCols).length > 0) {
+      await db("notification_preferences")
+        .where({ user_id: userId })
+        .update({ ...adminCols, updated_at: new Date() });
+    }
+
+    const updated = await db("notification_preferences").where({ user_id: userId }).first<Record<string, unknown>>();
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+}
+
+// ── Admin push status ─────────────────────────────────────────────────────────
+
+export async function getAdminPushStatusController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const active = await db("user_push_tokens")
+      .where({ user_id: userId, is_active: true })
+      .count<{ count: string }[]>("id as count")
+      .first();
+    res.json({
+      success: true,
+      data: {
+        has_active_token: parseInt(active?.count ?? "0", 10) > 0,
+        configured:       isFcmConfigured(),
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+// ── Test notification ─────────────────────────────────────────────────────────
+
+export async function testAdminPushController(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const userId    = req.user!.id;
+    const adminIds  = await getAdminUserIds();
+    const recipient = adminIds.includes(userId) ? [userId] : [];
+    if (recipient.length === 0) {
+      res.status(400).json({ success: false, error: "No push token registered for this admin account" });
+      return;
+    }
+
+    const { sendPushToUsers } = await import("../services/fcm.service");
+    const result = await sendPushToUsers(recipient, {
+      title:             "Test Notification",
+      body:              "Admin push notifications are working correctly.",
+      deep_link:         "/settings",
+      notification_type: "admin_test",
+    });
+
+    res.json({ success: true, data: { sent: result.sent, failed: result.failed } });
   } catch (err) { next(err); }
 }

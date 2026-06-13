@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { settingsApi } from '@/api/settings.api'
 import { authApi } from '@/api/auth.api'
+import { adminPushApi } from '@/api/notifications.api'
+import type { AdminPushPreferences } from '@/api/notifications.api'
 import { useAuthStore } from '@/store/auth.store'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -11,6 +13,7 @@ import { Card, Badge, Button, Input, Skeleton, Modal } from '@/components/ui'
 import { ENDPOINTS } from '@/config/endpoints'
 import type { SettingEntry, SettingsByCategory, EnvironmentInfo } from '@/types'
 import type { TotpSetupData } from '@/api/auth.api'
+import { requestFcmToken, isFirebaseConfigured, onForegroundMessage } from '@/lib/firebase'
 import {
   Settings,
   Zap,
@@ -35,6 +38,9 @@ import {
   LogOut,
   CreditCard,
   HeartHandshake,
+  BellRing,
+  BellOff,
+  Send,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -55,6 +61,7 @@ const TABS = [
   { key: 'payment',      label: 'Payment',       icon: <CreditCard  className="h-3.5 w-3.5" /> },
   { key: 'security',     label: 'Security',      icon: <Shield      className="h-3.5 w-3.5" /> },
   { key: 'notification', label: 'Notifications', icon: <Bell        className="h-3.5 w-3.5" /> },
+  { key: 'alerts',       label: 'Alerts',        icon: <BellRing    className="h-3.5 w-3.5" /> },
   { key: 'queue',        label: 'Queue',         icon: <ListChecks  className="h-3.5 w-3.5" /> },
   { key: 'maintenance',  label: 'Maintenance',   icon: <Wrench      className="h-3.5 w-3.5" /> },
   { key: 'environment',  label: 'Environment',   icon: <Server      className="h-3.5 w-3.5" /> },
@@ -742,6 +749,256 @@ function AccountSecurityPanel() {
   )
 }
 
+// ── Admin Alerts Panel ────────────────────────────────────────────────────────
+
+interface PrefToggleProps {
+  label:       string
+  description: string
+  checked:     boolean
+  onChange:    (v: boolean) => void
+  disabled?:   boolean
+}
+
+function PrefToggle({ label, description, checked, onChange, disabled }: PrefToggleProps) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-0">
+      <div>
+        <p className="text-sm font-medium text-ink">{label}</p>
+        <p className="text-xs text-ink-faint mt-0.5">{description}</p>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-40 ${
+          checked ? 'bg-accent' : 'bg-surface-3'
+        }`}
+        role="switch"
+        aria-checked={checked}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  )
+}
+
+function AdminAlertsPanel() {
+  const qc = useQueryClient()
+
+  const { data: prefs, isLoading, error } = useQuery<AdminPushPreferences>({
+    queryKey: ['admin-push-prefs'],
+    queryFn:  adminPushApi.getPreferences,
+  })
+
+  const { data: status, refetch: refetchStatus } = useQuery({
+    queryKey: ['admin-push-status'],
+    queryFn:  adminPushApi.getStatus,
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: adminPushApi.updatePreferences,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-push-prefs'] })
+      toast.success('Preferences saved')
+    },
+    onError: () => toast.error('Failed to save preferences'),
+  })
+
+  const testMutation = useMutation({
+    mutationFn: adminPushApi.sendTest,
+    onSuccess: (data) => {
+      if (data.sent > 0) toast.success('Test notification sent!')
+      else toast.error('Sent but no tokens registered — enable push first')
+    },
+    onError: () => toast.error('Test failed'),
+  })
+
+  const [registering, setRegistering] = useState(false)
+
+  async function handleEnablePush() {
+    if (!isFirebaseConfigured()) {
+      toast.error('Firebase not configured — set VITE_FIREBASE_* env vars')
+      return
+    }
+    setRegistering(true)
+    try {
+      const result = await requestFcmToken()
+      if (!result.ok) {
+        if (result.reason === 'permission_denied') toast.error('Notification permission denied')
+        else if (result.reason === 'not_configured') toast.error('Firebase env vars not set')
+        else toast.error(result.message ?? 'Failed to get push token')
+        return
+      }
+      await adminPushApi.registerToken(result.token)
+      await adminPushApi.updatePreferences({ push_enabled: true })
+      await qc.invalidateQueries({ queryKey: ['admin-push-prefs'] })
+      await refetchStatus()
+      toast.success('Push notifications enabled!')
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  // Listen for foreground push messages while this tab is open
+  useEffect(() => {
+    return onForegroundMessage((title, body) => {
+      toast(`${title}: ${body}`, { icon: '🔔', duration: 6000 })
+    })
+  }, [])
+
+  function toggle(key: keyof AdminPushPreferences) {
+    if (!prefs) return
+    updateMutation.mutate({ [key]: !prefs[key] })
+  }
+
+  if (error) return (
+    <Card className="p-6 text-center text-sm text-rose-400">
+      Failed to load alert preferences
+    </Card>
+  )
+
+  if (isLoading || !prefs) return (
+    <Card className="divide-y divide-border">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="p-4 space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-64" />
+        </div>
+      ))}
+    </Card>
+  )
+
+  const hasToken     = status?.has_active_token ?? false
+  const fcmReady     = prefs.fcm_configured && isFirebaseConfigured()
+
+  return (
+    <div className="space-y-6">
+      {/* Push registration */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <BellRing className="h-4 w-4 text-ink-faint" />
+          <h3 className="text-sm font-semibold text-ink">Browser Push Notifications</h3>
+          <Badge variant={hasToken && prefs.push_enabled ? 'success' : 'neutral'} className="ml-auto">
+            {hasToken && prefs.push_enabled ? 'Active' : 'Inactive'}
+          </Badge>
+        </div>
+
+        {!prefs.fcm_configured && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Firebase is not configured on the backend. Set <code className="font-mono">FIREBASE_PROJECT_ID</code>, <code className="font-mono">FIREBASE_CLIENT_EMAIL</code>, and <code className="font-mono">FIREBASE_PRIVATE_KEY</code> in Railway env vars to enable push delivery.
+            </p>
+          </div>
+        )}
+
+        {!isFirebaseConfigured() && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Firebase web SDK not configured. Set <code className="font-mono">VITE_FIREBASE_API_KEY</code>, <code className="font-mono">VITE_FIREBASE_PROJECT_ID</code>, <code className="font-mono">VITE_FIREBASE_MESSAGING_SENDER_ID</code>, <code className="font-mono">VITE_FIREBASE_APP_ID</code>, and <code className="font-mono">VITE_FIREBASE_VAPID_KEY</code> in the admin dashboard env file.
+            </p>
+          </div>
+        )}
+
+        <p className="text-xs text-ink-faint">
+          Register this browser to receive real-time push alerts for operational events — failed transactions, provider outages, new support tickets, and more.
+        </p>
+
+        <div className="flex gap-2 flex-wrap">
+          {!hasToken || !prefs.push_enabled ? (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<BellRing className="h-3.5 w-3.5" />}
+              disabled={registering || !fcmReady}
+              onClick={() => void handleEnablePush()}
+            >
+              {registering ? 'Registering…' : 'Enable Push Notifications'}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<BellOff className="h-3.5 w-3.5" />}
+              onClick={() => updateMutation.mutate({ push_enabled: false })}
+              disabled={updateMutation.isPending}
+            >
+              Disable Push
+            </Button>
+          )}
+
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Send className="h-3.5 w-3.5" />}
+            disabled={testMutation.isPending || !hasToken}
+            onClick={() => testMutation.mutate()}
+          >
+            {testMutation.isPending ? 'Sending…' : 'Send Test'}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Category toggles */}
+      <Card className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Bell className="h-4 w-4 text-ink-faint" />
+          <h3 className="text-sm font-semibold text-ink">Alert Categories</h3>
+        </div>
+        <p className="text-xs text-ink-faint mb-4">
+          Choose which operational events trigger a push notification to your device. These only affect your account.
+        </p>
+
+        <div>
+          <PrefToggle
+            label="Transaction Failures"
+            description="Push when all providers fail for a customer transaction"
+            checked={prefs.admin_transaction_failures}
+            onChange={() => toggle('admin_transaction_failures')}
+            disabled={updateMutation.isPending}
+          />
+          <PrefToggle
+            label="Provider Alerts"
+            description="Push when a provider's circuit breaker trips open"
+            checked={prefs.admin_provider_alerts}
+            onChange={() => toggle('admin_provider_alerts')}
+            disabled={updateMutation.isPending}
+          />
+          <PrefToggle
+            label="Support Messages"
+            description="Push when a customer opens a new support ticket"
+            checked={prefs.admin_support_messages}
+            onChange={() => toggle('admin_support_messages')}
+            disabled={updateMutation.isPending}
+          />
+          <PrefToggle
+            label="Payment Alerts"
+            description="Push for payment gateway failures and webhook errors"
+            checked={prefs.admin_payment_alerts}
+            onChange={() => toggle('admin_payment_alerts')}
+            disabled={updateMutation.isPending}
+          />
+          <PrefToggle
+            label="Security Events"
+            description="Push for suspicious logins and security-related events"
+            checked={prefs.admin_security_events}
+            onChange={() => toggle('admin_security_events')}
+            disabled={updateMutation.isPending}
+          />
+          <PrefToggle
+            label="System Alerts"
+            description="Push for critical system events and maintenance notices"
+            checked={prefs.admin_system_alerts}
+            onChange={() => toggle('admin_system_alerts')}
+            disabled={updateMutation.isPending}
+          />
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 // ── Skeleton loading ──────────────────────────────────────────────────────────
 
 function SettingsSkeleton() {
@@ -773,7 +1030,7 @@ export function SettingsPage() {
     void qc.invalidateQueries({ queryKey: ['admin-settings'] })
   }, [qc])
 
-  const currentSettings = activeTab !== 'environment' && activeTab !== 'account'
+  const currentSettings = activeTab !== 'environment' && activeTab !== 'account' && activeTab !== 'alerts'
     ? (settingsData?.[activeTab] ?? [])
     : []
 
@@ -814,6 +1071,8 @@ export function SettingsPage() {
           <EnvironmentPanel />
         ) : activeTab === 'account' ? (
           <AccountSecurityPanel />
+        ) : activeTab === 'alerts' ? (
+          <AdminAlertsPanel />
         ) : error ? (
           <ErrorMessage
             error={error}
