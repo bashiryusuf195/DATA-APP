@@ -16,8 +16,8 @@ export function LoginPage() {
   const [challengeId, setChallengeId] = useState('')
 
   // Credentials step
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
+  const [identifier, setIdentifier] = useState('')
+  const [password,   setPassword]   = useState('')
 
   // 2FA step
   const [totpCode, setTotpCode] = useState('')
@@ -43,11 +43,11 @@ export function LoginPage() {
 
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) { setError('Email and password are required.'); return }
+    if (!identifier || !password) { setError('Email and password are required.'); return }
     setLoading(true)
     setError('')
     try {
-      const res = await authApi.login({ email, password })
+      const res = await authApi.login({ identifier, password })
 
       if (res.requires_2fa) {
         setChallengeId(res.challenge_id)
@@ -142,8 +142,8 @@ export function LoginPage() {
               <Input
                 label="Email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="admin@example.com"
                 autoComplete="email"
                 prefix={<Mail className="h-4 w-4" />}
