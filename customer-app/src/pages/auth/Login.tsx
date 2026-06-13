@@ -29,7 +29,7 @@ const LAST_EMAIL_KEY = 'hive-last-email'
 export function LoginPage() {
   const [step, setStep]               = useState<Step>('credentials')
   const [challengeId, setChallengeId] = useState('')
-  const [email, setEmail]             = useState(() => localStorage.getItem(LAST_EMAIL_KEY) ?? '')
+  const [identifier, setIdentifier]   = useState(() => localStorage.getItem(LAST_EMAIL_KEY) ?? '')
   const [password, setPassword]       = useState('')
   const [totpCode, setTotpCode]       = useState('')
   const [loading, setLoading]         = useState(false)
@@ -194,10 +194,10 @@ export function LoginPage() {
 
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) { setError('Email and password are required.'); return }
+    if (!identifier || !password) { setError('Email or phone number and password are required.'); return }
     setLoading(true); setError('')
     try {
-      const res = await authApi.login({ email, password })
+      const res = await authApi.login({ identifier, password })
       if (res.requires_2fa) {
         setChallengeId(res.challenge_id)
         setStep('2fa')
@@ -278,7 +278,7 @@ export function LoginPage() {
       <h1 className="text-xl font-bold text-ink mb-1">Sign in</h1>
       <p className="text-sm text-ink-muted mb-6">Enter your credentials to continue.</p>
       <form onSubmit={handleCredentials} className="space-y-4">
-        <Input label="Email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); localStorage.setItem(LAST_EMAIL_KEY, e.target.value) }} placeholder="you@example.com" autoComplete="email webauthn" prefix={<Mail className="h-4 w-4" />} />
+        <Input label="Email or Phone Number" type="text" value={identifier} onChange={(e) => { setIdentifier(e.target.value); localStorage.setItem(LAST_EMAIL_KEY, e.target.value) }} placeholder="you@example.com or 08012345678" autoComplete="username webauthn" prefix={<Mail className="h-4 w-4" />} />
         <Input
           label="Password"
           type={showPw ? 'text' : 'password'}

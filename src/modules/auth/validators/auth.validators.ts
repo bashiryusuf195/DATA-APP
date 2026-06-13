@@ -45,7 +45,7 @@ export type RegisterInput = z.infer<typeof RegisterSchema>;
 // ── Login ──────────────────────────────────────────────────────
 
 export const LoginSchema = z.object({
-  email:              emailField,
+  identifier:         z.string({ required_error: "Email or phone number is required" }).min(1).trim(),
   password:           z.string({ required_error: "Password is required" }).min(1),
   device_fingerprint: deviceFingerprintField,
   device_name:        z.string().max(100).optional(),

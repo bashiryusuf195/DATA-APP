@@ -335,6 +335,26 @@ export async function register(
   return { user: coerceUser(userRow!), tokens, sessionId, rbac };
 }
 
+// ── Login helpers ──────────────────────────────────────────────
+
+function normalizeToE164(phone: string): string | null {
+  const stripped = phone.replace(/[\s\-\(\)]/g, "");
+  if (/^\+[1-9]\d{6,14}$/.test(stripped)) return stripped;
+  const digits = stripped.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("0")) return "+234" + digits.slice(1);
+  if (digits.length === 13 && digits.startsWith("234")) return "+" + digits;
+  return null;
+}
+
+async function resolveLoginIdentifier(db: Knex, identifier: string) {
+  if (identifier.includes("@")) {
+    return db("users").where({ email: identifier.toLowerCase().trim() }).whereNull("deleted_at").first();
+  }
+  const e164 = normalizeToE164(identifier.trim());
+  if (!e164) return undefined;
+  return db("users").where({ phone: e164 }).whereNull("deleted_at").first();
+}
+
 // ── Login ──────────────────────────────────────────────────────
 
 export async function login(
@@ -347,14 +367,12 @@ export async function login(
 > {
   const traceId = req.traceId ?? "no-trace";
 
-  // 1. Load user
-  const user = await db("users")
-    .where({ email: input.email })
-    .whereNull("deleted_at")
-    .first();
+  // 1. Load user — accept email or phone number
+  const user = await resolveLoginIdentifier(db, input.identifier);
+  const resolvedEmail = (user?.email as string | undefined) ?? input.identifier;
 
   logger.info("login_attempt", {
-    email:            input.email,
+    identifier:       input.identifier,
     password_present: !!input.password,
     user_found:       !!user,
     user_status:      user?.status ?? null,
@@ -388,7 +406,7 @@ export async function login(
   logger.info("login_supabase_signin", { userId: user.id as string, traceId });
   let supabaseSession: Awaited<ReturnType<typeof supabaseSignIn>>;
   try {
-    supabaseSession = await supabaseSignIn(input.email, input.password);
+    supabaseSession = await supabaseSignIn(resolvedEmail, input.password);
     logger.info("login_supabase_signin_ok", { userId: user.id as string, traceId });
   } catch (signinErr) {
     // Increment failed attempts
