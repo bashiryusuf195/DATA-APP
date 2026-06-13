@@ -178,6 +178,7 @@ async function sendBatch(
 export async function sendPushToUsers(
   userIds: string[],
   payload: PushPayload,
+  options?: { platforms?: ("web" | "android" | "ios")[] },
 ): Promise<PushResult> {
   const app = getFirebaseApp();
   if (!app) return { sent: 0, failed: 0, disabled: true };
@@ -185,6 +186,9 @@ export async function sendPushToUsers(
   const rows = await db("user_push_tokens")
     .whereIn("user_id", userIds)
     .where("is_active", true)
+    .modify((qb: ReturnType<typeof db>) => {
+      if (options?.platforms?.length) qb.whereIn("platform", options.platforms);
+    })
     .select("token");
 
   console.log(
