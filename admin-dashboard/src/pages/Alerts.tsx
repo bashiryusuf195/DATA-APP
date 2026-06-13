@@ -296,7 +296,7 @@ export function AlertsPage() {
       </div>
 
       {total > limit && (
-        <Pagination page={page} total={total} limit={limit} onPageChange={setPage} />
+        <Pagination page={page} total={total} limit={limit} onPage={setPage} />
       )}
     </div>
   )
