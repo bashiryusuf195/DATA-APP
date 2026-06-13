@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ExternalLink, CheckCircle2, AlertCircle, Clock,
@@ -15,20 +15,43 @@ import { isAxiosError } from 'axios'
 type Phase = 'input' | 'transfer_details' | 'redirect' | 'verifying' | 'success' | 'pending' | 'failed'
 type Method = 'card' | 'bank'
 
+const SESSION_REF_KEY   = 'fund_wallet_ref'
+const SESSION_PHASE_KEY = 'fund_wallet_phase'
+const SESSION_URL_KEY   = 'fund_wallet_url'
+
 export function FundWalletPage() {
   const navigate = useNavigate()
   const [method, setMethod]           = useState<Method>('bank')
   const [amount, setAmount]           = useState('')
   const [amountError, setAmountError] = useState('')
-  const [phase, setPhase]             = useState<Phase>('input')
-  const [reference, setReference]     = useState('')
-  const [payUrl, setPayUrl]           = useState('')
+  const [phase, setPhase]             = useState<Phase>(() => {
+    // Restore only the redirect phase — transfer_details needs transferAccount object
+    const saved = sessionStorage.getItem(SESSION_PHASE_KEY)
+    return saved === 'redirect' ? 'redirect' : 'input'
+  })
+  const [reference, setReference]     = useState(() => sessionStorage.getItem(SESSION_REF_KEY) ?? '')
+  const [payUrl, setPayUrl]           = useState(() => sessionStorage.getItem(SESSION_URL_KEY) ?? '')
   const [newBalance, setNewBalance]   = useState<number | null>(null)
   const [copied, setCopied]                     = useState(false)
   const [copiedSquad, setCopiedSquad]           = useState(false)
   const [copiedTransfer, setCopiedTransfer]     = useState(false)
   const [transferAccount, setTransferAccount]   = useState<TransferAccount | null>(null)
   const [transferAmount, setTransferAmount]     = useState<number | null>(null)
+
+  // Persist in-flight reference so refresh during redirect doesn't lose it
+  useEffect(() => {
+    if (reference) sessionStorage.setItem(SESSION_REF_KEY, reference)
+  }, [reference])
+  useEffect(() => {
+    if (phase === 'redirect') {
+      sessionStorage.setItem(SESSION_PHASE_KEY, phase)
+      if (payUrl) sessionStorage.setItem(SESSION_URL_KEY, payUrl)
+    } else {
+      sessionStorage.removeItem(SESSION_REF_KEY)
+      sessionStorage.removeItem(SESSION_PHASE_KEY)
+      sessionStorage.removeItem(SESSION_URL_KEY)
+    }
+  }, [phase, payUrl])
 
   const { data: balance }  = useWalletBalance()
   const { data: dva, isLoading: dvaLoading }     = useDedicatedAccount()
