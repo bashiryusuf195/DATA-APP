@@ -273,6 +273,42 @@ html:not(.dark) .lm-section-title::before {
   border-radius: 2px;
 }
 
+/* ── Light-mode form & input polish ──────────────────────────────────────────
+   Scoped to html:not(.dark) — zero impact on dark mode.
+   Improves depth and focus feedback on service and auth forms.
+────────────────────────────────────────────────────────────────────────────── */
+
+/* All shadow-card elements: richer layered elevation in light mode */
+html:not(.dark) .shadow-card {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.07),
+    0 6px 24px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Text input focus: brand ring with soft outer glow */
+html:not(.dark) input:focus,
+html:not(.dark) textarea:focus {
+  box-shadow:
+    0 0 0 2px rgb(68 68 217),
+    0 0 0 5px rgba(68, 68, 217, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.07) !important;
+}
+
+/* NumPadInput active state: same brand ring + glow treatment */
+html:not(.dark) [role="textbox"].ring-2 {
+  box-shadow:
+    0 0 0 2px rgb(68 68 217),
+    0 0 0 5px rgba(68, 68, 217, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.07) !important;
+}
+
+/* Inputs at rest: subtle inset shadow to feel more tactile in light mode */
+html:not(.dark) input:not(:focus),
+html:not(.dark) textarea:not(:focus) {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
 /* ── Skeleton shimmer ────────────────────────────────────────────────────────
    A left-to-right highlight sweep that works in both light and dark mode.
    --skeleton-highlight is a thin bright band; base colour is --surface-2.
@@ -448,7 +484,21 @@ html, body {
   .sheet-backdrop { animation: none; }
 }
 
-/* 8. Safe-area utilities ────────────────────────────────────────────────────
+/* 8. NumPad slide-up entry animation ────────────────────────────────────────
+   Applied to the NumPad container so it glides in from the bottom rather than
+   popping in abruptly. The 220ms cubic matches the bottom sheet animation.  */
+@keyframes numpad-slide-up {
+  from { transform: translateY(100%); opacity: 0.7; }
+  to   { transform: translateY(0);    opacity: 1;   }
+}
+.numpad-slide-up {
+  animation: numpad-slide-up 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .numpad-slide-up { animation: none; }
+}
+
+/* 9. Safe-area utilities ────────────────────────────────────────────────────
    Used by AppHeader (top) and BottomNav (bottom) to respect the Android
    status bar and gesture navigation bar when running inside Capacitor.
    On plain web/PWA, env() resolves to 0px so these are no-ops.

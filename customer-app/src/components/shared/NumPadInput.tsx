@@ -1,4 +1,4 @@
-import { useId, useEffect } from 'react'
+import { useRef, useId, useEffect } from 'react'
 import { useNumPadStore } from '@/store/numpad.store'
 import { cn } from '@/utils/cn'
 
@@ -27,6 +27,7 @@ export function NumPadInput({
   error, hint, prefix, disabled = false, className,
 }: NumPadInputProps) {
   const fieldId   = useId()
+  const divRef    = useRef<HTMLDivElement>(null)
   const openPad   = useNumPadStore((s) => s.open)
   const syncValue = useNumPadStore((s) => s.syncValue)
   const isOpen    = useNumPadStore((s) => s.isOpen)
@@ -38,6 +39,22 @@ export function NumPadInput({
     if (isActive) syncValue(value)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
+
+  // Scroll field into view when NumPad opens — prevents the fixed 260px NumPad from covering the active input
+  useEffect(() => {
+    if (!isActive || !divRef.current) return
+    const el = divRef.current
+    const t = setTimeout(() => {
+      const rect = el.getBoundingClientRect()
+      const numPadHeight = 264 // 40px label bar + 4 rows × 54px keys + buffer
+      const margin = 24
+      const visibleBottom = window.innerHeight - numPadHeight - margin
+      if (rect.bottom > visibleBottom) {
+        window.scrollBy({ top: rect.bottom - visibleBottom, behavior: 'smooth' })
+      }
+    }, 60)
+    return () => clearTimeout(t)
+  }, [isActive])
 
   // Close numpad if this field unmounts while active (page navigation)
   useEffect(() => {
@@ -59,7 +76,7 @@ export function NumPadInput({
     : ''
 
   return (
-    <div className={cn('w-full', className)}>
+    <div ref={divRef} className={cn('w-full', className)}>
       {label && (
         <label className="block text-sm font-medium text-ink mb-1.5">
           {label}

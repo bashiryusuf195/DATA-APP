@@ -19,6 +19,7 @@ import { PullToRefreshIndicator } from '@/components/shared/PullToRefresh'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
 import { useAuthStore }           from '@/store/auth.store'
 import { useThemeStore }          from '@/store/theme.store'
+import { useNumPadStore }         from '@/store/numpad.store'
 import { usePwaInstall }          from '@/hooks/usePwaInstall'
 import { usePullToRefresh }       from '@/hooks/usePullToRefresh'
 import { usePushNotifications }   from '@/hooks/usePushNotifications'
@@ -31,6 +32,7 @@ export function AppLayout() {
   const biometricEnabled = useAuthStore((s) => s.biometric_enabled)
   const setBalanceHidden = useThemeStore((s) => s.setBalanceHidden)
   const dark             = useThemeStore((s) => s.dark)
+  const numPadOpen       = useNumPadStore((s) => s.isOpen)
   const push             = usePushNotifications()
 
   // Sync Android status-bar / browser chrome colour with the app theme
@@ -175,7 +177,7 @@ export function AppLayout() {
         )}
 
         {/* Page content */}
-        <main className={`flex-1 px-4 pb-28 md:pt-8 md:pb-4 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'app-content-offset-ticker' : 'app-content-offset'}`}>
+        <main className={`flex-1 px-4 md:pt-8 md:pb-4 md:px-8 lg:px-10 xl:px-12 w-full mx-auto md:max-w-5xl lg:max-w-6xl xl:max-w-7xl ${tickers.length > 0 ? 'app-content-offset-ticker' : 'app-content-offset'} ${numPadOpen ? 'pb-[280px]' : 'pb-28'}`}>
           <PageTransition />
         </main>
 

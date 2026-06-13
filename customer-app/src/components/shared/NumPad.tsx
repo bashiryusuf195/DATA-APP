@@ -21,7 +21,7 @@ export function NumPad() {
   return (
     // z-[45]: above BottomNav (z-40), below Modal backdrops (z-50)
     <div
-      className="fixed inset-x-0 bottom-0 z-[45] select-none"
+      className="fixed inset-x-0 bottom-0 z-[45] select-none numpad-slide-up"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       {/* Label + Done bar */}
