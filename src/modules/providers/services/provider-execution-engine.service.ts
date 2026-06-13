@@ -16,6 +16,7 @@ import {
 } from "../../transactions/services/transaction.service";
 import { createNotification } from "../../notifications/services/notification.service";
 import { sendTransactionPush } from "../../notifications/services/fcm.service";
+import { sendAdminPushNotification } from "../../notifications/services/admin-push.service";
 import {
   recordSuccess as metricsRecordSuccess,
   recordFailure as metricsRecordFailure,
@@ -925,6 +926,21 @@ class ProviderExecutionEngine {
       notification_type: "purchase_failed",
       reference:         transaction_reference,
     }).catch(() => {/* logged inside sendTransactionPush */});
+
+    sendAdminPushNotification({
+      title:             "Transaction Failed",
+      body:              `${service_type.toUpperCase()} purchase failed after ${attemptedProviders.length} attempt(s). Ref: ${transaction_reference}`,
+      deep_link:         `/transactions`,
+      notification_type: "admin_transaction_failure",
+      preference_key:    "admin_transaction_failures",
+      metadata: {
+        reference:         transaction_reference,
+        service_type,
+        provider_attempts: String(attemptedProviders.length),
+        user_id:           transaction.user_id,
+        amount:            String(transaction.amount),
+      },
+    }).catch(() => {});
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

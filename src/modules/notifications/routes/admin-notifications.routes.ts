@@ -12,7 +12,15 @@ import {
   createTemplateController,
   updateTemplateController,
   deleteNotificationController,
+  getAdminPushPreferencesController,
+  updateAdminPushPreferencesController,
+  getAdminPushStatusController,
+  testAdminPushController,
 } from "../controllers/admin-notifications.controller";
+import {
+  registerPushTokenController,
+  deregisterPushTokenController,
+} from "../controllers/push-token.controller";
 
 const router = Router();
 
@@ -79,5 +87,13 @@ router.patch(
   ...adminGuard, adminRateLimiter,
   updateTemplateController,
 );
+
+// ── Admin push preferences & token registration ───────────────────────────────
+router.get(  "/admin/push-preferences", ...adminGuard, adminRateLimiter, getAdminPushPreferencesController);
+router.put(  "/admin/push-preferences", ...adminGuard, adminRateLimiter, updateAdminPushPreferencesController);
+router.get(  "/admin/push-status",      ...adminGuard, adminRateLimiter, getAdminPushStatusController);
+router.post( "/admin/push/test",        ...adminGuard, adminRateLimiter, testAdminPushController);
+router.post( "/admin/push-token",       ...adminGuard, adminRateLimiter, registerPushTokenController);
+router.delete("/admin/push-token",      ...adminGuard, adminRateLimiter, deregisterPushTokenController);
 
 export { router as adminNotificationsRouter };

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getDbInstance } from "../../../db/knex";
+import { sendAdminPushNotification } from "../../notifications/services/admin-push.service";
 
 const db = getDbInstance();
 
@@ -120,6 +121,21 @@ export async function createTicket(data: CreateTicketData) {
       assigned_to_email:     data.assigned_to_email      ?? null,
     })
     .returning("*");
+
+  sendAdminPushNotification({
+    title:             "New Support Ticket",
+    body:              `"${data.subject}" from ${data.user_email ?? "anonymous"}`,
+    deep_link:         `/support/tickets`,
+    notification_type: "admin_support_message",
+    preference_key:    "admin_support_messages",
+    metadata: {
+      ticket_reference: (row as Record<string, unknown>).reference as string ?? "",
+      subject:          data.subject,
+      user_email:       data.user_email ?? "",
+      priority:         data.priority ?? "medium",
+    },
+  }).catch(() => {});
+
   return row;
 }
 

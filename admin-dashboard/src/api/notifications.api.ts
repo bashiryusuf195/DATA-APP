@@ -130,3 +130,46 @@ export const notificationsApi = {
     apiClient.patch<{ success: boolean; data: NotificationTemplate }>(`/admin/notification-templates/${id}`, body)
       .then((r) => r.data.data),
 }
+
+// ── Admin push notifications ──────────────────────────────────────────────────
+
+export interface AdminPushPreferences {
+  push_enabled:               boolean
+  admin_transaction_failures: boolean
+  admin_provider_alerts:      boolean
+  admin_support_messages:     boolean
+  admin_payment_alerts:       boolean
+  admin_security_events:      boolean
+  admin_system_alerts:        boolean
+  fcm_configured:             boolean
+}
+
+export const adminPushApi = {
+  getPreferences: (): Promise<AdminPushPreferences> =>
+    apiClient
+      .get<{ success: boolean; data: AdminPushPreferences }>('/admin/push-preferences')
+      .then((r) => r.data.data),
+
+  updatePreferences: (prefs: Partial<AdminPushPreferences>): Promise<AdminPushPreferences> =>
+    apiClient
+      .put<{ success: boolean; data: AdminPushPreferences }>('/admin/push-preferences', prefs)
+      .then((r) => r.data.data),
+
+  getStatus: (): Promise<{ has_active_token: boolean; configured: boolean }> =>
+    apiClient
+      .get<{ success: boolean; data: { has_active_token: boolean; configured: boolean } }>('/admin/push-status')
+      .then((r) => r.data.data),
+
+  registerToken: (token: string): Promise<void> =>
+    apiClient
+      .post('/admin/push-token', { token, platform: 'web', browser: navigator.userAgent.slice(0, 100) })
+      .then(() => undefined),
+
+  deregisterToken: (token: string): Promise<void> =>
+    apiClient.delete('/admin/push-token', { data: { token } }).then(() => undefined),
+
+  sendTest: (): Promise<{ sent: number; failed: number }> =>
+    apiClient
+      .post<{ success: boolean; data: { sent: number; failed: number } }>('/admin/push/test')
+      .then((r) => r.data.data),
+}

@@ -1,4 +1,5 @@
 import { getDbInstance } from "../../../db/knex";
+import { sendAdminPushNotification, checkAndUpdateCooldown } from "../../notifications/services/admin-push.service";
 
 const db = getDbInstance();
 
@@ -66,6 +67,33 @@ export async function recordFailure(providerCode: string): Promise<void> {
     [providerCode, CIRCUIT_OPEN_THRESHOLD, CIRCUIT_OPEN_THRESHOLD,
      CIRCUIT_OPEN_THRESHOLD, CIRCUIT_OPEN_THRESHOLD]
   );
+
+  // Alert admins when the circuit just tripped open (10-min cooldown per provider)
+  const state = await db("provider_circuit_state")
+    .where({ provider_code: providerCode })
+    .first<{ circuit_open: boolean; consecutive_failures: number } | undefined>();
+
+  if (state?.circuit_open) {
+    const shouldSend = await checkAndUpdateCooldown(
+      "provider_circuit_open",
+      providerCode,
+      10,
+    ).catch(() => false);
+
+    if (shouldSend) {
+      sendAdminPushNotification({
+        title:             "Provider Alert",
+        body:              `${providerCode} has ${state.consecutive_failures} consecutive failures — circuit open.`,
+        deep_link:         `/health-metrics`,
+        notification_type: "admin_provider_alert",
+        preference_key:    "admin_provider_alerts",
+        metadata: {
+          provider_code:        providerCode,
+          consecutive_failures: String(state.consecutive_failures),
+        },
+      }).catch(() => {});
+    }
+  }
 }
 
 export async function resetCircuit(providerCode: string): Promise<void> {
