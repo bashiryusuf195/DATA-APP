@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/auth.store'
+import { useSystemStore } from '@/store/system.store'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -39,6 +40,12 @@ apiClient.interceptors.response.use(
   (res) => res,
   (error) => {
     const status: number | undefined = error.response?.status
+
+    // 503 from the backend with maintenance flag → surface the maintenance screen
+    if (status === 503 && error.response?.data?.maintenance === true) {
+      useSystemStore.getState().setMaintenance(true)
+      return new Promise(() => {})
+    }
 
     if (status === 401) {
       const url: string  = error.config?.url ?? ''

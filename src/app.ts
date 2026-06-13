@@ -30,6 +30,7 @@ import { webhookRouter } from "./modules/webhooks/routes/webhook.routes";
 import { notificationsRouter }       from "./modules/notifications/routes/notifications.routes";
 import { adminRouter }               from "./routes/admin.routes";
 import { publicAuditMiddleware }       from "./middleware/publicAudit";
+import { maintenanceMiddleware }       from "./middleware/maintenance.middleware";
 import { publicRouter }               from "./modules/public/routes/public.routes";
 import { transactionPinRouter }       from "./modules/security/routes/transaction-pin.routes";
 import { customerKycRouter }          from "./modules/compliance/routes/customer-kyc.routes";
@@ -105,6 +106,11 @@ app.use(requestLogger);
 
 // ── 5. Rate limiter ───────────────────────────────────────────────────────────
 app.use(standardLimiter);
+
+// ── 5b. Maintenance mode gate ─────────────────────────────────────────────────
+// Returns 503 for customer routes when maintenance_mode=true in admin_settings.
+// Admin, webhook, and public routes are always bypassed.
+app.use(maintenanceMiddleware);
 
 // ── 6. Routes ─────────────────────────────────────────────────────────────────
 // publicAuditMiddleware fires on res.on("finish") for every request.

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { getDbInstance } from '../../../db/knex'
+import { invalidateMaintenanceCache } from '../../../middleware/maintenance.middleware'
 
 const DEFAULT_FUNDING_CARDS = [
   { type: 'quick_transfer',    enabled: true },
@@ -69,5 +70,27 @@ export async function getAppContentController(
     res.json(content)
   } catch (err) {
     next(err)
+  }
+}
+
+// ── GET /public/status ────────────────────────────────────────────────────────
+// Public endpoint — no auth required. Returns maintenance state so the customer
+// app can show the maintenance screen before making any authenticated request.
+
+export async function getSystemStatusController(
+  _req: Request,
+  res:  Response,
+): Promise<void> {
+  try {
+    const row = await getDbInstance()('admin_settings')
+      .where({ key: 'maintenance_mode' })
+      .first<{ value: string } | undefined>()
+    // Ensure the in-process cache stays consistent with the DB value
+    // (this endpoint bypasses the middleware, so refresh it here too)
+    invalidateMaintenanceCache()
+    res.json({ maintenance: row?.value === 'true' })
+  } catch {
+    // On any DB error, report not in maintenance so the app stays usable
+    res.json({ maintenance: false })
   }
 }

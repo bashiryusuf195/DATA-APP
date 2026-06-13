@@ -41,6 +41,7 @@ import {
   BellRing,
   BellOff,
   Send,
+  Power,
 } from 'lucide-react'
 
 function errMsg(err: unknown, fallback: string): string {
@@ -999,6 +1000,134 @@ function AdminAlertsPanel() {
   )
 }
 
+// ── Maintenance Mode Panel ────────────────────────────────────────────────────
+
+function MaintenanceModePanel({ settings, onSaved }: CategoryPanelProps) {
+  const setting   = settings.find((s) => s.key === 'maintenance_mode')
+  const isOn      = setting?.value === 'true'
+  const [armed, setArmed] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: (next: boolean) => settingsApi.update('maintenance_mode', next ? 'true' : 'false'),
+    onSuccess: (_data, next) => {
+      toast.success(next ? 'Maintenance mode enabled — customers are now blocked' : 'Maintenance mode disabled — service restored')
+      setArmed(false)
+      onSaved()
+    },
+    onError: () => { toast.error('Failed to update maintenance mode'); setArmed(false) },
+  })
+
+  if (!setting) {
+    return (
+      <Card className="p-6 text-center text-ink-faint text-sm">
+        Maintenance setting not found. It will be created automatically on the next server restart.
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Status card */}
+      <Card className={`p-6 border-2 transition-colors ${isOn ? 'border-red-500/40 bg-red-500/5' : 'border-emerald-500/20 bg-emerald-500/5'}`}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${isOn ? 'bg-red-500/15' : 'bg-emerald-500/15'}`}>
+              <Power className={`h-6 w-6 ${isOn ? 'text-red-400' : 'text-emerald-400'}`} />
+            </div>
+            <div>
+              <p className="text-base font-bold text-ink">
+                {isOn ? 'Maintenance Mode ON' : 'Maintenance Mode OFF'}
+              </p>
+              <p className="text-xs text-ink-faint mt-0.5">
+                {isOn
+                  ? 'All customer API requests are returning 503. Admin and webhook routes are unaffected.'
+                  : 'Service is running normally. Customers can access all features.'}
+              </p>
+            </div>
+          </div>
+          <Badge variant={isOn ? 'danger' : 'success'} className="shrink-0 text-sm px-3 py-1">
+            {isOn ? 'ON' : 'OFF'}
+          </Badge>
+        </div>
+
+        {setting.updated_by && (
+          <p className="text-[11px] text-ink-faint mt-4 pt-4 border-t border-border">
+            Last changed by {setting.updated_by} · {new Date(setting.updated_at).toLocaleString()}
+          </p>
+        )}
+      </Card>
+
+      {/* Action */}
+      {isOn ? (
+        <Card className="p-5 space-y-4">
+          <div className="flex items-start gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/5 p-3">
+            <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              Disabling maintenance mode will immediately restore customer access.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            icon={<Power className="h-4 w-4" />}
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate(false)}
+          >
+            {mutation.isPending ? 'Restoring…' : 'Disable Maintenance Mode'}
+          </Button>
+        </Card>
+      ) : (
+        <Card className="p-5 space-y-4">
+          <div className="flex items-start gap-2 rounded-lg border border-red-400/30 bg-red-400/5 p-3">
+            <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            <div className="text-xs text-red-600 dark:text-red-400 space-y-1">
+              <p className="font-semibold">Enabling maintenance mode will immediately block all customer requests.</p>
+              <p>Webhooks (Paystack, providers) and admin routes remain active. Disable as soon as maintenance is complete.</p>
+            </div>
+          </div>
+
+          {!armed ? (
+            <Button
+              variant="danger"
+              icon={<Wrench className="h-4 w-4" />}
+              onClick={() => setArmed(true)}
+            >
+              Enable Maintenance Mode
+            </Button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Button
+                variant="danger"
+                disabled={mutation.isPending}
+                onClick={() => mutation.mutate(true)}
+              >
+                {mutation.isPending ? 'Enabling…' : 'Confirm — Block All Customers'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setArmed(false)}
+                className="text-sm text-ink-muted hover:text-ink transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Info */}
+      <Card className="p-4 space-y-2">
+        <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">What stays active during maintenance</p>
+        <ul className="text-xs text-ink-faint space-y-1 list-disc list-inside">
+          <li>Admin dashboard — all admin routes remain accessible</li>
+          <li>Paystack webhooks — wallet credits continue processing</li>
+          <li>Provider webhooks — VTU callbacks are not blocked</li>
+          <li>Public endpoints — /public/status so the app can detect maintenance</li>
+        </ul>
+      </Card>
+    </div>
+  )
+}
+
 // ── Skeleton loading ──────────────────────────────────────────────────────────
 
 function SettingsSkeleton() {
@@ -1030,7 +1159,7 @@ export function SettingsPage() {
     void qc.invalidateQueries({ queryKey: ['admin-settings'] })
   }, [qc])
 
-  const currentSettings = activeTab !== 'environment' && activeTab !== 'account' && activeTab !== 'alerts'
+  const currentSettings = activeTab !== 'environment' && activeTab !== 'account' && activeTab !== 'alerts' && activeTab !== 'maintenance'
     ? (settingsData?.[activeTab] ?? [])
     : []
 
@@ -1073,6 +1202,13 @@ export function SettingsPage() {
           <AccountSecurityPanel />
         ) : activeTab === 'alerts' ? (
           <AdminAlertsPanel />
+        ) : activeTab === 'maintenance' ? (
+          isLoading ? <SettingsSkeleton /> : (
+            <MaintenanceModePanel
+              settings={settingsData?.['maintenance'] ?? []}
+              onSaved={handleSaved}
+            />
+          )
         ) : error ? (
           <ErrorMessage
             error={error}
