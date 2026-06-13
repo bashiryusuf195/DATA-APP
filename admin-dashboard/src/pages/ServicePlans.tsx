@@ -1032,6 +1032,182 @@ function CategoryOrderModal({ open, onClose }: { open: boolean; onClose: () => v
   )
 }
 
+// ── Plan display-order modal ──────────────────────────────────────────────────
+
+function PlanOrderModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [serviceType, setServiceType] = useState('data')
+  const [network, setNetwork]         = useState('mtn')
+  const [category, setCategory]       = useState('sme')
+  const [localPlans, setLocalPlans]   = useState<ServicePlan[]>([])
+
+  const config = SERVICE_TYPE_CONFIGS[serviceType]
+
+  // Reset network when service type changes
+  useEffect(() => {
+    const first = SERVICE_TYPE_CONFIGS[serviceType]?.operatorOptions[0]?.value ?? ''
+    setNetwork(first)
+  }, [serviceType])
+
+  // Reset category when service type changes
+  useEffect(() => {
+    const first = SERVICE_TYPE_CONFIGS[serviceType]?.categoryOptions[0]?.value ?? ''
+    setCategory(first)
+  }, [serviceType])
+
+  const { data: plansData, isLoading } = useQuery({
+    queryKey: ['plan-order-plans', serviceType, network, category],
+    queryFn: () =>
+      catalogApi.listServicePlans({
+        service_type:     serviceType,
+        network_operator: config?.operatorOptions.length > 0 ? network : undefined,
+        plan_category:    category || undefined,
+        limit:            500,
+      }),
+    enabled: open && !!serviceType,
+  })
+
+  // Sync local list when query results arrive
+  useEffect(() => {
+    if (!plansData) return
+    const sorted = [...plansData.plans].sort((a, b) => (a.plan_sort_order ?? 0) - (b.plan_sort_order ?? 0))
+    setLocalPlans(sorted)
+  }, [plansData])
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      for (let i = 0; i < localPlans.length; i++) {
+        const plan = localPlans[i]
+        if ((plan.plan_sort_order ?? 0) !== i) {
+          await catalogApi.updateServicePlan(plan.id, { plan_sort_order: i })
+        }
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-service-plans'] })
+      toast.success('Plan order saved')
+      onClose()
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to save plan order')),
+  })
+
+  function moveUp(i: number) {
+    if (i === 0) return
+    setLocalPlans((prev) => {
+      const next = [...prev]
+      ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+      return next
+    })
+  }
+
+  function moveDown(i: number) {
+    if (i === localPlans.length - 1) return
+    setLocalPlans((prev) => {
+      const next = [...prev]
+      ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+      return next
+    })
+  }
+
+  if (!open) return null
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Plan Display Order"
+      subtitle="Set the order plans appear within a category in the customer app"
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={saveMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending || isLoading || localPlans.length === 0}
+          >
+            {saveMutation.isPending ? 'Saving…' : 'Save Order'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <Select
+            label="Service Type"
+            value={serviceType}
+            onChange={(e) => setServiceType(e.target.value)}
+            options={CAT_ORDER_SERVICE_TYPES}
+          />
+          <Select
+            label={config?.operatorLabel ?? 'Network'}
+            value={network}
+            onChange={(e) => setNetwork(e.target.value)}
+            options={config?.operatorOptions ?? []}
+          />
+          <Select
+            label={config?.categoryLabel ?? 'Category'}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            options={config?.categoryOptions ?? []}
+          />
+        </div>
+
+        {isLoading ? (
+          <SkeletonTable rows={5} />
+        ) : localPlans.length === 0 ? (
+          <p className="text-sm text-ink-muted text-center py-4">
+            No plans found for this selection.
+          </p>
+        ) : (
+          <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+            <p className="text-xs text-ink-faint mb-1">
+              Use the arrows to reorder. The first item appears first in the customer app.
+            </p>
+            {localPlans.map((plan, i) => (
+              <div
+                key={plan.id}
+                className="flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-3 py-2.5"
+              >
+                <span className="text-xs text-ink-faint w-5 shrink-0 text-right font-mono">
+                  {i + 1}.
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">{plan.name}</p>
+                  <p className="text-xs text-ink-faint">₦{plan.amount.toLocaleString()}</p>
+                </div>
+                <div className="flex gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => moveUp(i)}
+                    disabled={i === 0}
+                    className="p-1 rounded text-ink-faint hover:text-ink hover:bg-surface-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Move up"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveDown(i)}
+                    disabled={i === localPlans.length - 1}
+                    className="p-1 rounded text-ink-faint hover:text-ink hover:bg-surface-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Move down"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 // ── Bulk toggle confirmation modal ────────────────────────────────────────────
 
 interface BulkToggleModalProps {
@@ -1457,6 +1633,7 @@ export function ServicePlansPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<ServicePlan | null>(null)
   const [categoryOrderOpen, setCategoryOrderOpen] = useState(false)
+  const [planOrderOpen,     setPlanOrderOpen]     = useState(false)
 
   const { data: services = [] } = useQuery({
     queryKey: ['admin-services'],
@@ -1795,6 +1972,8 @@ export function ServicePlansPage() {
               onClick={() => void refetch()}>Refresh</Button>
             <Button variant="secondary" size="sm" icon={<ListOrdered className="h-3.5 w-3.5" />}
               onClick={() => setCategoryOrderOpen(true)}>Category Order</Button>
+            <Button variant="secondary" size="sm" icon={<ListOrdered className="h-3.5 w-3.5" />}
+              onClick={() => setPlanOrderOpen(true)}>Plan Order</Button>
             <Button variant="secondary" size="sm" icon={<Download className="h-3.5 w-3.5" />}
               onClick={() => setImportOpen(true)}>Import Plans</Button>
             <Button variant="primary" size="sm" icon={<Plus className="h-3.5 w-3.5" />}
@@ -2018,6 +2197,10 @@ export function ServicePlansPage() {
       <CategoryOrderModal
         open={categoryOrderOpen}
         onClose={() => setCategoryOrderOpen(false)}
+      />
+      <PlanOrderModal
+        open={planOrderOpen}
+        onClose={() => setPlanOrderOpen(false)}
       />
 
       {/* Delete plan confirmation */}
