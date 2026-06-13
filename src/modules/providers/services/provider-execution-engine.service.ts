@@ -160,7 +160,7 @@ class ProviderExecutionEngine {
         sendTransactionPush(transaction.user_id, "purchase_successful", {
           title:             "Transaction Successful",
           body:              `Your ${service_type} purchase was successful.`,
-          deep_link:         "/history",
+          deep_link:         `/transactions/${transaction_reference}`,
           notification_type: "purchase_successful",
           reference:         transaction_reference,
         }).catch(() => {/* logged inside sendTransactionPush */});
@@ -755,7 +755,7 @@ class ProviderExecutionEngine {
     sendTransactionPush(params.transaction.user_id, "purchase_successful", {
       title:             "Transaction Successful",
       body:              `Your ${params.service_type} purchase was successful.`,
-      deep_link:         "/history",
+      deep_link:         `/transactions/${params.transaction_reference}`,
       notification_type: "purchase_successful",
       reference:         params.transaction_reference,
     }).catch(() => {/* logged inside sendTransactionPush */});
@@ -921,7 +921,7 @@ class ProviderExecutionEngine {
     sendTransactionPush(transaction.user_id, "purchase_failed", {
       title:             "Transaction Failed",
       body:              `Your ${service_type} purchase failed and has been refunded.`,
-      deep_link:         "/history",
+      deep_link:         `/transactions/${transaction_reference}`,
       notification_type: "purchase_failed",
       reference:         transaction_reference,
     }).catch(() => {/* logged inside sendTransactionPush */});
