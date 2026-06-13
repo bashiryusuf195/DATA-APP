@@ -17,6 +17,7 @@
 //   npm run dev    (development — tsx watch, hot reload)
 //   npm start      (production  — compiled JS, node dist/server.js)
 
+import './instrument'; // must be first — initialises Sentry before any other module
 import fs   from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';

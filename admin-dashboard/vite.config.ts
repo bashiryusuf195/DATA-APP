@@ -17,6 +17,9 @@ function spaBypass(req: { headers?: Record<string, string | string[] | undefined
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    sourcemap: 'hidden', // generate maps for Sentry upload; not served to browsers
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

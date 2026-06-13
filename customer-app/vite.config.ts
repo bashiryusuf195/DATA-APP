@@ -13,6 +13,9 @@ function spaBypass(req: { headers?: Record<string, string | string[] | undefined
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    sourcemap: 'hidden', // generate maps for Sentry upload; not served to browsers
+  },
   define: {
     // Replaced at build time with the ISO timestamp of this build
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
