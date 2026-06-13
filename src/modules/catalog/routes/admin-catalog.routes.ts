@@ -18,6 +18,8 @@ import {
   bulkClearOverrideController,
   bulkSetProviderByIdController,
   bulkImportServicePlansController,
+  listCategoryOrdersController,
+  upsertCategoryOrdersController,
 } from "../controllers/admin-catalog.controller";
 
 const router = Router();
@@ -25,6 +27,8 @@ const router = Router();
 const adminGuard = [authenticate, requireRole("admin", "super_admin")] as const;
 
 router.get("/service-plans/category-providers",    ...adminGuard, adminRateLimiter, getCategoryProvidersController);
+router.get("/service-plans/category-orders",       ...adminGuard, adminRateLimiter, listCategoryOrdersController);
+router.put("/service-plans/category-orders",       ...adminGuard, adminRateLimiter, upsertCategoryOrdersController);
 router.post("/service-plans/bulk-assign-provider", ...adminGuard, adminRateLimiter, bulkAssignProviderController);
 router.post("/service-plans/bulk-clear-override",  ...adminGuard, adminRateLimiter, bulkClearOverrideController);
 router.post("/service-plans/bulk-set-provider",    ...adminGuard, adminRateLimiter, bulkSetProviderByIdController);

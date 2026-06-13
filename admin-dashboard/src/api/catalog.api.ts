@@ -9,6 +9,8 @@ import type {
   ProviderPlanMapping,
   CreatePlanMappingInput,
   UpdatePlanMappingInput,
+  CategorySortOrder,
+  UpsertCategoryOrdersInput,
 } from '@/types'
 
 export interface ServicePlansMeta {
@@ -96,6 +98,14 @@ export const catalogApi = {
 
   deleteServicePlan: (id: string): Promise<void> =>
     apiClient.delete(`/admin/service-plans/${id}`).then(() => undefined),
+
+  listCategoryOrders: (params?: { service_type?: string }): Promise<CategorySortOrder[]> =>
+    apiClient
+      .get<{ success: boolean; data: CategorySortOrder[] }>('/admin/service-plans/category-orders', { params })
+      .then((r) => (Array.isArray(r.data.data) ? r.data.data : [])),
+
+  upsertCategoryOrders: (body: UpsertCategoryOrdersInput): Promise<void> =>
+    apiClient.put('/admin/service-plans/category-orders', body).then(() => undefined),
 
   fetchProviderPlans: (providerCode: string, service: 'data' | 'cable_tv' | 'electricity', network?: string): Promise<{ service: string; network: string | null; plans: Record<string, unknown>[] }> =>
     apiClient

@@ -653,6 +653,7 @@ export interface ServicePlan {
   network_operator: string | null
   plan_category: string | null
   duration_days: number | null
+  plan_sort_order: number
   created_at: string
   updated_at: string
   // provider routing overrides
@@ -664,6 +665,24 @@ export interface ServicePlan {
   service_slug: string
   service_name: string
   service_type: ServiceType
+}
+
+export interface CategorySortOrder {
+  id: string
+  service_type: string
+  network_operator: string | null
+  plan_category: string
+  sort_order: number
+  updated_at: string
+}
+
+export interface UpsertCategoryOrdersInput {
+  orders: Array<{
+    service_type: string
+    network_operator: string | null
+    plan_category: string
+    sort_order: number
+  }>
 }
 
 export interface CreateServiceInput {
@@ -694,6 +713,7 @@ export interface CreateServicePlanInput {
   network_operator?: string | null
   plan_category?: string | null
   duration_days?: number | null
+  plan_sort_order?: number
   primary_provider_code?: string | null
   fallback_provider_code?: string | null
   provider_variation_code?: string | null
@@ -714,6 +734,7 @@ export interface UpdateServicePlanInput {
   network_operator?: string | null
   plan_category?: string | null
   duration_days?: number | null
+  plan_sort_order?: number
   primary_provider_code?: string | null
   fallback_provider_code?: string | null
   provider_variation_code?: string | null

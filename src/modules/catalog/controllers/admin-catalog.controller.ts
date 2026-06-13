@@ -16,6 +16,8 @@ import {
   updateServicePlan,
   deleteServicePlan,
   bulkImportServicePlans,
+  listCategoryOrders,
+  upsertCategoryOrders,
 } from "../services/catalog.service";
 
 const SERVICE_TYPES = [
@@ -69,6 +71,7 @@ const CreateServicePlanSchema = z.object({
   network_operator: z.string().max(100).nullable().optional(),
   plan_category: z.string().max(100).nullable().optional(),
   duration_days: z.number().int().positive().nullable().optional(),
+  plan_sort_order: z.number().int().min(0).default(0).optional(),
   primary_provider_code: z.string().max(100).nullable().optional(),
   fallback_provider_code: z.string().max(100).nullable().optional(),
   provider_variation_code: z.string().max(100).nullable().optional(),
@@ -90,6 +93,7 @@ const UpdateServicePlanSchema = z
     network_operator: z.string().max(100).nullable().optional(),
     plan_category: z.string().max(100).nullable().optional(),
     duration_days: z.number().int().positive().nullable().optional(),
+    plan_sort_order: z.number().int().min(0).optional(),
     primary_provider_code: z.string().max(100).nullable().optional(),
     fallback_provider_code: z.string().max(100).nullable().optional(),
     provider_variation_code: z.string().max(100).nullable().optional(),
@@ -381,6 +385,54 @@ export async function bulkImportServicePlansController(
     );
 
     res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Category sort-order controllers ──────────────────────────────────────────
+
+export async function listCategoryOrdersController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const service_type = typeof req.query.service_type === "string" ? req.query.service_type : undefined;
+    const rows = await listCategoryOrders({ service_type });
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+const UpsertCategoryOrdersSchema = z.object({
+  orders: z.array(
+    z.object({
+      service_type:     z.string().min(1).max(100),
+      network_operator: z.string().max(100).nullable().optional(),
+      plan_category:    z.string().min(1).max(100),
+      sort_order:       z.number().int().min(0),
+    })
+  ).min(1).max(200),
+});
+
+export async function upsertCategoryOrdersController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { orders } = UpsertCategoryOrdersSchema.parse(req.body);
+    await upsertCategoryOrders(
+      orders.map((o) => ({
+        service_type:     o.service_type,
+        network_operator: o.network_operator ?? null,
+        plan_category:    o.plan_category,
+        sort_order:       o.sort_order,
+      }))
+    );
+    res.json({ success: true, data: { saved: orders.length } });
   } catch (err) {
     next(err);
   }

@@ -15,7 +15,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 import { fmtCurrency } from '@/utils/format'
 import { ENDPOINTS } from '@/config/endpoints'
 import type { ServicePlan, CatalogService, Provider, CreateServicePlanInput, UpdateServicePlanInput, RoutingRule, ProviderPlanMapping, CreatePlanMappingInput } from '@/types'
-import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Edit, ToggleLeft, ToggleRight, TrendingUp, ToggleRight as BulkIcon, AlertTriangle, UserCheck, XCircle, Download, Loader2, Trash2, ListOrdered, ArrowUp, ArrowDown } from 'lucide-react'
 
 const PAGE_SIZE = 50
 
@@ -54,6 +54,7 @@ interface PlanFormProps {
 interface PlanFormState extends CreateServicePlanInput {
   provider_metadata_raw: string
   duration_days_str: string
+  plan_sort_order_str: string
 }
 
 // ── Service-type field configuration ─────────────────────────────────────────
@@ -310,6 +311,8 @@ function buildFormState(initial?: ServicePlan | null): PlanFormState {
       plan_category: initial.plan_category ?? null,
       duration_days: initial.duration_days ?? null,
       duration_days_str: initial.duration_days != null ? String(initial.duration_days) : '',
+      plan_sort_order: initial.plan_sort_order ?? 0,
+      plan_sort_order_str: String(initial.plan_sort_order ?? 0),
       primary_provider_code: initial.primary_provider_code ?? null,
       fallback_provider_code: initial.fallback_provider_code ?? null,
       provider_variation_code: initial.provider_variation_code ?? null,
@@ -331,6 +334,8 @@ function buildFormState(initial?: ServicePlan | null): PlanFormState {
     plan_category: null,
     duration_days: null,
     duration_days_str: '',
+    plan_sort_order: 0,
+    plan_sort_order_str: '0',
     primary_provider_code: null,
     fallback_provider_code: null,
     provider_variation_code: null,
@@ -588,6 +593,7 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
     const duration_days = form.duration_days_str
       ? parseInt(form.duration_days_str, 10)
       : null
+    const plan_sort_order = parseInt(form.plan_sort_order_str, 10) || 0
     return {
       service_id: form.service_id,
       provider_code: form.provider_code,
@@ -602,6 +608,7 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
       network_operator: form.network_operator || null,
       plan_category: form.plan_category || null,
       duration_days,
+      plan_sort_order,
       primary_provider_code: form.primary_provider_code || null,
       fallback_provider_code: form.fallback_provider_code || null,
       provider_variation_code: form.provider_variation_code || null,
@@ -762,6 +769,17 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
             error={errors.duration_days_str}
           />
 
+          <Input
+            label="Plan Sort Order"
+            type="number"
+            min={0}
+            step={1}
+            value={form.plan_sort_order_str}
+            onChange={(e) => setForm((f) => ({ ...f, plan_sort_order_str: e.target.value }))}
+            placeholder="0"
+            hint="Lower = displayed first within category (0 = top)"
+          />
+
           {numField('amount', 'Base Amount (₦)', 'Provider face value (0 for variable-amount plans)')}
           {numField('cost_price', 'Cost Price (₦)', 'What you pay the provider')}
           {numField('selling_price', 'Selling Price (₦)', 'What users pay')}
@@ -835,6 +853,181 @@ function PlanFormModal({ open, onClose, services, providers, initial, onSaved }:
         </div>
       </div>
       {isEdit && initial?.id && <PlanMappingsSection planId={initial.id} />}
+    </Modal>
+  )
+}
+
+// ── Category display-order modal ──────────────────────────────────────────────
+
+const CAT_ORDER_SERVICE_TYPES = [
+  { value: 'data',                  label: 'Data'     },
+  { value: 'airtime',               label: 'Airtime'  },
+  { value: 'electricity',           label: 'Electricity' },
+  { value: 'cable_tv',              label: 'Cable TV' },
+  { value: 'exam_pin',              label: 'Exam PIN' },
+  { value: 'identity_verification', label: 'Identity' },
+]
+
+function CategoryOrderModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [serviceType, setServiceType] = useState('data')
+  const [network, setNetwork]         = useState('mtn')
+  const [localOrder, setLocalOrder]   = useState<string[]>([])
+
+  const { data: savedOrders = [], isLoading } = useQuery({
+    queryKey: ['admin-category-orders'],
+    queryFn:  () => catalogApi.listCategoryOrders(),
+    enabled:  open,
+  })
+
+  const config = SERVICE_TYPE_CONFIGS[serviceType]
+
+  // Rebuild local order when service type, network, or saved data changes
+  useEffect(() => {
+    if (!config) return
+    const baseCategories = config.categoryOptions.map((o) => o.value)
+    const saved = savedOrders
+      .filter((o) => o.service_type === serviceType && o.network_operator === network)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((o) => o.plan_category)
+    const savedSet = new Set(saved)
+    const remaining = baseCategories.filter((c) => !savedSet.has(c))
+    setLocalOrder([...saved, ...remaining])
+  }, [serviceType, network, savedOrders, config])
+
+  // Reset network when service type changes
+  useEffect(() => {
+    const first = SERVICE_TYPE_CONFIGS[serviceType]?.operatorOptions[0]?.value ?? ''
+    setNetwork(first)
+  }, [serviceType])
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      catalogApi.upsertCategoryOrders({
+        orders: localOrder.map((cat, idx) => ({
+          service_type:     serviceType,
+          network_operator: config?.operatorOptions.length > 0 ? network : null,
+          plan_category:    cat,
+          sort_order:       idx,
+        })),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-category-orders'] })
+      toast.success('Category order saved')
+      onClose()
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to save category order')),
+  })
+
+  function moveUp(i: number) {
+    if (i === 0) return
+    setLocalOrder((prev) => {
+      const next = [...prev]
+      ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+      return next
+    })
+  }
+
+  function moveDown(i: number) {
+    if (i === localOrder.length - 1) return
+    setLocalOrder((prev) => {
+      const next = [...prev]
+      ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+      return next
+    })
+  }
+
+  const catLabel = (cat: string) =>
+    config?.categoryOptions.find((o) => o.value === cat)?.label ?? cat
+
+  if (!open) return null
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Category Display Order"
+      subtitle="Set the order plan categories appear in the customer app"
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={saveMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending || isLoading || localOrder.length === 0}
+          >
+            {saveMutation.isPending ? 'Saving…' : 'Save Order'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Select
+            label="Service Type"
+            value={serviceType}
+            onChange={(e) => setServiceType(e.target.value)}
+            options={CAT_ORDER_SERVICE_TYPES}
+          />
+          {config?.operatorOptions.length > 0 && (
+            <Select
+              label={config.operatorLabel}
+              value={network}
+              onChange={(e) => setNetwork(e.target.value)}
+              options={config.operatorOptions}
+            />
+          )}
+        </div>
+
+        {isLoading ? (
+          <SkeletonTable rows={4} />
+        ) : localOrder.length === 0 ? (
+          <p className="text-sm text-ink-muted text-center py-4">
+            No categories configured for this selection.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-xs text-ink-faint mb-1">
+              Use the arrows to reorder. The first item appears first in the customer app.
+            </p>
+            {localOrder.map((cat, i) => (
+              <div
+                key={cat}
+                className="flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-3 py-2.5"
+              >
+                <span className="text-xs text-ink-faint w-5 shrink-0 text-right font-mono">
+                  {i + 1}.
+                </span>
+                <span className="flex-1 text-sm font-medium text-ink">{catLabel(cat)}</span>
+                <div className="flex gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => moveUp(i)}
+                    disabled={i === 0}
+                    className="p-1 rounded text-ink-faint hover:text-ink hover:bg-surface-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Move up"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveDown(i)}
+                    disabled={i === localOrder.length - 1}
+                    className="p-1 rounded text-ink-faint hover:text-ink hover:bg-surface-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Move down"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Modal>
   )
 }
@@ -1263,6 +1456,7 @@ export function ServicePlansPage() {
   const [bulkSetProviderOpen, setBulkSetProviderOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<ServicePlan | null>(null)
+  const [categoryOrderOpen, setCategoryOrderOpen] = useState(false)
 
   const { data: services = [] } = useQuery({
     queryKey: ['admin-services'],
@@ -1599,6 +1793,8 @@ export function ServicePlansPage() {
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />}
               onClick={() => void refetch()}>Refresh</Button>
+            <Button variant="secondary" size="sm" icon={<ListOrdered className="h-3.5 w-3.5" />}
+              onClick={() => setCategoryOrderOpen(true)}>Category Order</Button>
             <Button variant="secondary" size="sm" icon={<Download className="h-3.5 w-3.5" />}
               onClick={() => setImportOpen(true)}>Import Plans</Button>
             <Button variant="primary" size="sm" icon={<Plus className="h-3.5 w-3.5" />}
@@ -1818,6 +2014,10 @@ export function ServicePlansPage() {
         onClose={() => setImportOpen(false)}
         services={services}
         onSaved={handleSaved}
+      />
+      <CategoryOrderModal
+        open={categoryOrderOpen}
+        onClose={() => setCategoryOrderOpen(false)}
       />
 
       {/* Delete plan confirmation */}
