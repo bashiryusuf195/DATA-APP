@@ -41,7 +41,9 @@ export function AppLayout() {
 
   // Refresh user profile at most once per 5 min — React Query caches the result
   // so repeated AppLayout mounts (navigation back, StrictMode) skip the request.
-  const { data: freshUser } = useQuery({
+  // isLoading is true ONLY during the very first fetch (no cached data). On
+  // subsequent SPA navigation the cache is warm so isLoading is false immediately.
+  const { data: freshUser, isLoading: meIsLoading } = useQuery({
     queryKey: ['auth-me'],
     queryFn:  authApi.me,
     staleTime: 5 * 60 * 1000,
@@ -59,8 +61,14 @@ export function AppLayout() {
   // Show setup modal once per session if no PIN is configured.
   // "Set up later" hides it for this session; the API will still reject
   // purchases until a PIN is created.
+  //
+  // IMPORTANT: gate on !meIsLoading so we never show the modal while the
+  // initial /auth/me fetch is in flight.  Without this gate, stale localStorage
+  // data (has_transaction_pin: false from a previous registration, or a PIN set
+  // on another device) would cause the modal to flash and immediately disappear
+  // once the server response arrives with has_transaction_pin: true.
   const [dismissed, setDismissed] = useState(false)
-  const showSetup = !!user && !user.has_transaction_pin && !dismissed
+  const showSetup = !!user && !meIsLoading && !user.has_transaction_pin && !dismissed
 
   // ── Biometric onboarding prompt (Android native only) ─────────────────────
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false)
@@ -135,6 +143,9 @@ export function AppLayout() {
 
   const handlePinSetupSuccess = () => {
     if (user) setUser({ ...user, has_transaction_pin: true })
+    // Invalidate the auth-me cache so freshUser re-fetches with has_transaction_pin: true.
+    // Prevents a stale cache value from incorrectly re-showing the modal on next navigation.
+    void queryClient.invalidateQueries({ queryKey: ['auth-me'] })
   }
 
   return (
