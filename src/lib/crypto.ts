@@ -11,7 +11,7 @@
 // PIN hashing uses bcrypt (one-way — can verify but cannot reverse).
 
 import crypto from 'crypto';
-import bcrypt  from 'bcrypt';
+import bcrypt  from 'bcryptjs';
 import { config } from '../config';
 
 const ALGORITHM  = 'aes-256-gcm';

@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { getDbInstance } from "../../../db/knex";
 import { redis } from "../../../config/redis";
 import {
