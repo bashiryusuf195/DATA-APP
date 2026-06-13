@@ -16,7 +16,7 @@ export interface TotpSetupData {
 }
 
 export interface LoginInput {
-  email: string
+  identifier: string
   password: string
 }
 
