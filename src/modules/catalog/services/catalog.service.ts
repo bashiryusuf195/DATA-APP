@@ -17,6 +17,14 @@ export async function getActivePlansForType(
 ) {
   return db("service_plans")
     .join("catalog_services", "service_plans.service_id", "catalog_services.id")
+    // Join category sort-order table; handles nullable network_operator via COALESCE
+    .leftJoin(
+      db.raw(`service_plan_category_orders sco ON (
+        sco.service_type = catalog_services.service_type
+        AND sco.plan_category = service_plans.plan_category
+        AND COALESCE(sco.network_operator, '') = COALESCE(service_plans.network_operator, '')
+      )`)
+    )
     .where("catalog_services.service_type", serviceType)
     .where("service_plans.is_active", true)
     .where("catalog_services.is_active", true)
@@ -50,6 +58,9 @@ export async function getActivePlansForType(
         });
       }
     })
+    // Category order first (unset categories fall to end), then plan order, then amount
+    .orderByRaw("COALESCE(sco.sort_order, 9999) ASC")
+    .orderBy("service_plans.plan_sort_order", "asc")
     .orderBy("service_plans.amount", "asc")
     .select(
       "service_plans.id",
@@ -62,6 +73,7 @@ export async function getActivePlansForType(
       "service_plans.metadata",
       "service_plans.network_operator",
       "service_plans.plan_category",
+      "service_plans.plan_sort_order",
       "catalog_services.slug as service_slug",
       "catalog_services.name as service_name"
     );
@@ -102,7 +114,7 @@ export interface ServicePlanRow {
   selling_price: string | null; is_variable_amount: boolean;
   metadata: Record<string, unknown>; is_active: boolean;
   network_operator: string | null; plan_category: string | null;
-  duration_days: number | null;
+  duration_days: number | null; plan_sort_order: number;
   created_at: string; updated_at: string;
   service_slug: string; service_name: string; service_type: string;
   primary_provider_code: string | null; fallback_provider_code: string | null;
@@ -158,7 +170,7 @@ export async function adminListServicePlans(filters: AdminListServicePlansFilter
         "sp.id", "sp.service_id", "sp.provider_code", "sp.name",
         "sp.variation_code", "sp.amount", "sp.cost_price", "sp.selling_price",
         "sp.is_variable_amount", "sp.metadata", "sp.is_active",
-        "sp.network_operator", "sp.plan_category", "sp.duration_days",
+        "sp.network_operator", "sp.plan_category", "sp.duration_days", "sp.plan_sort_order",
         "sp.created_at", "sp.updated_at",
         "sp.primary_provider_code", "sp.fallback_provider_code",
         "sp.provider_variation_code", "sp.provider_metadata",
@@ -236,6 +248,7 @@ export async function createServicePlan(data: {
   is_variable_amount: boolean;
   metadata: Record<string, unknown>;
   is_active: boolean;
+  plan_sort_order?: number;
   primary_provider_code?: string | null;
   fallback_provider_code?: string | null;
   provider_variation_code?: string | null;
@@ -260,6 +273,7 @@ export async function updateServicePlan(
     is_variable_amount: boolean;
     metadata: Record<string, unknown>;
     is_active: boolean;
+    plan_sort_order: number;
     primary_provider_code: string | null;
     fallback_provider_code: string | null;
     provider_variation_code: string | null;
@@ -480,4 +494,49 @@ export async function getPlanByVariationCode(
       "catalog_services.name as service_name"
     )
     .first();
+}
+
+// ── Category display-order ────────────────────────────────────────────────────
+
+export interface CategoryOrderRow {
+  id: string;
+  service_type: string;
+  network_operator: string | null;
+  plan_category: string;
+  sort_order: number;
+  updated_at: string;
+}
+
+export async function listCategoryOrders(
+  filters: { service_type?: string } = {}
+): Promise<CategoryOrderRow[]> {
+  return db("service_plan_category_orders")
+    .modify((q) => {
+      if (filters.service_type) q.where("service_type", filters.service_type);
+    })
+    .orderBy("service_type", "asc")
+    .orderByRaw("COALESCE(network_operator, '') ASC")
+    .orderBy("sort_order", "asc")
+    .select<CategoryOrderRow[]>("*");
+}
+
+export async function upsertCategoryOrders(
+  orders: Array<{
+    service_type: string;
+    network_operator: string | null;
+    plan_category: string;
+    sort_order: number;
+  }>
+): Promise<void> {
+  if (orders.length === 0) return;
+  for (const o of orders) {
+    await db.raw(
+      `INSERT INTO service_plan_category_orders
+         (id, service_type, network_operator, plan_category, sort_order, updated_at)
+       VALUES (gen_random_uuid(), ?, ?, ?, ?, NOW())
+       ON CONFLICT (service_type, COALESCE(network_operator, ''), plan_category)
+       DO UPDATE SET sort_order = EXCLUDED.sort_order, updated_at = NOW()`,
+      [o.service_type, o.network_operator, o.plan_category, o.sort_order]
+    );
+  }
 }
