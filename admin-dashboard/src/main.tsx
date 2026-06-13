@@ -1,3 +1,6 @@
+import { initSentry } from '@/lib/sentry'
+initSentry() // must run before React renders so all errors are caught
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { syncAuthHeader } from '@/api/client'

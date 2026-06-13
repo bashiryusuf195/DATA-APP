@@ -1,4 +1,6 @@
 import { useRouteError, isRouteErrorResponse, Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Sentry } from '@/lib/sentry'
 import { AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui'
 
@@ -6,6 +8,14 @@ import { Button } from '@/components/ui'
 
 export function RouteError() {
   const error = useRouteError()
+
+  useEffect(() => {
+    // Only report actual JS errors — not loader/action 4xx/5xx responses
+    if (!isRouteErrorResponse(error)) {
+      const err = error instanceof Error ? error : new Error(`Route error: ${String(error)}`)
+      Sentry.captureException(err)
+    }
+  }, [error])
 
   let heading = 'Something went wrong'
   let detail  = 'An unexpected error occurred. Please try refreshing the page.'

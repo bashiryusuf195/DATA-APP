@@ -23,6 +23,7 @@
     "@capacitor/push-notifications": "^8.1.1",
     "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
+    "@sentry/react": "^10.57.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@tanstack/react-query": "^5.28.0",
     "axios": "^1.6.8",
