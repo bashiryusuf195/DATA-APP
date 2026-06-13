@@ -1,32 +1,36 @@
 import type { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.alterTable("transactions", (t) => {
-    // Snapshot of the price charged to the customer at purchase time.
-    // Equals transaction.amount for fixed-price plans.
-    t.decimal("selling_price_snapshot", 18, 2).nullable().defaultTo(null);
+  // Guard each column so a partially-applied migration can be retried safely.
+  const [hasSellingPrice, hasCostPrice, hasProfit] = await Promise.all([
+    knex.schema.hasColumn("transactions", "selling_price_snapshot"),
+    knex.schema.hasColumn("transactions", "cost_price_snapshot"),
+    knex.schema.hasColumn("transactions", "profit_snapshot"),
+  ]);
 
-    // Snapshot of the provider's cost price at purchase time.
-    // Priority: provider_plan_mappings.provider_cost_price →
-    //           service_plans.cost_price → NULL (unknown).
-    t.decimal("cost_price_snapshot", 18, 2).nullable().defaultTo(null);
+  if (!hasSellingPrice || !hasCostPrice || !hasProfit) {
+    await knex.schema.alterTable("transactions", (t) => {
+      if (!hasSellingPrice) {
+        t.decimal("selling_price_snapshot", 18, 2).nullable().defaultTo(null);
+      }
+      if (!hasCostPrice) {
+        t.decimal("cost_price_snapshot", 18, 2).nullable().defaultTo(null);
+      }
+      if (!hasProfit) {
+        t.decimal("profit_snapshot", 18, 2).nullable().defaultTo(null);
+      }
+    });
+  }
 
-    // selling_price_snapshot − cost_price_snapshot.
-    // NULL when cost price is unknown (cannot compute profit).
-    t.decimal("profit_snapshot", 18, 2).nullable().defaultTo(null);
-  });
-
-  // Composite index for the analytics query hot-path:
-  // successful purchase transactions filtered and sorted by processed_at.
+  // CREATE INDEX IF NOT EXISTS is safe to re-run even if the index already exists.
   await knex.schema.raw(`
-    CREATE INDEX transactions_analytics_idx
+    CREATE INDEX IF NOT EXISTS transactions_analytics_idx
       ON transactions (status, type, processed_at)
       WHERE status = 'successful'
   `);
 
-  // Index for month-bucketed daily breakdown queries.
   await knex.schema.raw(`
-    CREATE INDEX transactions_processed_month_idx
+    CREATE INDEX IF NOT EXISTS transactions_processed_month_idx
       ON transactions (DATE_TRUNC('month', processed_at))
       WHERE status = 'successful'
   `);
