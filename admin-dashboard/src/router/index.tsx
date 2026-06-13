@@ -59,6 +59,7 @@ import { CmsPagesPage }             from '@/pages/CmsPages'
 import { CmsEditorPage }            from '@/pages/CmsEditor'
 import { SquadUATPage }             from '@/pages/SquadUAT'
 import { ServiceStatusPage }        from '@/pages/ServiceStatusPage'
+import { AlertsPage }               from '@/pages/Alerts'
 
 import {
   Landmark,
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
       // ── Overview ───────────────────────────────────────────────────────────
       { path: '/',          element: <Navigate to="/dashboard" replace /> },
       { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/alerts',    element: <AlertsPage /> },
 
       // ── Users ──────────────────────────────────────────────────────────────
       { path: '/users', element: <UsersPage /> },

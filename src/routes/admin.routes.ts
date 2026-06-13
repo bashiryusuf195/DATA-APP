@@ -43,6 +43,7 @@ import { adminAnalyticsRouter }        from "../modules/analytics/routes/admin-a
 import { adminCmsRouter }              from "../modules/cms/routes/admin-cms.routes";
 import { adminServiceStatusRouter }   from "../modules/service-status/routes/admin-service-status.routes";
 import { squadUatRouter }              from "../modules/wallet/routes/squad-uat.routes";
+import { adminAlertsRouter }           from "../modules/alerts/routes/alerts.routes";
 
 const router = Router();
 
@@ -85,5 +86,6 @@ router.use("/", adminAnalyticsRouter);
 router.use("/", adminCmsRouter);
 router.use("/", adminServiceStatusRouter);
 router.use("/squad-uat", squadUatRouter);
+router.use("/", adminAlertsRouter);
 
 export { router as adminRouter };

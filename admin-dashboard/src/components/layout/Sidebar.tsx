@@ -10,7 +10,7 @@ import {
   Gift, MessageSquare, Flag, PackageX, Webhook, Layout, MonitorDot,
   HeartHandshake, HardDrive, KeyRound, TrendingUp, AlertTriangle,
   BookOpen, Tag, RefreshCcw, FileText, Plus, FlaskConical, Activity,
-  BarChart2,
+  BarChart2, BellDot,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -133,6 +133,7 @@ const nav: NavSection[] = [
     key:   'system',
     title: 'System Health',
     items: [
+      { to: '/alerts',                           label: 'Alerts',               icon: <BellDot        className="h-4 w-4" /> },
       { to: '/operations/system-health',         label: 'System Health',        icon: <HeartHandshake className="h-4 w-4" /> },
       { to: '/operations/queue-monitor',         label: 'Queue Monitor',        icon: <MonitorDot     className="h-4 w-4" /> },
       { to: '/failed-jobs',                      label: 'Failed Jobs',          icon: <PackageX       className="h-4 w-4" /> },

@@ -12,6 +12,13 @@ import type { PlanProviderOverrides } from "../../providers/services/provider-ex
 import { getPlanMappingForProvider } from "../../providers/services/provider-plan-mappings.service";
 import { logger } from "../../../lib/logger";
 import db from "../../../db/knex";
+import {
+  LARGE_TX_THRESHOLD_NGN,
+  alertLargeTransaction,
+  alertProviderWalletLow,
+  checkAndAlertRepeatedFailures,
+  isLowBalanceError,
+} from "../../alerts/services/admin-alert.service";
 
 export const vtuPurchaseWorker = createWorker(
   "vtu-purchases",
@@ -177,6 +184,11 @@ export const vtuPurchaseWorker = createWorker(
       }
     }
 
+    // Alert on unusually large transactions (first-time success only)
+    if (result.success && !result.idempotent_replay && data.amount >= LARGE_TX_THRESHOLD_NGN) {
+      alertLargeTransaction(data.user_id, data.amount, data.service_type, data.reference).catch(() => {});
+    }
+
     logger.info("vtu_job_complete", {
       reference:        data.reference,
       service_type:     data.service_type,
@@ -221,6 +233,20 @@ vtuPurchaseWorker.on("failed", async (job, err) => {
     reference: data?.reference ?? "unknown",
     error:     err.message,
   });
+
+  // Check for repeated failures and low-balance errors on every attempt
+  if (data?.user_id) {
+    checkAndAlertRepeatedFailures(data.user_id).catch(() => {});
+  }
+  if (isLowBalanceError(err.message) && data?.reference) {
+    db('provider_attempts')
+      .where({ transaction_reference: data.reference })
+      .orderBy('attempt_number', 'desc')
+      .select('provider_code')
+      .first<{ provider_code: string } | undefined>()
+      .then((row) => alertProviderWalletLow(row?.provider_code ?? `${data.service_type ?? 'vtu'}_provider`, err.message))
+      .catch(() => {});
+  }
 
   if (!isFinal) return;
 

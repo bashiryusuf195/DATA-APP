@@ -17,8 +17,13 @@ import { markWebhookProcessed } from "../../webhooks/services/webhook.service";
 import { getDedicatedAccountByCustomerCode } from "../../wallet/services/dva.service";
 import { getDbInstance } from "../../../db/knex";
 import { WalletService } from "../../../services/wallet/WalletService";
-import { logger }        from "../../../lib/logger";
-import { errorReporter } from "../../../lib/error-reporter";
+import { logger }             from "../../../lib/logger";
+import { errorReporter }      from "../../../lib/error-reporter";
+import {
+  LARGE_TX_THRESHOLD_NGN,
+  alertLargeTransaction,
+  alertGatewayDown,
+} from "../../alerts/services/admin-alert.service";
 
 const db            = getDbInstance();
 const walletService = new WalletService(db);
@@ -128,6 +133,10 @@ export const paystackWebhookWorker = createWorker("paystack-webhooks", async (jo
     idempotent:       walletResult.idempotent,
   });
 
+  if (!walletResult.idempotent && amountNgn >= LARGE_TX_THRESHOLD_NGN) {
+    alertLargeTransaction(fundingTx.user_id, amountNgn, 'wallet_funding', reference).catch(() => {});
+  }
+
   // 5. Create transactions record (idempotent: skip if already exists)
   const existingTx = await getTransactionByReference(reference).catch(() => null);
   if (!existingTx) {
@@ -232,6 +241,7 @@ paystackWebhookWorker.on('failed', (job, err) => {
       job?.attemptsMade ?? 0,
       { reference },
     );
+    alertGatewayDown('paystack', reference, err.message).catch(() => {});
   }
 });
 
