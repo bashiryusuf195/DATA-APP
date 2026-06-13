@@ -9,6 +9,7 @@ import {
 import { createNotification } from "../../notifications/services/notification.service";
 import { getPlanByVariationCode } from "../../catalog/services/catalog.service";
 import type { PlanProviderOverrides } from "../../providers/services/provider-execution-engine.service";
+import { getPlanMappingForProvider } from "../../providers/services/provider-plan-mappings.service";
 import { logger } from "../../../lib/logger";
 import db from "../../../db/knex";
 
@@ -65,14 +66,16 @@ export const vtuPurchaseWorker = createWorker(
     // Also read provider_variation_code (needed by providers like SMShika data
     // that use a numeric plan ID instead of our internal variation_code).
     let planOverrides: PlanProviderOverrides | undefined;
-    let planId:                   string | null = null;
+    let planId:                    string | null = null;
+    let planCostPrice:             number | null = null;
     let planProviderVariationCode: string | null = null;
-    let planCategory: string | null = null;
-    let planNetworkOperator: string | null = null;
+    let planCategory:              string | null = null;
+    let planNetworkOperator:       string | null = null;
 
     if (data.variation_code) {
       const plan = await getPlanByVariationCode(data.service_type, data.variation_code).catch(() => null);
-      planId = (plan?.id as string | null) ?? null;
+      planId        = (plan?.id         as string | null) ?? null;
+      planCostPrice = plan?.cost_price  != null ? Number(plan.cost_price) : null;
       if (plan?.primary_provider_code) {
         planOverrides = {
           primary_provider_code:  plan.primary_provider_code as string,
@@ -133,6 +136,46 @@ export const vtuPurchaseWorker = createWorker(
         currency:              transaction.currency ?? "NGN",
       },
     });
+
+    // Save profit snapshot after a first-time success so analytics reports use
+    // prices that were current at purchase time, not live plan prices.
+    // Skipped on idempotent replays (snapshot already written on original attempt).
+    if (result.success && !result.idempotent_replay && result.final_provider) {
+      try {
+        let costPrice: number | null = planCostPrice;
+
+        // Override with the per-provider mapping cost if one is configured.
+        if (planId) {
+          const mapping = await getPlanMappingForProvider(planId, result.final_provider).catch(() => null);
+          if (mapping?.provider_cost_price != null) {
+            costPrice = Number(mapping.provider_cost_price);
+          }
+        }
+
+        const sellingPrice = data.amount;
+        const profit       = costPrice !== null ? sellingPrice - costPrice : null;
+
+        await db("transactions").where({ reference: data.reference }).update({
+          selling_price_snapshot: sellingPrice,
+          cost_price_snapshot:    costPrice,
+          profit_snapshot:        profit,
+        });
+
+        logger.info("vtu_profit_snapshot_saved", {
+          reference:     data.reference,
+          selling_price: sellingPrice,
+          cost_price:    costPrice,
+          profit,
+          provider:      result.final_provider,
+        });
+      } catch (snapErr) {
+        // Non-fatal — the purchase succeeded; just log and move on.
+        logger.warn("vtu_profit_snapshot_failed", {
+          reference: data.reference,
+          error:     (snapErr as Error).message,
+        });
+      }
+    }
 
     logger.info("vtu_job_complete", {
       reference:        data.reference,

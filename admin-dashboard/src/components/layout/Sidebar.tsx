@@ -10,6 +10,7 @@ import {
   Gift, MessageSquare, Flag, PackageX, Webhook, Layout, MonitorDot,
   HeartHandshake, HardDrive, KeyRound, TrendingUp, AlertTriangle,
   BookOpen, Tag, RefreshCcw, FileText, Plus, FlaskConical, Activity,
+  BarChart2,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -105,10 +106,11 @@ const nav: NavSection[] = [
     key:   'reports',
     title: 'Reports',
     items: [
-      { to: '/finance/revenue',                label: 'Revenue',        icon: <TrendingUp    className="h-4 w-4" /> },
-      { to: '/finance/reconciliation-issues',  label: 'Recon Issues',   icon: <AlertTriangle className="h-4 w-4" /> },
-      { to: '/audit-logs',                     label: 'Audit Logs',     icon: <ClipboardList className="h-4 w-4" /> },
-      { to: '/referral-program',               label: 'Referral Program',icon: <Gift         className="h-4 w-4" /> },
+      { to: '/finance/revenue',                label: 'Revenue',          icon: <TrendingUp    className="h-4 w-4" /> },
+      { to: '/finance/profit-analysis',        label: 'Profit Analytics', icon: <BarChart2     className="h-4 w-4" /> },
+      { to: '/finance/reconciliation-issues',  label: 'Recon Issues',     icon: <AlertTriangle className="h-4 w-4" /> },
+      { to: '/audit-logs',                     label: 'Audit Logs',       icon: <ClipboardList className="h-4 w-4" /> },
+      { to: '/referral-program',               label: 'Referral Program', icon: <Gift          className="h-4 w-4" /> },
     ],
   },
   {

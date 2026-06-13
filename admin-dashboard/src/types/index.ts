@@ -972,6 +972,58 @@ export interface WeeklyTrend {
   revenue: number
 }
 
+// ── Profit Analytics ──────────────────────────────────────────────────────────
+
+export interface ProfitSummary {
+  revenue: number
+  cost:    number
+  profit:  number
+  count:   number
+}
+
+export interface ProfitDailyRow {
+  date:    string
+  revenue: number
+  cost:    number
+  profit:  number
+  count:   number
+}
+
+export interface ProfitServiceRow {
+  service_type: string
+  revenue:      number
+  cost:         number
+  profit:       number
+  count:        number
+}
+
+export interface ProfitProviderRow {
+  provider_code: string
+  revenue:       number
+  cost:          number
+  profit:        number
+  count:         number
+}
+
+export interface ProfitMonthRow {
+  month:   string
+  revenue: number
+  cost:    number
+  profit:  number
+  count:   number
+}
+
+export interface ProfitAnalyticsData {
+  selected_month:          string
+  today:                   ProfitSummary
+  month:                   ProfitSummary
+  all_time:                ProfitSummary & { missing_cost_price_count: number }
+  daily_breakdown:         ProfitDailyRow[]
+  service_breakdown:       ProfitServiceRow[]
+  provider_breakdown:      ProfitProviderRow[]
+  monthly_history:         ProfitMonthRow[]
+}
+
 export interface Refund {
   id: string
   transaction_id: string
