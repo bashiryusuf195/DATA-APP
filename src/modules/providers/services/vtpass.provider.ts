@@ -149,6 +149,21 @@ export class VTPassProvider extends HttpVTUProvider {
   return `${prefix}${cleanRef}`;
 }
 
+private readHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    "api-key": this.apiKey,
+    "public-key": this.publicKey,
+  };
+}
+
+private writeHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    "api-key": this.apiKey,
+    "secret-key": this.secretKey,
+  };
+}
   // ── HTTP primitives ───────────────────────────────────────────────────────
 
   private async fetchWithTimeout(
