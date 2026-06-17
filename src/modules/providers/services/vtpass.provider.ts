@@ -131,25 +131,23 @@ export class VTPassProvider extends HttpVTUProvider {
 
   // VTPass requires the first 8 characters of request_id to be today's date (YYYYMMDD).
   // Our internal references are "DAT-20260611-XXXXXX" — strip the prefix so VTPass gets "20260611-XXXXXX".
-  private vtpassRequestId(ref: string): string {
-    return ref.replace(/^[A-Za-z]+-(\d{8})-/, "$1-");
-  }
+ private vtpassRequestId(ref: string): string {
+  const now = new Date();
 
-  private readHeaders(): Record<string, string> {
-    return {
-      "Content-Type": "application/json",
-      "api-key":      this.apiKey,
-      "public-key":   this.publicKey,
-    };
-  }
+  // Africa/Lagos is UTC+1 and has no daylight saving time.
+  const lagos = new Date(now.getTime() + 60 * 60 * 1000);
 
-  private writeHeaders(): Record<string, string> {
-    return {
-      "Content-Type": "application/json",
-      "api-key":      this.apiKey,
-      "secret-key":   this.secretKey,
-    };
-  }
+  const yyyy = lagos.getUTCFullYear();
+  const mm = String(lagos.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(lagos.getUTCDate()).padStart(2, "0");
+  const hh = String(lagos.getUTCHours()).padStart(2, "0");
+  const min = String(lagos.getUTCMinutes()).padStart(2, "0");
+
+  const prefix = `${yyyy}${mm}${dd}${hh}${min}`;
+  const cleanRef = ref.replace(/[^A-Za-z0-9]/g, "").slice(-18);
+
+  return `${prefix}${cleanRef}`;
+}
 
   // ── HTTP primitives ───────────────────────────────────────────────────────
 
