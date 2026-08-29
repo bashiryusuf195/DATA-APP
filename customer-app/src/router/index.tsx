@@ -23,6 +23,7 @@ const OnboardingPage = lazy(() => import('@/pages/onboarding/Onboarding').then(m
 const AboutPage          = lazy(() => import('@/pages/legal/About').then(m => ({ default: m.AboutPage })))
 const ContactPage        = lazy(() => import('@/pages/legal/Contact').then(m => ({ default: m.ContactPage })))
 const PrivacyPolicyPage  = lazy(() => import('@/pages/legal/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicyPage })))
+const DeleteAccountPage = lazy(() => import('@/pages/legal/DeleteAccount').then(m => ({ default: m.DeleteAccountPage })))
 const TermsOfServicePage = lazy(() => import('@/pages/legal/TermsOfService').then(m => ({ default: m.TermsOfServicePage })))
 const RefundPolicyPage   = lazy(() => import('@/pages/legal/RefundPolicy').then(m => ({ default: m.RefundPolicyPage })))
 
@@ -127,6 +128,7 @@ export const router = createBrowserRouter([
       { path: '/about',            element: <AboutPage /> },
       { path: '/contact',          element: <ContactPage /> },
       { path: '/privacy-policy',   element: <PrivacyPolicyPage /> },
+      { path: '/delete-account',   element: <DeleteAccountPage /> },
       { path: '/terms-of-service', element: <TermsOfServicePage /> },
       { path: '/refund-policy',    element: <RefundPolicyPage /> },
     ],
