@@ -267,6 +267,33 @@ interface EdataCablePurchaseResponse {
   balance_before?: string;
   balance_after?:  string;
 }
+interface EdataSlipResponse {
+  Status?:         string;
+  status?:         string;
+  message?:        string;
+  reference?:      string;
+  transaction_id?: number;
+  amount?:         string;
+  balance_before?: string;
+  balance_after?:  string;
+  identity?: {
+    nin?:          string;
+    bvn?:          string;
+    firstName?:    string;
+    surname?:      string;
+    lastName?:     string;
+    gender?:       string;
+    birthDate?:    string;
+    telephoneNo?:  string;
+    phoneNumber?:  string;
+    photo_url?:    string;
+  };
+  pdf_url?:     string;
+  result_url?:  string;
+  has_pdf?:     boolean;
+  api_response?: string | null;
+  refunded?:    boolean;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -367,13 +394,16 @@ export class EdataProvider extends HttpVTUProvider {
     if (input.service_type === "electricity") {
       return this.purchaseElectricity(input, apiKey, baseUrl);
     }
-    if (input.service_type === "cable_tv") {
+        if (input.service_type === "cable_tv") {
       return this.purchaseCable(input, apiKey, baseUrl);
+    }
+    if (input.service_type === "identity_verification") {
+      return this.purchaseIdentity(input, apiKey, baseUrl);
     }
 
     throw new Error(
       `eData: service_type '${input.service_type}' not implemented. ` +
-      `Supported: airtime, data, electricity, cable_tv.`
+      `Supported: airtime, data, electricity, cable_tv, identity_verification.`
     );
   }
 
@@ -786,6 +816,121 @@ export class EdataProvider extends HttpVTUProvider {
       raw_response:       {
         status: raw.status, Status: raw.Status, message: raw.message,
         api_response: raw.api_response, balance_before: raw.balance_before, balance_after: raw.balance_after,
+      },
+    };
+  }
+    // ── Identity (NIN/BVN slip) ─────────────────────────────────────────────
+
+  private async purchaseIdentity(
+    input: ProviderPurchaseInput,
+    apiKey: string,
+    baseUrl: string,
+  ): Promise<ProviderPurchaseResult> {
+    const variationCode = input.variation_code ?? "";
+    const isNin = variationCode.startsWith("nin");
+    const isBvn = variationCode.startsWith("bvn");
+
+    if (!isNin && !isBvn) {
+      throw new Error(
+        `eData identity: cannot resolve id type from variation_code '${variationCode}'. ` +
+        `Expected it to start with 'nin' or 'bvn'.`
+      );
+    }
+
+    const idNumber = (input.metadata?.id_number as string | undefined) ?? undefined;
+    if (!idNumber) {
+      throw new Error(
+        `eData identity: id_number is required (pass the ${isNin ? "NIN" : "BVN"} in metadata.id_number)`
+      );
+    }
+
+    const slipType = input.plan_category ?? "standard";
+    const idType: "nin" | "bvn" = isNin ? "nin" : "bvn";
+    const endpoint = isNin ? "/api/nin-slip/" : "/api/bvn-slip/";
+    const bodyKey  = isNin ? "nin" : "bvn";
+
+    console.log("[EDATA] identity purchase →", {
+      id_type: idType, slip_type: slipType, id: maskPhone(idNumber), reference: input.reference,
+    });
+
+    const response = await this.fetchWithTimeout(`${baseUrl}${endpoint}`, {
+      method:  "POST",
+      headers: {
+        "Authorization": `Token ${apiKey}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify({ [bodyKey]: idNumber, slip_type: slipType }),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(`eData identity: HTTP ${response.status} authentication failure — verify api_key`);
+    }
+
+    const raw = await this.parseJson<EdataSlipResponse>(response, "identity slip");
+
+    const SUCCESS_VALUES = new Set(["success", "successful"]);
+    const rawStatusLower = (raw.status ?? raw.Status ?? "").toLowerCase();
+    const isSuccess = SUCCESS_VALUES.has(rawStatusLower);
+
+    console.log("[EDATA] identity purchase ←", {
+      status: raw.status, Status: raw.Status, message: raw.message,
+      transaction_id: raw.transaction_id, has_pdf: raw.has_pdf, reference: input.reference,
+    });
+
+    const safeResponse = {
+      status: raw.status, Status: raw.Status, message: raw.message,
+      reference: raw.reference, transaction_id: raw.transaction_id,
+      balance_before: raw.balance_before, balance_after: raw.balance_after,
+      refunded: raw.refunded,
+    };
+
+    if (!isSuccess || !raw.transaction_id) {
+      return {
+        success:            false,
+        provider_reference: raw.reference ?? input.reference,
+        provider:           this.name,
+        message:            raw.message ?? "Identity verification failed",
+        status:             "failed",
+        raw_response:       safeResponse,
+      };
+    }
+
+    let pdfBase64: string | undefined;
+    try {
+      const pdfRes = await this.fetchWithTimeout(
+        `${baseUrl}${isNin ? "/api/nin-slip/download/" : "/api/bvn-slip/download/"}${raw.transaction_id}`,
+        { method: "GET", headers: { "Authorization": `Token ${apiKey}` } },
+      );
+      if (pdfRes.ok) {
+        const buf = Buffer.from(await pdfRes.arrayBuffer());
+        pdfBase64 = buf.toString("base64");
+      } else {
+        console.warn("[EDATA] identity PDF download failed", {
+          status: pdfRes.status, transaction_id: raw.transaction_id,
+        });
+      }
+    } catch (err) {
+      console.warn("[EDATA] identity PDF download error", { error: (err as Error).message });
+    }
+
+    const identity = raw.identity ?? {};
+
+    return {
+      success:            true,
+      provider_reference: raw.reference ?? input.reference,
+      provider:           this.name,
+      message:            raw.message ?? "Identity verification successful",
+      status:             "successful",
+      raw_response:       safeResponse,
+      report_data: {
+        id_type:        idType,
+        id_number:      idNumber,
+        first_name:     identity.firstName,
+        last_name:      identity.surname ?? identity.lastName,
+        date_of_birth:  identity.birthDate,
+        gender:         identity.gender,
+        phone:          identity.telephoneNo ?? identity.phoneNumber,
+        portal_pdf_data: pdfBase64,
       },
     };
   }
