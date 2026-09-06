@@ -1,5 +1,4 @@
-import { useRef, useId, useEffect } from 'react'
-import { useNumPadStore } from '@/store/numpad.store'
+import { useId } from 'react'
 import { cn } from '@/utils/cn'
 
 interface NumPadInputProps {
@@ -18,98 +17,63 @@ interface NumPadInputProps {
 }
 
 /**
- * A styled field that opens the global NumPad instead of the system keyboard.
- * Uses a `div` (not `<input>`) so native keyboards never appear on mobile.
+ * Native numeric input — replaces the old custom on-screen NumPad.
+ * Uses a real <input> so the device keyboard, paste, and autofill all work normally.
  */
 export function NumPadInput({
   value, onChange, label, placeholder, maxLength,
   masked = false, hasDecimal = false,
   error, hint, prefix, disabled = false, className,
 }: NumPadInputProps) {
-  const fieldId   = useId()
-  const divRef    = useRef<HTMLDivElement>(null)
-  const openPad   = useNumPadStore((s) => s.open)
-  const syncValue = useNumPadStore((s) => s.syncValue)
-  const isOpen    = useNumPadStore((s) => s.isOpen)
-  const activeId  = useNumPadStore((s) => s.fieldId)
-  const isActive  = isOpen && activeId === fieldId
+  const fieldId = useId()
 
-  // Sync chip/external changes while this field is open
-  useEffect(() => {
-    if (isActive) syncValue(value)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
-
-  // Scroll field into view when NumPad opens — prevents the fixed 260px NumPad from covering the active input
-  useEffect(() => {
-    if (!isActive || !divRef.current) return
-    const el = divRef.current
-    const t = setTimeout(() => {
-      const rect = el.getBoundingClientRect()
-      const numPadHeight = 264 // 40px label bar + 4 rows × 54px keys + buffer
-      const margin = 24
-      const visibleBottom = window.innerHeight - numPadHeight - margin
-      if (rect.bottom > visibleBottom) {
-        window.scrollBy({ top: rect.bottom - visibleBottom, behavior: 'smooth' })
-      }
-    }, 60)
-    return () => clearTimeout(t)
-  }, [isActive])
-
-  // Close numpad if this field unmounts while active (page navigation)
-  useEffect(() => {
-    return () => {
-      if (useNumPadStore.getState().fieldId === fieldId) {
-        useNumPadStore.getState().close()
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let v = e.target.value
+    // Strip anything that isn't a digit (and a single decimal point, if allowed)
+    v = hasDecimal ? v.replace(/[^\d.]/g, '') : v.replace(/\D/g, '')
+    if (hasDecimal) {
+      const firstDot = v.indexOf('.')
+      if (firstDot !== -1) {
+        v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '')
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const handleOpen = () => {
-    if (disabled) return
-    openPad({ fieldId, value, onChange, maxLength, masked, hasDecimal, label, placeholder })
+    if (maxLength) v = v.slice(0, maxLength)
+    onChange(v)
   }
 
-  const display = value
-    ? (masked ? '●'.repeat(value.length) : value)
-    : ''
-
   return (
-    <div ref={divRef} className={cn('w-full', className)}>
+    <div className={cn('w-full', className)}>
       {label && (
-        <label className="block text-sm font-medium text-ink mb-1.5">
+        <label htmlFor={fieldId} className="block text-sm font-medium text-ink mb-1.5">
           {label}
         </label>
       )}
 
-      <div
-        role="textbox"
-        aria-label={label}
-        aria-readonly="false"
-        aria-disabled={disabled}
-        tabIndex={disabled ? -1 : 0}
-        className={cn(
-          'relative w-full h-11 flex items-center px-3.5 rounded-xl border text-sm cursor-pointer',
-          'bg-surface-1 transition-all select-none',
-          isActive
-            ? 'ring-2 ring-brand-500 border-transparent'
-            : 'border-border',
-          error && !isActive && 'border-danger',
-          disabled && 'opacity-50 bg-surface-2 cursor-not-allowed',
-          prefix && 'pl-9',
-        )}
-        onClick={handleOpen}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleOpen() }}
-      >
+      <div className="relative w-full">
         {prefix && (
-          <span className="absolute left-3 flex items-center pointer-events-none text-ink-faint">
+          <span className="absolute left-3 inset-y-0 flex items-center pointer-events-none text-ink-faint">
             {prefix}
           </span>
         )}
-        <span className={display ? 'text-ink' : 'text-ink-faint'}>
-          {display || placeholder || ''}
-        </span>
+        <input
+          id={fieldId}
+          type={masked ? 'password' : hasDecimal ? 'text' : 'tel'}
+          inputMode={hasDecimal ? 'decimal' : 'numeric'}
+          pattern={hasDecimal ? undefined : '[0-9]*'}
+          value={value}
+          onChange={handleChange}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          disabled={disabled}
+          className={cn(
+            'w-full h-11 px-3.5 rounded-xl border text-sm bg-surface-1 transition-all',
+            'text-ink placeholder:text-ink-faint',
+            'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
+            error && 'border-danger',
+            disabled && 'opacity-50 bg-surface-2 cursor-not-allowed',
+            prefix && 'pl-9',
+          )}
+        />
       </div>
 
       {error  && <p className="mt-1.5 text-xs text-danger">{error}</p>}
