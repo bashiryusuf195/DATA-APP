@@ -4,6 +4,7 @@ import { MockVTUProvider } from "./mock-vtu.provider";
 import { VTPassProvider } from "./vtpass.provider";
 import { SmshikaProvider } from "./smshika.provider";
 import { ClubkonnectProvider } from "./clubkonnect.provider";
+import { EdataProvider } from "./edata.provider";
 import { LegitDataWayProvider } from "./legitdataway.provider";
 import { SecureIDVerifyProvider } from "./secureidverify.provider";
 import { config } from "../../../config";
@@ -39,6 +40,10 @@ class ProviderRegistryService {
     // which the execution engine handles as a provider error and fails over.
     this.register(new SmshikaProvider());
     console.log("[PROVIDER REGISTRY] SMShika registered (credentials loaded from DB at call time)");
+    
+    // eData — same DB-credential pattern as SMShika.
+    this.register(new EdataProvider());
+    console.log("[PROVIDER REGISTRY] eData registered (credentials loaded from DB at call time)");
 
     // Clubkonnect — same DB-credential pattern as SMShika.
     this.register(new ClubkonnectProvider());
