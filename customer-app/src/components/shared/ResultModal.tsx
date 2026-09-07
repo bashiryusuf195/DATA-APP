@@ -2,8 +2,10 @@ import { Modal, Button } from '@/components/ui'
 import { CheckCircle2, XCircle, Clock, RefreshCw, Home, History, Loader2, Search, Copy, Check, Download, ShieldCheck, Receipt } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useState, useCallback } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { fmtCurrency, normalizeTransactionStatus } from '@/utils/format'
 import { transactionsApi } from '@/api/transactions.api'
+import { saveBlobToDevice } from '@/utils/nativeSave'
 import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 import type { Transaction } from '@/types'
@@ -48,7 +50,12 @@ export function ResultModal({ open, transaction, isPolling = false, onClose, onR
     if (!transaction) return
     setIsDownloading(true)
     try {
-      await transactionsApi.downloadReport(transaction.reference)
+      if (Capacitor.isNativePlatform()) {
+        const { blob, filename } = await transactionsApi.fetchReportBlob(transaction.reference)
+        await saveBlobToDevice(blob, filename)
+      } else {
+        await transactionsApi.downloadReport(transaction.reference)
+      }
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 422) {
         toast.error('Report not ready yet — please try again in a moment.')
