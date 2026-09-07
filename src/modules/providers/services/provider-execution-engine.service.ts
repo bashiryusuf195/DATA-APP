@@ -22,7 +22,7 @@ import {
   recordFailure as metricsRecordFailure,
   isCircuitOpen,
 } from "./provider-health-metrics.service";
-import { classifyError } from "./error-classifier.service";
+import { classifyError, type ErrorClassification } from "./error-classifier.service";
 import { processReferralReward } from "../../referral/services/referral-reward.service";
 import { logger } from "../../../lib/logger";
 import type { VTUProvider } from "./provider.interface";
@@ -198,12 +198,27 @@ class ProviderExecutionEngine {
 
     if (candidates.length === 0) {
       const reason = "No eligible providers configured or available";
+      // If we're here only because the sole provider was already attempted
+      // (e.g. a prior attempt timed out with no confirmed outcome) and there's
+      // no fallback to check against, the true delivery status is UNKNOWN —
+      // not confirmed failed. Auto-refunding here risks double-paying a
+      // customer whose order actually went through on the provider's side.
+      const isAmbiguous = rejectedProviders.some((r) => r.reason === "ALREADY_ATTEMPTED");
       logger.warn("engine_no_candidates", {
         reference:   transaction_reference,
         service_type,
         rejected:    rejectedProviders.length,
+        ambiguous:   isAmbiguous,
       });
-      await this.handleAllFailed(params, [], rejectedProviders, reason, executionStartedAt, null);
+      if (isAmbiguous) {
+        await this.handleRequiresReview(
+          params, [], rejectedProviders,
+          "Provider already attempted with an unconfirmed outcome (e.g. timeout) — no other provider configured. Manual verification required before refund or completion.",
+          executionStartedAt,
+        );
+      } else {
+        await this.handleAllFailed(params, [], rejectedProviders, reason, executionStartedAt, null);
+      }
       return {
         success: false, pending: false, provider_result: null, final_provider: null,
         attempted_providers: [], rejected_providers: rejectedProviders,
@@ -214,7 +229,8 @@ class ProviderExecutionEngine {
     }
 
     // ── Execute with provider-level failover ──────────────────────────────────
-    const attemptedProviders: string[]          = [];
+    const attemptedProviders: string[]                  = [];
+    const attemptClassifications: ErrorClassification[] = [];
     let failoverTriggered                        = false;
     let attemptNumber                            = existingAttemptCount + 1;
     let lastError                                = "All providers exhausted";
@@ -289,6 +305,10 @@ class ProviderExecutionEngine {
           : rawError
             ? classifyError(rawError)
             : null;
+
+      if (!success && !isPending && errorClass && errorClass !== "PENDING") {
+        attemptClassifications.push(errorClass as ErrorClassification);
+      }
 
       const safeRequest: Record<string, unknown> = {
         service_type:   resolvedInput.service_type,
@@ -410,13 +430,33 @@ class ProviderExecutionEngine {
     }
 
     // ── All providers exhausted ───────────────────────────────────────────────
+    // If any exhausted attempt was a TIMEOUT/NETWORK_ERROR (outcome never
+    // confirmed by the provider), or a provider was skipped as ALREADY_ATTEMPTED
+    // with no fallback to check against, the true delivery status is UNKNOWN.
+    // Auto-refunding in that case risks paying out twice — route to manual
+    // review instead so an admin can check the provider's dashboard first.
+    const isAmbiguousOutcome =
+      attemptClassifications.some((c) => c === "TIMEOUT" || c === "NETWORK_ERROR") ||
+      rejectedProviders.some((r) => r.reason === "ALREADY_ATTEMPTED");
+
     logger.error("engine_all_providers_exhausted", {
-      reference:   transaction_reference,
-      tried:       attemptedProviders,
-      rejected:    rejectedProviders.map((r) => r.provider_code),
+      reference:       transaction_reference,
+      tried:           attemptedProviders,
+      rejected:        rejectedProviders.map((r) => r.provider_code),
       service_type,
+      ambiguous:       isAmbiguousOutcome,
+      classifications: attemptClassifications,
     });
-    await this.handleAllFailed(params, attemptedProviders, rejectedProviders, lastError, executionStartedAt, lastResult);
+
+    if (isAmbiguousOutcome) {
+      await this.handleRequiresReview(
+        params, attemptedProviders, rejectedProviders,
+        `${lastError} (outcome unconfirmed — timeout/network error means the order may have gone through on the provider's side). Manual verification required before refund.`,
+        executionStartedAt,
+      );
+    } else {
+      await this.handleAllFailed(params, attemptedProviders, rejectedProviders, lastError, executionStartedAt, lastResult);
+    }
 
     return {
       success:                    false,
@@ -814,6 +854,96 @@ class ProviderExecutionEngine {
       provider:           result.provider,
       provider_reference: result.provider_reference,
     });
+  }
+
+  // ── Requires-review handler ────────────────────────────────────────────────
+  //
+  // Used when the outcome is genuinely unconfirmed — a timeout, network error,
+  // or a provider that was skipped as ALREADY_ATTEMPTED with no fallback to
+  // verify against. We do NOT refund here: the provider may have completed the
+  // order despite the ambiguous response, and refunding blind risks paying out
+  // twice (customer keeps the delivered airtime/data AND gets their money back).
+  // An admin must check the provider dashboard and either confirm delivery
+  // (mark successful, no refund) or confirm non-delivery (manual refund).
+
+  private async handleRequiresReview(
+    params:             ExecuteWithFailoverParams,
+    attemptedProviders: string[],
+    rejectedProviders:  RejectedProvider[],
+    reason:             string,
+    executionStartedAt: Date,
+  ): Promise<void> {
+    const { transaction_reference, transaction, service_type } = params;
+    const executionCompletedAt = new Date();
+
+    logger.warn("engine_requires_review", {
+      reference: transaction_reference,
+      reason,
+      attempted: attemptedProviders,
+    });
+
+    await updateTransactionStatus(transaction_reference, {
+      status:         "requires_review",
+      failure_reason: reason,
+      metadata: {
+        execution: {
+          attempted_providers:    attemptedProviders,
+          rejected_providers:     rejectedProviders,
+          failover_triggered:     attemptedProviders.length > 1,
+          final_provider:         null,
+          failure_stage:          "ambiguous_outcome",
+          total_attempts:         attemptedProviders.length,
+          all_failed:             false,
+          requires_manual_review: true,
+          failure_reason:         reason,
+          execution_started_at:   executionStartedAt.toISOString(),
+          execution_completed_at: executionCompletedAt.toISOString(),
+          total_latency_ms:       executionCompletedAt.getTime() - executionStartedAt.getTime(),
+        },
+      },
+    });
+
+    // Deliberately no refund here — see comment above.
+
+    createNotification({
+      user_id:          transaction.user_id,
+      channel:          "in_app",
+      type:             "purchase_processing",
+      title:            "Transaction Under Review",
+      message:          `We're verifying your ${service_type} purchase — this can take a few minutes. We'll update you shortly.`,
+      notification_key: `purchase_review:${transaction_reference}`,
+      metadata: {
+        reference: transaction_reference,
+        type:      service_type,
+        amount:    Number(transaction.amount),
+      },
+    }).catch((err) =>
+      logger.warn("engine_review_notification_failed", { error: (err as Error).message })
+    );
+
+    sendTransactionPush(transaction.user_id, "purchase_processing", {
+      title:             "Transaction Under Review",
+      body:              `We're verifying your ${service_type} purchase — this can take a few minutes.`,
+      deep_link:         `/transactions/${transaction_reference}`,
+      notification_type: "purchase_processing",
+      reference:         transaction_reference,
+    }).catch(() => {/* logged inside sendTransactionPush */});
+
+    sendAdminPushNotification({
+      title:             "⚠️ Transaction Requires Manual Review",
+      body:              `${service_type.toUpperCase()} purchase has an unconfirmed outcome (timeout/no fallback). Check provider dashboard before refunding. Ref: ${transaction_reference}`,
+      deep_link:         `/transactions`,
+      notification_type: "admin_transaction_review",
+      preference_key:    "admin_transaction_failures",
+      metadata: {
+        reference:         transaction_reference,
+        service_type,
+        provider_attempts: String(attemptedProviders.length),
+        user_id:           transaction.user_id,
+        amount:            String(transaction.amount),
+        reason,
+      },
+    }).catch(() => {});
   }
 
   // ── All-failed handler ────────────────────────────────────────────────────
