@@ -94,6 +94,7 @@ export const transactionsApi = {
   buyExamPin:    (body: ExamPinPurchaseInput)          => purchase('exam-pin',               body),
   verifyIdentity:(body: IdentityVerificationInput)     => purchase('identity-verification',  body),
 
+  /** Download the identity verification PDF report (web/PWA — anchor-click). */
   downloadReport: async (reference: string): Promise<void> => {
     const resp = await apiClient.get(
       `/transactions/identity-verification/${reference}/report`,
@@ -106,6 +107,31 @@ export const transactionsApi = {
     a.download   = `verification-${reference}.pdf`
     a.click()
     URL.revokeObjectURL(objUrl)
+  },
+
+  /** Fetch the identity verification PDF report as a Blob (native path — used before writing to device). */
+  fetchReportBlob: async (reference: string): Promise<{ blob: Blob; filename: string }> => {
+    try {
+      const resp = await apiClient.get(
+        `/transactions/identity-verification/${reference}/report`,
+        { responseType: 'blob' },
+      )
+      return {
+        blob: new Blob([resp.data as BlobPart], { type: 'application/pdf' }),
+        filename: `verification-${reference}.pdf`,
+      }
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data instanceof Blob) {
+        try {
+          const text = await (err.response.data as Blob).text()
+          const json = JSON.parse(text) as { error?: string; message?: string }
+          throw new Error(json.error ?? json.message ?? 'Could not generate report')
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== 'Could not generate report') throw parseErr
+        }
+      }
+      throw err
+    }
   },
 
   /** Download a PDF receipt for any transaction type (web/PWA — anchor-click). */

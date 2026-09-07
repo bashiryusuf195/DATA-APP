@@ -7,13 +7,13 @@ import {
 } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
-import { Filesystem, Directory } from '@capacitor/filesystem'
 import { cn } from '@/utils/cn'
 import { useTransaction } from '@/hooks/useTransactions'
 import { useSupportConfig } from '@/hooks/useSupportConfig'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { fmtCurrency, fmtDateTime, normalizeTransactionStatus } from '@/utils/format'
 import { transactionsApi } from '@/api/transactions.api'
+import { saveBlobToDevice } from '@/utils/nativeSave'
 import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 import type { Transaction } from '@/types'
@@ -547,35 +547,12 @@ function ActionBar({ tx }: { tx: Transaction }) {
     setDownloading(true)
     try {
       if (Capacitor.isNativePlatform()) {
-        console.log('[Receipt] Fetching PDF for reference:', tx.reference)
         const { blob, filename } = await transactionsApi.fetchReceiptBlob(tx.reference)
-        console.log('[Receipt] PDF fetched ok, size:', blob.size, 'bytes')
-
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload  = () => resolve((reader.result as string).split(',')[1])
-          reader.onerror = (e) => { console.error('[Receipt] FileReader error:', e); reject(e) }
-          reader.readAsDataURL(blob)
-        })
-        console.log('[Receipt] Base64 encoded, length:', base64.length)
-
-        const writeResult = await Filesystem.writeFile({
-          path: filename,
-          data: base64,
-          directory: Directory.Cache,
-        })
-        console.log('[Receipt] Written to cache, uri:', writeResult.uri)
-
-        await Share.share({
-          title: 'Transaction Receipt',
-          files: [writeResult.uri],
-          dialogTitle: 'Save or Share Receipt',
-        })
+        await saveBlobToDevice(blob, filename)
       } else {
         await transactionsApi.downloadReceipt(tx.reference)
       }
     } catch (err) {
-      console.error('[Receipt] Download error:', err)
       const msg = err instanceof Error ? err.message : 'Could not generate receipt. Please try again.'
       toast.error(msg)
     } finally {
@@ -655,7 +632,12 @@ export function TransactionDetailPage() {
   const handleReportDownload = useCallback(async (ref: string) => {
     setIsDownloading(true)
     try {
-      await transactionsApi.downloadReport(ref)
+      if (Capacitor.isNativePlatform()) {
+        const { blob, filename } = await transactionsApi.fetchReportBlob(ref)
+        await saveBlobToDevice(blob, filename)
+      } else {
+        await transactionsApi.downloadReport(ref)
+      }
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 422) {
         toast.error('Report is not available yet. Please try again later.')
