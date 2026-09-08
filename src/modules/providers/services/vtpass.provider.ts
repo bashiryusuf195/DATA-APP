@@ -1,4 +1,3 @@
-import { config } from "../../../config";
 import { HttpVTUProvider } from "./http-vtu.provider";
 import type {
   ProviderPurchaseInput,
@@ -11,6 +10,7 @@ import type {
   CableVerifyInput,
   CableVerifyResult,
 } from "../types/provider.types";
+import { getProviderCredentials } from "./provider-credentials.service";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,6 @@ interface VTPassTransaction {
   amount?: number;
   type?: string;
   phone?: string;
-  // Exam pin delivery
   pins?: Array<{ pin: string; serial?: string }>;
 }
 
@@ -40,7 +39,6 @@ interface VTPassPurchaseResponse {
   response_description?: string;
   requestId?: string;
   amount?: string;
-  // Exam pin: single pin returned here
   purchased_code?: string;
 }
 
@@ -52,16 +50,13 @@ interface VTPassBalanceResponse {
   data?: { balance?: string | number };
 }
 
-// Merchant verify covers both meter and cable TV — fields differ per service.
 interface VTPassMerchantVerifyResponse {
   code: string;
   content?: {
-    // Electricity meter fields
     Customer_Name?: string;
     Address?: string;
     MeterNumber?: string;
     Customer_Arrears?: string;
-    // Cable TV fields
     Status?: string;
     Due_Date?: string;
     Current_Bouquet?: string;
@@ -77,48 +72,49 @@ function maskPhone(phone?: string): string {
   return `${phone.slice(0, 4)}${"*".repeat(phone.length - 4)}`;
 }
 
+interface VTPassCreds {
+  baseUrl:   string;
+  apiKey:    string;
+  publicKey: string;
+  secretKey: string;
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export class VTPassProvider extends HttpVTUProvider {
   readonly name = "vtpass";
 
-  // VTPass API key authentication (from their docs):
-  //   GET  requests → api-key + public-key headers
-  //   POST requests → api-key + secret-key headers
-  // VTPASS_USERNAME / VTPASS_PASSWORD are dashboard-login only, not used in API calls.
-  private readonly baseUrl:   string;
-  private readonly apiKey:    string;
-  private readonly publicKey: string;
-  private readonly secretKey: string;
-
   constructor() {
     super("vtpass");
-    const v = config.vtpass;
-    this.baseUrl   = v.baseUrl;
-    this.apiKey    = v.apiKey;
-    this.publicKey = v.publicKey;
-    this.secretKey = v.secretKey;
   }
 
-  // ── Credential validation ─────────────────────────────────────────────────
+  // ── Credential loading (DB-backed, same pattern as SMShika/eData) ─────────
+  //
+  // public_key has no dedicated column in provider_credentials, so it is
+  // stored in metadata.public_key by the admin credentials form.
 
-  missingCredentials(): string[] {
-    const checks: [string, string][] = [
-      ["VTPASS_BASE_URL",   this.baseUrl],
-      ["VTPASS_API_KEY",    this.apiKey],
-      ["VTPASS_PUBLIC_KEY", this.publicKey],
-      ["VTPASS_SECRET_KEY", this.secretKey],
-    ];
-    return checks.filter(([, v]) => !v).map(([k]) => k);
-  }
+  private async loadCreds(): Promise<VTPassCreds> {
+    const creds = await this.requireCredentials();
 
-  private assertCredentials(): void {
-    const missing = this.missingCredentials();
+    const baseUrl   = creds.base_url ?? "";
+    const apiKey    = creds.api_key_encrypted ?? "";
+    const secretKey = creds.secret_key_encrypted ?? "";
+    const publicKey = ((creds.metadata as Record<string, unknown> | null)?.["public_key"] as string | undefined) ?? "";
+
+    const missing: string[] = [];
+    if (!baseUrl)   missing.push("base_url");
+    if (!apiKey)    missing.push("api_key");
+    if (!secretKey) missing.push("secret_key");
+    if (!publicKey) missing.push("public_key (set via metadata.public_key)");
+
     if (missing.length > 0) {
       throw new Error(
-        `VTPass provider credentials not configured. Missing: ${missing.join(", ")}`
+        `VTPass: credentials not fully configured — missing: ${missing.join(", ")}. ` +
+        `Add them in Admin > API Integrations > VTPass.`
       );
     }
+
+    return { baseUrl, apiKey, publicKey, secretKey };
   }
 
   // ── Auth headers ──────────────────────────────────────────────────────────
@@ -126,44 +122,43 @@ export class VTPassProvider extends HttpVTUProvider {
   // VTPass REST API authentication (from official docs):
   //   GET  /balance                        → api-key + public-key  (readHeaders)
   //   POST /pay, /requery, /merchant-verify → api-key + secret-key (writeHeaders)
-  //
-  // Authorization: Basic is for the VTPass web dashboard only.
 
   // VTPass requires the first 8 characters of request_id to be today's date (YYYYMMDD).
   // Our internal references are "DAT-20260611-XXXXXX" — strip the prefix so VTPass gets "20260611-XXXXXX".
- private vtpassRequestId(ref: string): string {
-  const now = new Date();
+  private vtpassRequestId(ref: string): string {
+    const now = new Date();
 
-  // Africa/Lagos is UTC+1 and has no daylight saving time.
-  const lagos = new Date(now.getTime() + 60 * 60 * 1000);
+    // Africa/Lagos is UTC+1 and has no daylight saving time.
+    const lagos = new Date(now.getTime() + 60 * 60 * 1000);
 
-  const yyyy = lagos.getUTCFullYear();
-  const mm = String(lagos.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(lagos.getUTCDate()).padStart(2, "0");
-  const hh = String(lagos.getUTCHours()).padStart(2, "0");
-  const min = String(lagos.getUTCMinutes()).padStart(2, "0");
+    const yyyy = lagos.getUTCFullYear();
+    const mm = String(lagos.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(lagos.getUTCDate()).padStart(2, "0");
+    const hh = String(lagos.getUTCHours()).padStart(2, "0");
+    const min = String(lagos.getUTCMinutes()).padStart(2, "0");
 
-  const prefix = `${yyyy}${mm}${dd}${hh}${min}`;
-  const cleanRef = ref.replace(/[^A-Za-z0-9]/g, "").slice(-18);
+    const prefix = `${yyyy}${mm}${dd}${hh}${min}`;
+    const cleanRef = ref.replace(/[^A-Za-z0-9]/g, "").slice(-18);
 
-  return `${prefix}${cleanRef}`;
-}
+    return `${prefix}${cleanRef}`;
+  }
 
-private readHeaders(): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "api-key": this.apiKey,
-    "public-key": this.publicKey,
-  };
-}
+  private readHeaders(creds: VTPassCreds): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      "api-key": creds.apiKey,
+      "public-key": creds.publicKey,
+    };
+  }
 
-private writeHeaders(): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "api-key": this.apiKey,
-    "secret-key": this.secretKey,
-  };
-}
+  private writeHeaders(creds: VTPassCreds): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      "api-key": creds.apiKey,
+      "secret-key": creds.secretKey,
+    };
+  }
+
   // ── HTTP primitives ───────────────────────────────────────────────────────
 
   private async fetchWithTimeout(
@@ -233,9 +228,6 @@ private writeHeaders(): Record<string, string> {
   // ── Service-type payload builders ─────────────────────────────────────────
 
   private buildAirtimePayload(input: ProviderPurchaseInput): Record<string, unknown> {
-    // VTPass airtime serviceID is the bare network name: mtn | glo | airtel | etisalat
-    // variation_code may arrive as "mtn-airtime" (other-provider format) — strip the suffix.
-    // 9mobile is stored internally as "9mobile" but VTPass uses the legacy name "etisalat".
     const NETWORK_MAP: Record<string, string> = { "9mobile": "etisalat" };
     const raw     = input.network_operator ?? input.variation_code ?? "";
     const base    = raw.split("-")[0].toLowerCase();
@@ -263,8 +255,6 @@ private writeHeaders(): Record<string, string> {
     if (!variationCode) {
       throw new Error("VTPass data purchase requires variation_code (data plan code)");
     }
-    // Strip any trailing -data suffix before appending, so "mtn" and "mtn-data" both → "mtn-data"
-    // VTPass uses legacy brand name "etisalat" for 9mobile.
     const NETWORK_MAP: Record<string, string> = { "9mobile": "etisalat" };
     const base    = input.network_operator.replace(/-data$/i, "").toLowerCase();
     const network = NETWORK_MAP[base] ?? base;
@@ -279,7 +269,6 @@ private writeHeaders(): Record<string, string> {
   }
 
   private buildCableTvPayload(input: ProviderPurchaseInput): Record<string, unknown> {
-    // network_operator = "dstv" | "gotv" | "startimes"
     if (!input.network_operator) {
       throw new Error(
         "VTPass cable TV purchase requires network_operator (dstv | gotv | startimes)"
@@ -294,7 +283,7 @@ private writeHeaders(): Record<string, string> {
     }
     return {
       request_id:        this.vtpassRequestId(input.reference),
-      serviceID:         input.network_operator,       // e.g. "dstv"
+      serviceID:         input.network_operator,
       billersCode:       input.smartcard_number,
       variation_code:    variationCode,
       amount:            input.amount,
@@ -305,7 +294,6 @@ private writeHeaders(): Record<string, string> {
   }
 
   private buildElectricityPayload(input: ProviderPurchaseInput): Record<string, unknown> {
-    // network_operator = disco serviceID, e.g. "ikeja-electric"
     if (!input.network_operator) {
       throw new Error(
         "VTPass electricity purchase requires network_operator (disco service ID, e.g. ikeja-electric)"
@@ -317,16 +305,15 @@ private writeHeaders(): Record<string, string> {
     const meterType = input.plan_category ?? input.variation_code ?? "prepaid";
     return {
       request_id:     this.vtpassRequestId(input.reference),
-      serviceID:      input.network_operator,          // e.g. "ikeja-electric"
+      serviceID:      input.network_operator,
       billersCode:    input.meter_number,
-      variation_code: meterType,                       // "prepaid" | "postpaid"
+      variation_code: meterType,
       amount:         input.amount,
       phone:          input.phone,
     };
   }
 
   private buildExamPinPayload(input: ProviderPurchaseInput): Record<string, unknown> {
-    // network_operator = "waec" | "waec-registration" | "jamb"
     if (!input.network_operator) {
       throw new Error(
         "VTPass exam pin purchase requires network_operator (waec | waec-registration | jamb)"
@@ -349,7 +336,7 @@ private writeHeaders(): Record<string, string> {
   // ── VTUProvider interface ─────────────────────────────────────────────────
 
   async purchase(input: ProviderPurchaseInput): Promise<ProviderPurchaseResult> {
-    this.assertCredentials();
+    const creds = await this.loadCreds();
 
     let payload: Record<string, unknown>;
 
@@ -385,16 +372,16 @@ private writeHeaders(): Record<string, string> {
       reference:      input.reference,
     });
 
-    const url      = `${this.baseUrl}/pay`;
+    const url      = `${creds.baseUrl}/pay`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.writeHeaders(),
+      headers: this.writeHeaders(creds),
       body:    JSON.stringify(payload),
     });
 
     if (response.status === 401) {
       throw new Error(
-        "VTPass: HTTP 401 authentication failure on /pay — verify VTPASS_API_KEY and VTPASS_SECRET_KEY."
+        "VTPass: HTTP 401 authentication failure on /pay — verify api_key and secret_key in Admin > API Integrations > VTPass."
       );
     }
     if (!response.ok) {
@@ -417,20 +404,20 @@ private writeHeaders(): Record<string, string> {
   }
 
   async verifyTransaction(reference: string): Promise<VerifyTransactionResult> {
-    this.assertCredentials();
+    const creds = await this.loadCreds();
 
     console.log("[VTPASS] requery →", { reference });
 
-    const url      = `${this.baseUrl}/requery`;
+    const url      = `${creds.baseUrl}/requery`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.writeHeaders(),
+      headers: this.writeHeaders(creds),
       body:    JSON.stringify({ request_id: this.vtpassRequestId(reference) }),
     });
 
     if (response.status === 401) {
       throw new Error(
-        "VTPass: HTTP 401 authentication failure on /requery — verify VTPASS_API_KEY."
+        "VTPass: HTTP 401 authentication failure on /requery — verify api_key in Admin > API Integrations > VTPass."
       );
     }
     if (!response.ok) {
@@ -459,18 +446,18 @@ private writeHeaders(): Record<string, string> {
   }
 
   async getBalance(): Promise<ProviderBalance> {
-    this.assertCredentials();
+    const creds = await this.loadCreds();
 
-    const url      = `${this.baseUrl}/balance`;
+    const url      = `${creds.baseUrl}/balance`;
     const response = await this.fetchWithTimeout(url, {
       method:  "GET",
-      headers: this.readHeaders(),
+      headers: this.readHeaders(creds),
     });
 
     if (response.status === 401) {
       const body = await response.text().catch(() => "");
       throw new Error(
-        `VTPass: HTTP 401 on /balance — api-key prefix: ${this.apiKey.slice(0, 6)}... — VTPass said: ${body.slice(0, 300)}`
+        `VTPass: HTTP 401 on /balance — api-key prefix: ${creds.apiKey.slice(0, 6)}... — VTPass said: ${body.slice(0, 300)}`
       );
     }
     if (!response.ok) {
@@ -481,7 +468,6 @@ private writeHeaders(): Record<string, string> {
     const raw = await this.parseJson<VTPassBalanceResponse>(response, "balance");
     console.log("[VTPASS] balance raw response:", JSON.stringify(raw));
 
-    // VTPass sandbox and live may nest the balance differently — try all known locations.
     const balanceValue =
       raw.balance ??
       raw.balance_details?.balance ??
@@ -497,11 +483,11 @@ private writeHeaders(): Record<string, string> {
   }
 
   async getServiceVariations(serviceID: string): Promise<unknown> {
-    this.assertCredentials();
-    const url      = `${this.baseUrl}/service-variations?serviceID=${encodeURIComponent(serviceID)}`;
+    const creds = await this.loadCreds();
+    const url      = `${creds.baseUrl}/service-variations?serviceID=${encodeURIComponent(serviceID)}`;
     const response = await this.fetchWithTimeout(url, {
       method:  "GET",
-      headers: this.readHeaders(),
+      headers: this.readHeaders(creds),
     });
     const text = await response.text().catch(() => "");
     if (!response.ok) {
@@ -515,12 +501,26 @@ private writeHeaders(): Record<string, string> {
   }
 
   async healthCheck(): Promise<ProviderHealthResult> {
-    const missing = this.missingCredentials();
-    if (missing.length > 0) {
+    const creds = await getProviderCredentials(this.name);
+
+    if (!creds) {
       return {
         healthy: false,
-        message: `VTPass not configured — missing env vars: ${missing.join(", ")}`,
+        message: "VTPass credentials not configured — add base_url, api_key, secret_key, and metadata.public_key in Admin > API Integrations",
       };
+    }
+    if (!creds.base_url) {
+      return { healthy: false, message: "VTPass base_url not set — add in Admin > API Integrations > VTPass" };
+    }
+    if (!creds.api_key_encrypted) {
+      return { healthy: false, message: "VTPass api_key not set — add in Admin > API Integrations > VTPass" };
+    }
+    if (!creds.secret_key_encrypted) {
+      return { healthy: false, message: "VTPass secret_key not set — add in Admin > API Integrations > VTPass" };
+    }
+    const publicKey = (creds.metadata as Record<string, unknown> | null)?.["public_key"];
+    if (!publicKey) {
+      return { healthy: false, message: "VTPass public_key not set — add via metadata.public_key in Admin > API Integrations > VTPass" };
     }
 
     const start = Date.now();
@@ -539,23 +539,19 @@ private writeHeaders(): Record<string, string> {
         return { healthy: false, latency_ms, message: msg };
       }
       if (msg.includes("timed out")) {
-        return { healthy: false, latency_ms, message: "VTPass health check timed out — check VTPASS_BASE_URL" };
+        return { healthy: false, latency_ms, message: "VTPass health check timed out — check base_url" };
       }
       if (msg.includes("network error") || msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED")) {
-        return { healthy: false, latency_ms, message: "VTPass network unreachable — check VTPASS_BASE_URL" };
+        return { healthy: false, latency_ms, message: "VTPass network unreachable — check base_url" };
       }
       return { healthy: false, latency_ms, message: `VTPass health check failed: ${msg}` };
     }
   }
 
   // ── Meter verification ────────────────────────────────────────────────────
-  //
-  // VTPass /merchant-verify for electricity:
-  //   disco_name = serviceID (e.g. "ikeja-electric")
-  //   meter_type = "prepaid" | "postpaid"
 
   async verifyMeter(input: MeterVerifyInput): Promise<MeterVerifyResult> {
-    this.assertCredentials();
+    const creds = await this.loadCreds();
 
     console.log("[VTPASS] verifyMeter →", {
       serviceID:  input.disco_name,
@@ -563,10 +559,10 @@ private writeHeaders(): Record<string, string> {
       meter:      input.meter_number.slice(0, 4) + "***",
     });
 
-    const url      = `${this.baseUrl}/merchant-verify`;
+    const url      = `${creds.baseUrl}/merchant-verify`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.writeHeaders(),
+      headers: this.writeHeaders(creds),
       body:    JSON.stringify({
         billersCode: input.meter_number,
         serviceID:   input.disco_name,
@@ -575,7 +571,7 @@ private writeHeaders(): Record<string, string> {
     });
 
     if (response.status === 401) {
-      throw new Error("VTPass: HTTP 401 on /merchant-verify — verify VTPASS_API_KEY.");
+      throw new Error("VTPass: HTTP 401 on /merchant-verify — verify api_key in Admin > API Integrations > VTPass.");
     }
     if (!response.ok) {
       throw new Error(`VTPass meter verify failed with HTTP ${response.status}`);
@@ -605,22 +601,19 @@ private writeHeaders(): Record<string, string> {
   }
 
   // ── Cable TV verification ─────────────────────────────────────────────────
-  //
-  // VTPass /merchant-verify for cable TV:
-  //   biller_code = serviceID (e.g. "dstv" | "gotv" | "startimes")
 
   async verifyCable(input: CableVerifyInput): Promise<CableVerifyResult> {
-    this.assertCredentials();
+    const creds = await this.loadCreds();
 
     console.log("[VTPASS] verifyCable →", {
       serviceID:   input.biller_code,
       smartcard:   input.smartcard_number.slice(0, 4) + "***",
     });
 
-    const url      = `${this.baseUrl}/merchant-verify`;
+    const url      = `${creds.baseUrl}/merchant-verify`;
     const response = await this.fetchWithTimeout(url, {
       method:  "POST",
-      headers: this.writeHeaders(),
+      headers: this.writeHeaders(creds),
       body:    JSON.stringify({
         billersCode: input.smartcard_number,
         serviceID:   input.biller_code,
@@ -629,7 +622,7 @@ private writeHeaders(): Record<string, string> {
     });
 
     if (response.status === 401) {
-      throw new Error("VTPass: HTTP 401 on /merchant-verify — verify VTPASS_API_KEY.");
+      throw new Error("VTPass: HTTP 401 on /merchant-verify — verify api_key in Admin > API Integrations > VTPass.");
     }
     if (!response.ok) {
       throw new Error(`VTPass cable verify failed with HTTP ${response.status}`);
@@ -656,4 +649,4 @@ private writeHeaders(): Record<string, string> {
       raw_response:     raw,
     };
   }
-}
+                                                      }
