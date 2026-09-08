@@ -817,8 +817,9 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
       switch (field) { case 'api_key': return apiKey; case 'secret_key': return secretKey
         case 'username': return username; case 'password': return password
         case 'bearer_token': return bearerToken; case 'webhook_secret': return webhookSecret
-        case 'custom_headers': return customHeaders; default: return '' }
-        case 'public_key': return publicKey
+        case 'custom_headers': return customHeaders;
+        case 'public_key': return publicKey; default: return '' }
+        
     }
     const missingRequired = required.filter((f) => !hasField(f) && !fieldValue(f).trim())
     if (missingRequired.length > 0) {
