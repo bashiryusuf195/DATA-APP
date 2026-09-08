@@ -85,6 +85,13 @@ const AUTH_TYPES: AuthTypeConfig[] = [
     shownFields:    ['base_url', 'username', 'api_key'],
     fieldLabels:    { username: 'UserID', api_key: 'APIKey' },
   },
+  {
+    value:          'api_key_secret_public',
+    label:          'API Key + Secret + Public Key',
+    description:    'VTPass-style — three keys: API key, secret key, and public key',
+    requiredFields: ['api_key', 'secret_key', 'public_key'],
+    shownFields:    ['base_url', 'api_key', 'secret_key', 'public_key'],
+  },
 ]
 
 const AUTH_TYPE_MAP = Object.fromEntries(
@@ -230,6 +237,7 @@ interface CredSectionProps {
   baseUrl: string;      setBaseUrl: (v: string) => void
   apiKey: string;       setApiKey: (v: string) => void
   secretKey: string;    setSecretKey: (v: string) => void
+  publicKey: string;     setPublicKey: (v: string) => void
   bearerToken: string;  setBearerToken: (v: string) => void
   username: string;     setUsername: (v: string) => void
   password: string;     setPassword: (v: string) => void
@@ -245,6 +253,7 @@ function CredSection({
   baseUrl, setBaseUrl,
   apiKey, setApiKey,
   secretKey, setSecretKey,
+  publicKey, setPublicKey,
   bearerToken, setBearerToken,
   username, setUsername,
   password, setPassword,
@@ -331,6 +340,16 @@ function CredSection({
           placeholder="Your secret key"
           configured={existing ? hasField('secret_key') : undefined}
           isRequired={required.includes('secret_key') && !hasField('secret_key')}
+        />
+      )}
+      {/* Public Key */}
+      {shown.includes('public_key') && (
+        <CredField
+          label="Public Key"
+          value={publicKey}
+          onChange={setPublicKey}
+          placeholder="Your public key"
+          isRequired={required.includes('public_key')}
         />
       )}
 
@@ -458,6 +477,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
   const [baseUrl, setBaseUrl]             = useState('')
   const [apiKey, setApiKey]               = useState('')
   const [secretKey, setSecretKey]         = useState('')
+  const [publicKey, setPublicKey]         = useState('')
   const [bearerToken, setBearerToken]     = useState('')
   const [username, setUsername]           = useState('')
   const [password, setPassword]           = useState('')
@@ -515,6 +535,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
       switch (field) {
         case 'api_key':        return apiKey
         case 'secret_key':     return secretKey
+        case 'public_key':     return publicKey
         case 'username':       return username
         case 'password':       return password
         case 'bearer_token':   return bearerToken
@@ -530,6 +551,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
       const labels: Record<string, string> = {
         api_key:        config.fieldLabels?.api_key    ?? 'API Key',
         secret_key:     'Secret Key',
+        public_key:     'Public Key',
         bearer_token:   'Bearer Token',
         username:       config.fieldLabels?.username   ?? 'Username',
         password:       'Password',
@@ -542,7 +564,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
     }
 
     // Build the payload — only include fields with values
-    const anyCredFilled = [baseUrl, apiKey, secretKey, bearerToken, username, password, webhookSecret, customHeaders]
+    const anyCredFilled = [baseUrl, apiKey, secretKey, publicKey, bearerToken, username, password, webhookSecret, customHeaders]
       .some((v) => v.trim())
 
     // In edit mode, always send auth_type even if no fields changed
@@ -555,6 +577,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
     if (baseUrl.trim())        body.base_url        = baseUrl.trim()
     if (apiKey.trim())         body.api_key          = apiKey.trim()
     if (secretKey.trim())      body.secret_key       = secretKey.trim()
+    if (publicKey.trim())      body.metadata         = { public_key: publicKey.trim() }
     if (bearerToken.trim())    body.bearer_token     = bearerToken.trim()
     if (username.trim())       body.username         = username.trim()
     if (password.trim())       body.password         = password.trim()
@@ -693,6 +716,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
               baseUrl={baseUrl}          setBaseUrl={setBaseUrl}
               apiKey={apiKey}            setApiKey={setApiKey}
               secretKey={secretKey}      setSecretKey={setSecretKey}
+              publicKey={publicKey}      setPublicKey={setPublicKey}
               bearerToken={bearerToken}  setBearerToken={setBearerToken}
               username={username}        setUsername={setUsername}
               password={password}        setPassword={setPassword}
@@ -743,6 +767,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
   const [baseUrl, setBaseUrl]             = useState('')
   const [apiKey, setApiKey]               = useState('')
   const [secretKey, setSecretKey]         = useState('')
+  const [publicKey, setPublicKey]         = useState('')
   const [bearerToken, setBearerToken]     = useState('')
   const [username, setUsername]           = useState('')
   const [password, setPassword]           = useState('')
@@ -779,6 +804,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
       switch (field) {
         case 'api_key':        return provider.has_api_key
         case 'secret_key':     return provider.has_secret_key
+        case 'public_key':     return publicKey.has_public_key
         case 'username':       return provider.has_username
         case 'password':       return provider.has_password
         case 'bearer_token':   return provider.has_bearer_token
@@ -798,6 +824,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
       const labels: Record<string, string> = {
         api_key:        config.fieldLabels?.api_key  ?? 'API Key',
         secret_key:     'Secret Key',
+        public_key:     'Public Key',
         bearer_token:   'Bearer Token',
         username:       config.fieldLabels?.username ?? 'Username',
         password:       'Password',
@@ -811,6 +838,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
     if (baseUrl.trim())        body.base_url        = baseUrl.trim()
     if (apiKey.trim())         body.api_key          = apiKey.trim()
     if (secretKey.trim())      body.secret_key       = secretKey.trim()
+    if (publicKey.trim())      body.metadata         = public_key: publicKey.trim()
     if (bearerToken.trim())    body.bearer_token     = bearerToken.trim()
     if (username.trim())       body.username         = username.trim()
     if (password.trim())       body.password         = password.trim()
@@ -838,6 +866,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
             baseUrl={baseUrl}          setBaseUrl={setBaseUrl}
             apiKey={apiKey}            setApiKey={setApiKey}
             secretKey={secretKey}      setSecretKey={setSecretKey}
+            publicKey={publicKey}      setPublicKey={setPublicKey}
             bearerToken={bearerToken}  setBearerToken={setBearerToken}
             username={username}        setUsername={setUsername}
             password={password}        setPassword={setPassword}
