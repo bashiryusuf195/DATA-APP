@@ -46,9 +46,12 @@ class ProviderRegistryService {
     // SecureIDVerify — NIN/BVN identity verification; credentials loaded from DB at call time.
     this.register(new SecureIDVerifyProvider());
     console.log("[PROVIDER REGISTRY] SecureIDVerify registered (credentials loaded from DB at call time)");
+
+    // Maskawasub — same DB-credential pattern as eData/SMShika.
+    this.register(new MaskawasubProvider());
+    console.log("[PROVIDER REGISTRY] Maskawasub registered (credentials loaded from DB at call time)");
   }
-this.register(new MaskawasubProvider());
-console.log("[PROVIDER REGISTRY] Maskawasub registered (credentials loaded from DB at call time)");
+
   register(provider: VTUProvider) {
     this.providers.set(provider.name, provider);
   }
