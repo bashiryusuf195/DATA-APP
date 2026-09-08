@@ -159,6 +159,7 @@ const AUTH_TYPE_VALUES = [
   "advanced",
   // Clubkonnect-style: UserID → username_encrypted, APIKey → api_key_encrypted
   "userid_apikey",
+  api_key_secret_public",
 ] as const;
 
 const UpsertCredentialsSchema = z
@@ -167,6 +168,7 @@ const UpsertCredentialsSchema = z
     base_url:       z.string().url().nullable().optional(),
     api_key:        z.string().nullable().optional(),
     secret_key:     z.string().nullable().optional(),
+    public_key:     z.string().nullable().optional(),
     username:       z.string().nullable().optional(),
     password:       z.string().nullable().optional(),
     bearer_token:   z.string().nullable().optional(),
