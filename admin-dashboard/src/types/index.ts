@@ -161,6 +161,7 @@ export type ProviderAuthType =
   | 'none'
   | 'advanced'
   | 'userid_apikey'
+  | 'api_key_secret_public'
 
 export interface UpsertProviderCredentialsInput {
   auth_type?: ProviderAuthType
