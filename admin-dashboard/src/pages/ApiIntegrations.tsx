@@ -804,7 +804,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
       switch (field) {
         case 'api_key':        return provider.has_api_key
         case 'secret_key':     return provider.has_secret_key
-        case 'public_key':     return publicKey.has_public_key
+        case 'public_key':     return provider.has_public_key
         case 'username':       return provider.has_username
         case 'password':       return provider.has_password
         case 'bearer_token':   return provider.has_bearer_token
@@ -818,6 +818,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
         case 'username': return username; case 'password': return password
         case 'bearer_token': return bearerToken; case 'webhook_secret': return webhookSecret
         case 'custom_headers': return customHeaders; default: return '' }
+        case 'public_key': return publicKey
     }
     const missingRequired = required.filter((f) => !hasField(f) && !fieldValue(f).trim())
     if (missingRequired.length > 0) {
@@ -838,7 +839,7 @@ function CredentialsModal({ provider, onClose, onSave, saving }: CredentialsModa
     if (baseUrl.trim())        body.base_url        = baseUrl.trim()
     if (apiKey.trim())         body.api_key          = apiKey.trim()
     if (secretKey.trim())      body.secret_key       = secretKey.trim()
-    if (publicKey.trim())      body.metadata         = public_key.trim()
+    if (publicKey.trim())      body.metadata         = publickey.trim()
     if (bearerToken.trim())    body.bearer_token     = bearerToken.trim()
     if (username.trim())       body.username         = username.trim()
     if (password.trim())       body.password         = password.trim()
