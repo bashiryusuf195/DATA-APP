@@ -11,6 +11,7 @@ export interface ProviderCredentials {
   base_url:                    string | null;
   api_key_encrypted:           string | null;
   secret_key_encrypted:        string | null;
+  public_key_encrypted:        string | null;
   username_encrypted:          string | null;
   password_encrypted:          string | null;
   bearer_token_encrypted:      string | null;
@@ -33,6 +34,7 @@ export interface SafeProviderCredentials {
   is_live:             boolean;
   has_api_key:         boolean;
   has_secret_key:      boolean;
+  has_public_key:      boolean;
   has_username:        boolean;
   has_password:        boolean;
   has_bearer_token:    boolean;
@@ -52,6 +54,7 @@ function toSafe(row: ProviderCredentials): SafeProviderCredentials {
     is_live:             row.is_live,
     has_api_key:         !!row.api_key_encrypted,
     has_secret_key:      !!row.secret_key_encrypted,
+    has_public_key:      !!row.public_key_encrypted,
     has_username:        !!row.username_encrypted,
     has_password:        !!row.password_encrypted,
     has_bearer_token:    !!row.bearer_token_encrypted,
@@ -103,6 +106,7 @@ export async function listProvidersWithCredentialStatus() {
       db.raw("CASE WHEN cred.secret_key_encrypted     IS NOT NULL THEN true ELSE false END AS has_secret_key"),
       db.raw("CASE WHEN cred.username_encrypted       IS NOT NULL THEN true ELSE false END AS has_username"),
       db.raw("CASE WHEN cred.password_encrypted       IS NOT NULL THEN true ELSE false END AS has_password"),
+      db.raw("CASE WHEN cred.public_key_encrypted IS NOT NULL THEN true ELSE false END AS has_public_key"),
       db.raw("CASE WHEN cred.bearer_token_encrypted   IS NOT NULL THEN true ELSE false END AS has_bearer_token"),
       db.raw("CASE WHEN cred.webhook_secret_encrypted IS NOT NULL THEN true ELSE false END AS has_webhook_secret"),
       db.raw("CASE WHEN cred.custom_headers_encrypted IS NOT NULL THEN true ELSE false END AS has_custom_headers"),
@@ -135,6 +139,7 @@ export interface UpsertCredentialsInput {
   // Production deployments should encrypt these values before calling this function.
   api_key?:         string | null;
   secret_key?:      string | null;
+  public_key?:      string | null;
   username?:        string | null;
   password?:        string | null;
   bearer_token?:    string | null;
@@ -152,29 +157,30 @@ export async function upsertProviderCredentials(
   const now = new Date();
 
   const patch: Record<string, unknown> = { updated_at: now };
-  if (input.base_url        !== undefined) patch.base_url                   = input.base_url;
-  if (input.api_key         !== undefined) patch.api_key_encrypted          = input.api_key;
-  if (input.secret_key      !== undefined) patch.secret_key_encrypted       = input.secret_key;
-  if (input.username        !== undefined) patch.username_encrypted         = input.username;
-  if (input.password        !== undefined) patch.password_encrypted         = input.password;
-  if (input.bearer_token    !== undefined) patch.bearer_token_encrypted     = input.bearer_token;
-  if (input.webhook_secret  !== undefined) patch.webhook_secret_encrypted   = input.webhook_secret;
-  if (input.custom_headers  !== undefined) patch.custom_headers_encrypted   = input.custom_headers;
-  if (input.auth_type       !== undefined) patch.auth_type                  = input.auth_type;
-  if (input.is_live         !== undefined) patch.is_live                    = input.is_live;
-  if (input.metadata        !== undefined) patch.metadata                   = JSON.stringify(input.metadata);
+if (input.base_url        !== undefined) patch.base_url                   = input.base_url;
+if (input.api_key         !== undefined) patch.api_key_encrypted          = input.api_key;
+if (input.secret_key      !== undefined) patch.secret_key_encrypted       = input.secret_key;
+if (input.public_key      !== undefined) patch.public_key_encrypted       = input.public_key;   // ← add here
+if (input.username        !== undefined) patch.username_encrypted         = input.username;
+if (input.password        !== undefined) patch.password_encrypted         = input.password;
+if (input.bearer_token    !== undefined) patch.bearer_token_encrypted     = input.bearer_token;
+if (input.webhook_secret  !== undefined) patch.webhook_secret_encrypted   = input.webhook_secret;
+if (input.custom_headers  !== undefined) patch.custom_headers_encrypted   = input.custom_headers;
+if (input.auth_type       !== undefined) patch.auth_type                  = input.auth_type;
+if (input.is_live         !== undefined) patch.is_live                    = input.is_live;
+if (input.metadata        !== undefined) patch.metadata                   = JSON.stringify(input.metadata);
 
-  const existing = await db("provider_credentials")
+const existing = await db("provider_credentials")
+  .where({ provider_code: input.provider_code })
+  .first();
+
+if (existing) {
+  const [updated] = await db("provider_credentials")
     .where({ provider_code: input.provider_code })
-    .first();
-
-  if (existing) {
-    const [updated] = await db("provider_credentials")
-      .where({ provider_code: input.provider_code })
-      .update(patch)
-      .returning("*");
-    return toSafe(updated as ProviderCredentials);
-  }
+    .update(patch)
+    .returning("*");
+  return toSafe(updated as ProviderCredentials);
+}
 
   const [created] = await db("provider_credentials")
     .insert({
@@ -184,6 +190,7 @@ export async function upsertProviderCredentials(
       api_key_encrypted:          input.api_key              ?? null,
       secret_key_encrypted:       input.secret_key           ?? null,
       username_encrypted:         input.username             ?? null,
+      public_key_encrypted:       input.public_key           ?? null,
       password_encrypted:         input.password             ?? null,
       bearer_token_encrypted:     input.bearer_token         ?? null,
       webhook_secret_encrypted:   input.webhook_secret       ?? null,
