@@ -97,6 +97,7 @@ export interface ProviderRegistryRow {
   // Credential presence flags (false when no credentials row exists)
   has_api_key: boolean
   has_secret_key: boolean
+  has_public_key: boolean
   has_username: boolean
   has_password: boolean
   has_bearer_token: boolean
@@ -123,6 +124,7 @@ export interface SafeProviderCredentials {
   is_live: boolean
   has_api_key: boolean
   has_secret_key: boolean
+  has_public_key: boolean
   has_username: boolean
   has_password: boolean
   has_bearer_token: boolean
@@ -168,6 +170,7 @@ export interface UpsertProviderCredentialsInput {
   base_url?: string | null
   api_key?: string | null
   secret_key?: string | null
+  public_key?: string | null 
   username?: string | null
   password?: string | null
   bearer_token?: string | null
