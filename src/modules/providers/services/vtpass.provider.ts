@@ -90,31 +90,30 @@ export class VTPassProvider extends HttpVTUProvider {
 
   // ── Credential loading (DB-backed, same pattern as SMShika/eData) ─────────
   //
-  // public_key has no dedicated column in provider_credentials, so it is
-  // stored in metadata.public_key by the admin credentials form.
+  // ...public_key...
 
   private async loadCreds(): Promise<VTPassCreds> {
-    const creds = await this.requireCredentials();
+  const creds = await this.requireCredentials();
 
-    const baseUrl   = creds.base_url ?? "";
-    const apiKey    = creds.api_key_encrypted ?? "";
-    const secretKey = creds.secret_key_encrypted ?? "";
-    const publicKey = ((creds.metadata as Record<string, unknown> | null)?.["public_key"] as string | undefined) ?? "";
+  const baseUrl   = creds.base_url ?? "";
+  const apiKey    = creds.api_key_encrypted ?? "";
+  const secretKey = creds.secret_key_encrypted ?? "";
+  const publicKey = creds.public_key_encrypted ?? "";   // ← was reading metadata.public_key
 
-    const missing: string[] = [];
-    if (!baseUrl)   missing.push("base_url");
-    if (!apiKey)    missing.push("api_key");
-    if (!secretKey) missing.push("secret_key");
-    if (!publicKey) missing.push("public_key (set via metadata.public_key)");
+  const missing: string[] = [];
+  if (!baseUrl)   missing.push("base_url");
+  if (!apiKey)    missing.push("api_key");
+  if (!secretKey) missing.push("secret_key");
+  if (!publicKey) missing.push("public_key");           // ← simplified message
 
-    if (missing.length > 0) {
-      throw new Error(
-        `VTPass: credentials not fully configured — missing: ${missing.join(", ")}. ` +
-        `Add them in Admin > API Integrations > VTPass.`
-      );
-    }
+  if (missing.length > 0) {
+    throw new Error(
+      `VTPass: credentials not fully configured — missing: ${missing.join(", ")}. ` +
+      `Add them in Admin > API Integrations > VTPass.`
+    );
+  }
 
-    return { baseUrl, apiKey, publicKey, secretKey };
+  return { baseUrl, apiKey, publicKey, secretKey };
   }
 
   // ── Auth headers ──────────────────────────────────────────────────────────
@@ -518,7 +517,7 @@ export class VTPassProvider extends HttpVTUProvider {
     if (!creds.secret_key_encrypted) {
       return { healthy: false, message: "VTPass secret_key not set — add in Admin > API Integrations > VTPass" };
     }
-    const publicKey = (creds.metadata as Record<string, unknown> | null)?.["public_key"];
+    const publicKey = creds.public_key_encrypted;
     if (!publicKey) {
       return { healthy: false, message: "VTPass public_key not set — add via metadata.public_key in Admin > API Integrations > VTPass" };
     }
