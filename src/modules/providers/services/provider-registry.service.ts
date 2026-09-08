@@ -18,22 +18,11 @@ class ProviderRegistryService {
     // Mock provider is always registered as the guaranteed fallback.
     this.register(new MockVTUProvider());
 
-    // Register VTPass if all required env vars are present.
-    const vtpass = new VTPassProvider();
-    const missing = vtpass.missingCredentials();
-    if (missing.length === 0) {
-      this.register(vtpass);
-      console.log(
-        "[PROVIDER REGISTRY] VTPass registered —",
-        config.vtpass.baseUrl
-      );
-    } else {
-      console.warn(
-        "[PROVIDER REGISTRY] VTPass not configured — missing:",
-        missing.join(", "),
-        "— mock provider will be used as fallback."
-      );
-    }
+    // VTPass now reads credentials from DB (not env vars), same pattern as
+    // SMShika/eData/Clubkonnect — always registered; requireCredentials()
+    // throws at call time if not configured, handled as a provider error.
+    this.register(new VTPassProvider());
+    console.log("[PROVIDER REGISTRY] VTPass registered (credentials loaded from DB at call time)");
 
     // SMShika reads credentials from DB (not env vars), so it is always
     // registered. requireCredentials() throws at call time if not configured,
