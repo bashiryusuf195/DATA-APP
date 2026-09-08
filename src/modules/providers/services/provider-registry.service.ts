@@ -7,6 +7,7 @@ import { ClubkonnectProvider } from "./clubkonnect.provider";
 import { EdataProvider } from "./edata.provider";
 import { LegitDataWayProvider } from "./legitdataway.provider";
 import { SecureIDVerifyProvider } from "./secureidverify.provider";
+import { MaskawasubProvider } from "./maskawasub.provider";
 import { config } from "../../../config";
 
 class ProviderRegistryService {
@@ -46,7 +47,8 @@ class ProviderRegistryService {
     this.register(new SecureIDVerifyProvider());
     console.log("[PROVIDER REGISTRY] SecureIDVerify registered (credentials loaded from DB at call time)");
   }
-
+this.register(new MaskawasubProvider());
+console.log("[PROVIDER REGISTRY] Maskawasub registered (credentials loaded from DB at call time)");
   register(provider: VTUProvider) {
     this.providers.set(provider.name, provider);
   }
