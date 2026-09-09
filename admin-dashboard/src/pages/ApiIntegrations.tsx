@@ -523,6 +523,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
       switch (field) {
         case 'api_key':        return initial.has_api_key
         case 'secret_key':     return initial.has_secret_key
+        case 'public_key':     return initial.has_public_key
         case 'username':       return initial.has_username
         case 'password':       return initial.has_password
         case 'bearer_token':   return initial.has_bearer_token
