@@ -577,7 +577,7 @@ function ProviderFormModal({ mode, initial, onClose, onSave, saving }: ProviderF
     if (baseUrl.trim())        body.base_url        = baseUrl.trim()
     if (apiKey.trim())         body.api_key          = apiKey.trim()
     if (secretKey.trim())      body.secret_key       = secretKey.trim()
-    if (publicKey.trim())      body.metadata         = { public_key: publicKey.trim() }
+    if (publicKey.trim())      body.public_key       = publicKey.trim()
     if (bearerToken.trim())    body.bearer_token     = bearerToken.trim()
     if (username.trim())       body.username         = username.trim()
     if (password.trim())       body.password         = password.trim()
