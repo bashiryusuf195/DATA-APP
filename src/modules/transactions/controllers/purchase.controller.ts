@@ -176,8 +176,8 @@ export async function verifyMeterController(
       );
     }
 
-    const discoId   = (plan.provider_variation_code as string | null) ?? "";
-    const meterType = (plan.plan_category           as string | null) ?? "prepaid";
+    const discoId   = (plan.network_operator as string | null) ?? "";
+const meterType = (plan.provider_variation_code as string | null) ?? "prepaid";
 
     if (!discoId) {
       throw new AppError(
