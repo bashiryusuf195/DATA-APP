@@ -285,11 +285,14 @@ export class MaskawasubProvider extends HttpVTUProvider {
     }
 
     const raw = await this.parseJson<MaskawasubTxnResponse>(response, "data purchase");
-    const isSuccess = this.isSuccessStatus(raw);
 
-    console.log("[MASKAWASUB] data purchase ←", {
-      status: raw.status, Status: raw.Status, message: raw.message, reference: input.reference,
-    });
+console.log("[MASKAWASUB] data purchase RAW ←", JSON.stringify(raw));  // ← add this
+
+const isSuccess = this.isSuccessStatus(raw);
+
+console.log("[MASKAWASUB] data purchase ←", {
+  status: raw.status, Status: raw.Status, message: raw.message, reference: input.reference,
+});
 
     return {
       success:            isSuccess,
