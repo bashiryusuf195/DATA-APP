@@ -62,6 +62,7 @@ interface MaskawasubTxnResponse {
   status?:         string;
   Status?:         string;
   message?:        string;
+  error?:          string[];
   balance_before?: string;
   balance_after?:  string;
   [key: string]:   unknown;
@@ -289,6 +290,7 @@ export class MaskawasubProvider extends HttpVTUProvider {
 console.log("[MASKAWASUB] data purchase RAW ←", JSON.stringify(raw));  // ← add this
 
 const isSuccess = this.isSuccessStatus(raw);
+    const errorMessage = Array.isArray(raw.error) ? raw.error.join("; ") : undefined;
 
 console.log("[MASKAWASUB] data purchase ←", {
   status: raw.status, Status: raw.Status, message: raw.message, reference: input.reference,
@@ -298,7 +300,7 @@ console.log("[MASKAWASUB] data purchase ←", {
       success:            isSuccess,
       provider_reference: input.reference,
       provider:           this.name,
-      message:            raw.message ?? (isSuccess ? "Data purchase successful" : "Data purchase failed"),
+      message:            raw.message ?? errorMessage ?? (isSuccess ? "Data purchase successful" : "Data purchase failed"),
       status:             isSuccess ? "successful" : "failed",
       raw_response: {
         status: raw.status, Status: raw.Status, message: raw.message,
