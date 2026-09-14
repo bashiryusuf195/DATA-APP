@@ -12,3 +12,4 @@ coverage/
 
 # Generated
 /src/generated/prisma
+customer-app/android/gradle.properties
