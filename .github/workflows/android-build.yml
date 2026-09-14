@@ -46,9 +46,10 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          cat >> gradle.properties <<EOF
-          HIVEDATA_STORE_FILE=hivedata-release.keystore
-          HIVEDATA_STORE_PASSWORD=$STORE_PASSWORD
+cat >> gradle.properties <<EOF
+android.useAndroidX=true
+android.enableJetifier=true
+HIVEDATA_STORE_FILE=hivedata-release.keystore          HIVEDATA_STORE_PASSWORD=$STORE_PASSWORD
           HIVEDATA_KEY_ALIAS=$KEY_ALIAS
           HIVEDATA_KEY_PASSWORD=$KEY_PASSWORD
           EOF
