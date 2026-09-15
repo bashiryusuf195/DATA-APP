@@ -239,7 +239,7 @@ interface NdsUserResponse extends NdsErrorEnvelope {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function maskPhone(phone?: string): string {
+function maskPhone(phone?: string | null): string {
   if (!phone || phone.length < 5) return "***";
   return `${phone.slice(0, 4)}${"*".repeat(phone.length - 4)}`;
 }
@@ -253,7 +253,7 @@ function resolveAirtimeNetworkId(variationCode: string): number | null {
   return id !== undefined ? id : null;
 }
 
-function resolveMeterTypeCode(raw: string | undefined): string {
+function resolveMeterTypeCode(raw: string | null | undefined): string {
   if (!raw) return "1";
   return METER_TYPE_CODE_MAP[raw.toLowerCase()] ?? "1";
 }
@@ -530,6 +530,14 @@ export class NetworkDataSubProvider extends HttpVTUProvider {
   async verifyMeter(input: MeterVerifyInput): Promise<MeterVerifyResult> {
     const creds = await this.loadCreds();
 
+    if (!input.disco_name) {
+      throw new Error(
+        "NetworkDataSub electricity: disco_id is missing. " +
+          "Set the plan's network_operator/provider_variation_code to the numeric disco_id from " +
+          "GET /electricity/providers."
+      );
+    }
+
     const discoId = parseInt(input.disco_name, 10);
     if (isNaN(discoId) || discoId <= 0) {
       throw new Error(
@@ -667,6 +675,13 @@ export class NetworkDataSubProvider extends HttpVTUProvider {
 
   async verifyCable(input: CableVerifyInput): Promise<CableVerifyResult> {
     const creds = await this.loadCreds();
+
+    if (!input.biller_code) {
+      throw new Error(
+        "NetworkDataSub cable: provider_id is missing. " +
+          "Set the plan's network_operator to the numeric provider_id from GET /cable/providers."
+      );
+    }
 
     const providerId = parseInt(input.biller_code, 10);
     if (isNaN(providerId) || providerId <= 0) {
