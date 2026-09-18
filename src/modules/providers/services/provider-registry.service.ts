@@ -8,6 +8,7 @@ import { EdataProvider } from "./edata.provider";
 import { LegitDataWayProvider } from "./legitdataway.provider";
 import { SecureIDVerifyProvider } from "./secureidverify.provider";
 import { MaskawasubProvider } from "./maskawasub.provider";
+import { NetworkDataSubProvider } from "./networkdatasub.provider";
 import { config } from "../../../config";
 
 class ProviderRegistryService {
@@ -50,6 +51,13 @@ class ProviderRegistryService {
     // Maskawasub — same DB-credential pattern as eData/SMShika.
     this.register(new MaskawasubProvider());
     console.log("[PROVIDER REGISTRY] Maskawasub registered (credentials loaded from DB at call time)");
+    
+    // NetworkDataSub — DB-credential pattern like eData/Maskawasub. Single
+    // bearer token (no separate public/secret key like VTPass). NOTE: no
+    // documented cable_tv purchase endpoint — purchase() throws for that
+    // service_type by design; only cable smartcard verification works.
+    this.register(new NetworkDataSubProvider());
+    console.log("[PROVIDER REGISTRY] NetworkDataSub registered (credentials loaded from DB at call time)");
   }
 
   register(provider: VTUProvider) {
